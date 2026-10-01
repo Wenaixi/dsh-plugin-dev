@@ -1,93 +1,104 @@
-# 插件形态与生命周期
+# 插件解剖学 (Plugin Anatomy)
 
-## 插件是什么
+在 DeepSeek Harness (DSH) 中，一切能力皆为插件。Cordis 插件是一等公民对象，通过声明依赖（`inject`）、提供或消费服务、监听或分发事件，向运行上下文注入功能。
 
-DSH 中插件是一个导出 apply 函数的 TypeScript 模块。框架加载时调用 apply(ctx)，插件经 ctx 注册自己贡献的一切。不存在需要打补丁的特权内核：扩展 DSH 的方式是把插件挂载到其他插件旁边，各项注册都是副作用，随插件卸载撤销。
+## 两种主要插件形态
 
-## 三种形态
+### 1. 函数插件 (Function Plugin)
+
+适用于大多数无状态扩展、工具注册、事件拦截或轻量业务集成：
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
+import Schema from '@deepseek-ai/schemastery'
 
-// 1. 函数形态（最常见）
-export const name = 'my-plugin'
+// 1. 显式插件标识（必须与导出同名）
+export const name = 'my-greeting-plugin'
+
+// 2. 静态依赖声明（确保服务已就绪）
 export const inject = ['tools']
-export function apply(ctx: Context) { /* ... */ }
 
-// 2. 对象形态
-export default {
-  name: 'my-plugin',
-  inject: ['tools'],
-  apply(ctx: Context) { /* ... */ },
+// 3. 强类型配置定义与 Schema 校验
+export interface Config {
+  prefix: string
+  repeat: number
 }
 
-// 3. 类形态：Service 子类，向其他插件提供服务时使用（见 services.md）
-import { Service } from '@deepseek-ai/cordis'
-export default class MyService extends Service {
-  static inject = ['tools']
-  constructor(ctx: Context) { super(ctx, 'myService') }
-}
-```
+export const Config: Schema<Config> = Schema.object({
+  prefix: Schema.string().default('Hello'),
+  repeat: Schema.number().default(1),
+})
 
-name 导出是可选的显示元数据。需要公开服务之前一直用函数形态。
-
-## Fiber 状态机
-
-每个被加载的插件拥有一个 Fiber 作用域：
-
-```
-PENDING → LOADING → ACTIVE
-              ↘ FAILED
-ACTIVE → UNLOADING → DISPOSED
-```
-
-| 状态 | 含义 |
-| --- | --- |
-| PENDING | 已声明，但所需依赖未就绪 |
-| LOADING | 依赖就绪，正在执行 apply |
-| ACTIVE | 插件运行中 |
-| FAILED | apply 抛出异常 |
-| UNLOADING | 正在卸载并释放资源 |
-| DISPOSED | 已完全卸载 |
-
-## 依赖驱动的加载
-
-声明了 inject 的插件会等待所有必需服务就绪才执行 apply。若依赖的服务消失（例如提供方被替换），插件自动卸载（ACTIVE → DISPOSED）；服务恢复后自动重新加载。
-
-## 自动清理机制
-
-通过 ctx 做的任何注册，在插件卸载时都会自动撤销：
-
-```ts
-export function apply(ctx: Context) {
-  ctx.on('some-event', handler)          // 事件监听：卸载时自动移除
-  ctx.tools.register(tool)               // 工具注册：卸载时自动注销
-  ctx.llm.registerAdapter(names, adapter) // 适配器注册：同样自动撤销
-  ctx.effect(() => {                     // 自定义资源：返回的 disposer 在卸载时执行
-    const connection = createConnection()
-    return () => connection.close()
+// 4. 应用入口函数
+export function apply(ctx: Context, config: Config) {
+  // apply 在所有 inject 声明的服务就绪后同步执行
+  ctx.tools.register({
+    name: 'greet',
+    description: 'Output a customized greeting',
+    parameters: { name: { type: 'string', required: true } },
+    async execute(args) {
+      return `${config.prefix}, ${args.name}! `.repeat(config.repeat).trim()
+    },
   })
+
+  // 注册的副作用（事件监听器、工具等）受 ctx 作用域管理，卸载时自动回滚
 }
 ```
 
-处置器按注册顺序的**逆序**开始调用；多个异步处置器并发执行、不保证逐个完成。存在顺序依赖的清理步骤必须放进同一个 ctx.effect() 返回的处置器中，由它负责串行等待。
+### 2. 服务类插件 (Service Class Plugin)
 
-## 嵌套上下文
-
-ctx.plugin(childPlugin) 创建子 Fiber：继承父上下文、拥有独立生命周期，随父插件卸载。
+适用于管理长生命周期资源、对外公开专属服务方法、或维护复杂运行时状态的场景：
 
 ```ts
-const fiber = ctx.plugin(myPlugin)   // 子 Fiber
-await fiber.dispose()                // 手动提前终止
+import { Service, type Context } from '@deepseek-ai/cordis'
+import Schema from '@deepseek-ai/schemastery'
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    taskQueue: TaskQueueService
+  }
+}
+
+export interface TaskQueueConfig {
+  concurrency: number
+}
+
+export class TaskQueueService extends Service {
+  static inject = ['sessions']
+  static Config: Schema<TaskQueueConfig> = Schema.object({
+    concurrency: Schema.number().default(5),
+  })
+
+  private runningCount = 0
+
+  constructor(ctx: Context, public config: TaskQueueConfig) {
+    // 注册服务名 'taskQueue'，true 表示全局单例/立即生效
+    super(ctx, 'taskQueue', true)
+  }
+
+  protected override start(): void | Promise<void> {
+    // 异步初始化连接或启动工作线程
+  }
+
+  protected override stop(): void | Promise<void> {
+    // 优雅停机、释放连接池或未完成任务
+  }
+
+  public enqueue(task: () => Promise<void>) {
+    // 公开的业务能力
+  }
+}
+
+export const name = 'task-queue-service'
+
+export function apply(ctx: Context, config: TaskQueueConfig) {
+  ctx.plugin(TaskQueueService, config)
+}
 ```
 
-dispose 保证：该插件拥有的所有注册被移除；其子插件被递归卸载；返回的 Promise 在所有异步清理完成后兑现。
+## 插件标准要素解剖
 
-## 失败行为
-
-- apply 抛出异常 → 进程因该错误终止。插件加载失败会明确报错，不会仅跳过该配置项。
-- 配置项的模块无法解析（路径或包名拼写错误）→ Cordis 通过 logger 服务报告错误，进程不崩溃；启动早期这条报告可能丢失。新增配置项似乎没有效果时，先检查拼写。
-
-## HMR（热模块替换）
-
-通过 cordis.yml 加载 @deepseek-ai/cordis-plugin-hmr 后，修改插件源文件会触发：卸载旧插件（清理所有注册）→ 重新加载新代码 → 执行新的 apply。修改 cordis.yml 中某插件的 config 同样触发热替换。因为注册都被自动清理，热替换后不会保留旧实例的注册。
+1. **`name` (唯一标识)**：每个插件模块必须导出小写连字符命名的字符串 `name`，供 Cordis 跟踪生命周期与日志排查。
+2. **`inject` (依赖拓扑)**：声明运行所需的硬性或软性服务。列表位置不决定执行顺序，依赖关系才决定执行拓扑。
+3. **`Config` 与 `Schema`**：导出 TypeScript 类型与运行时校验器，提供安全类型约束与默认值兜底。
+4. **可逆副作用 (Reversible Effects)**：所有注册（工具、事件监听、中间件、服务）均受 Fiber 跟踪，卸载插件时自动逆向注销，零内存泄漏。

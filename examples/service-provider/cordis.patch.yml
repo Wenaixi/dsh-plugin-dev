@@ -1,0 +1,4 @@
+# dsh-service-provider — 服务提供方与消费方演示层
+- insert:
+    - id: service-provider
+      name: dsh-service-provider

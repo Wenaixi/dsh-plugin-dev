@@ -1,0 +1,4 @@
+# dsh-event-interceptor — 工具拦截与审计中间件演示层
+- insert:
+    - id: event-interceptor
+      name: dsh-event-interceptor

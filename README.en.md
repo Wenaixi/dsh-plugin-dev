@@ -27,9 +27,12 @@ dsh-plugin-dev/
 ├── SKILL.md      # entry point: frontmatter, 8 hard rules, 6 scenario workflows,
 │                 # decision tables, and a pre-completion checklist
 ├── references/   # 12 detailed standards, loaded on demand (index: references/README.md)
-├── examples/     # two minimal, copy-and-run example plugins
+├── examples/     # five copy-and-run official spec example plugins (lifecycle, tools, services, event pipeline, configuration)
 │   ├── hello-plugin/
-│   └── greet-tool/
+│   ├── greet-tool/
+│   ├── service-provider/
+│   ├── event-interceptor/
+│   └── configurable-plugin/
 └── evals/        # trigger-evaluation set and methodology for the description
 ```
 

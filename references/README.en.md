@@ -1,27 +1,25 @@
-# References
+# DSH Plugin Development Technical Reference Catalog
 
-<p align="center">
-  <samp>
-    <strong>English</strong> ·
-    <a href="./README.md">中文</a>
-  </samp>
-</p>
+This directory contains the authoritative technical specifications, API contracts, and architectural designs for developing plugins in DeepSeek Harness (DSH 0.2.0-rc.2). All documents are calibrated against the latest official specifications and production code.
 
-This directory is the skill's progressive-disclosure detail library: SKILL.md keeps only the hard rules, scenario workflows and checklists, while the concrete standards load on demand from these 12 files. Read just the file for the topic you're working on.
+## Architecture & Documents Index
 
-| File | Covers | Read it when |
-| --- | --- | --- |
-| [plugin-anatomy.md](./plugin-anatomy.md) | Plugin shapes, lifecycle, Fiber state machine, auto-cleanup, HMR | writing/modifying plugins or handling lifecycle/HMR |
-| [services.md](./services.md) | Defining/consuming services, inject, isolation | defining or consuming services, injecting deps |
-| [events.md](./events.md) | Five dispatch modes, naming, persistent-session-event distinction | using events for communication/extension points |
-| [config.md](./config.md) | Plugin config and cordis.yml rows | making a plugin configurable |
-| [context-api.md](./context-api.md) | Context API, Fiber class, registry, inherited framework API | using scopes, the service store, or Fiber API |
-| [three-roles.md](./three-roles.md) | Three-role capability design | splitting a swappable capability |
-| [tools.md](./tools.md) | Complete tool-development contract | developing a model-facing tool |
-| [llm-adapter.md](./llm-adapter.md) | LLM adapter protocol | adding a model provider |
-| [plugin-forms.md](./plugin-forms.md) | Four extension forms + feature→mechanism map | writing hook/UI/protocol-bridge plugins |
-| [packaging.md](./packaging.md) | Packaging, install, layer order | packaging/installing a plugin |
-| [workspace-package.md](./workspace-package.md) | In-monorepo package checklist & naming | adding a package in the monorepo |
-| [seams.md](./seams.md) | Capability-seam catalog, architecture map | looking up built-in services/placement |
+### 1. Microkernel & Core Spine
+- [plugin-anatomy.md](./plugin-anatomy.md): Anatomy of plugins: Function plugins vs. Service class plugins, `name` identification, and `inject` dependencies.
+- [services.md](./services.md): The core service spine (`ctx.sessions`, `ctx.tools`, `ctx.agents`, `ctx.llm`, `ctx.systemPrompt`, etc.), service lifecycle, and TypeScript declaration merging.
+- [context-api.md](./context-api.md): Cordis Context tree, `ctx.plugin` mounting, `ctx.effect` reversible side effects, and `@deepseek-ai/dsh-scope` isolation.
+- [seams.md](./seams.md): Pluggable seams architecture: Service Definition, Provider, and Consumer decoupling.
 
-Authoritative source is the DeepSeek Harness documentation site (2026-08 snapshot); where it disagrees with generated references, the generated references win.
+### 2. Configuration & Patch System
+- [config.md](./config.md): Schemastery strong typing, `cordis.patch.yml` authoritative target, wholesale replacement semantics, and deprecation of `settings.yaml`.
+- [plugin-forms.md](./plugin-forms.md): Settings forms and configuration editor, entry ID addressing, form descriptors, optimistic concurrency revisions, and atomic persistence.
+
+### 3. Event Bus & Execution Pipeline
+- [events.md](./events.md): The 5 Cordis dispatch modes (`emit`, `waterfall`, `parallel`, `serial`, `bail`) and DSH core event taxonomy.
+- [tools.md](./tools.md): `ToolRuntime` management, `defineTool` DSL, PTC mode (`presentAs`), monotonic security guards (`guard`), and multimodal `ContentBlock` rendering.
+- [llm-adapter.md](./llm-adapter.md): Custom LLM adapter implementation, `LlmRuntime.registerAdapter`, `StreamChunk` protocol, and disjoint token accounting rules.
+
+### 4. Packaging, Workspace & Architecture Roles
+- [packaging.md](./packaging.md): Bundles vs. Profiles, `package.json` manifests, and the complete `dsh plugin add` workflow.
+- [workspace-package.md](./workspace-package.md): Monorepo multi-package workflow, pnpm workspace development, linking, and live HMR.
+- [three-roles.md](./three-roles.md): Browser / Host / Worker physical isolation, Dual-Face plugin standards, SlotRegistry UI injection, and dual-channel IPC networks.

@@ -1,4 +1,4 @@
-# dsh-plugin-dev
+# DeepSeek Harness (DSH) 插件开发权威指南
 
 <p align="center">
   <samp>
@@ -7,121 +7,92 @@
   </samp>
 </p>
 
-<p align="center">
-  <img src="https://img.shields.io/github/repo-size/zimodzh/dsh-plugin-dev-skills?style=flat-square" alt="repo size" />
-  <img src="https://img.shields.io/github/last-commit/zimodzh/dsh-plugin-dev-skills?style=flat-square" alt="last commit" />
-  <img src="https://img.shields.io/github/license/zimodzh/dsh-plugin-dev-skills?style=flat-square" alt="MIT license" />
-  <img src="https://img.shields.io/badge/Agent_Skills-compliant-4D6BFE?style=flat-square" alt="Agent Skills compliant" />
-</p>
+本项目是开发、审查、调试 **DeepSeek Harness (DSH 0.2.0-rc.2)** 插件与生态扩展的标准与权威参考知识库（Agent Skill）。
 
-一套遵循 [Agent Skills 规范](https://agentskills.io) 的技能，用于开发 [**DeepSeek Harness（DSH）**](https://github.com/deepseek-ai/deepseek-harness) 插件。
+DSH 是基于 Cordis 微内核构建的高可扩展 Agent Harness。在 DSH 架构中，**一切皆为插件 (Everything is a Plugin)**：会话日志、工具注册表、系统提示词装配、模型适配器、UI 界面以及执行循环驱动器均作为平等、可插拔的插件运行。
 
-DSH 是一个插件化的 Agent Harness SDK：模型适配器、工具注册表、会话日志、甚至 agent loop 本身，全都是可以从配置里替换的 Cordis 插件。本技能把[官方文档](https://deepseek-harness.github.io/deepseek-harness/guide/quickstart)里散落在教程、参考手册与生成目录中的约定，收敛成一套可执行的标准——任何加载了它的 agent，都能用同一种方式开发 DSH 插件。
+---
 
-> **注意：** 本技能为社区维护项目，与 DeepSeek 官方无隶属关系，亦未获官方背书。
+## 一、核心架构原则
 
-## 技能里有什么
+1. **零特权微内核**：系统不存在需要特殊侵入的固化内核。所有业务与平台能力均通过向共享 `Context` 注入服务或监听事件提供。
+2. **核心服务大动脉 (The Core Spine)**：
+   - `ctx.sessions` (`@deepseek-ai/dsh-session`)：仅追加事件日志与唯一真源。
+   - `ctx.systemPrompt` (`@deepseek-ai/dsh-system-prompt`)：提示词装配与工具 Schema 生成。
+   - `ctx.tools` (`@deepseek-ai/dsh-tools`)：工具注册表、单调安全守卫、PTC 模式与多模态渲染。
+   - `ctx.agents` (`@deepseek-ai/dsh-agent`)：活跃 Agent 句柄注册表与发起者作用域。
+   - `ctx.agentLoop` (`@deepseek-ai/dsh-agent-loop`)：实现 `AgentFactory` 的默认执行驱动器。
+   - `ctx.llm` (`@deepseek-ai/dsh-llm`)：提供方无关消息流式协议与适配器注册。
+   - `ctx.settings` (`@deepseek-ai/dsh-settings`)：配置表单描述符与补丁持久化服务。
+3. **五大事件派发模式 (Dispatch Modes)**：
+   - `emit`：同步广播通知，无返回值；
+   - `waterfall`：同步串行链式加工，返回最终加工数据；
+   - `parallel`：`Promise.all` 异步并发等待，返回结果数组；
+   - `serial`：按序 `await` 异步串行等待，返回结果数组；
+   - `bail`：异步短路阻断，首个非 `undefined` 返回值立即终止流程。
+4. **配置落点与全量替换规约**：
+   - **废弃警告**：`$DSH_HOME/settings.yaml` 已完全废弃，修改无效。
+   - **唯一落点**：用户与插件配置落点为 `$DSH_HOME/profiles/<profile>/cordis.patch.yml`。
+   - **全量替换 (Wholesale Replacement)**：Patch 中的 `config` 覆盖为整体替换，不做深合并。修改已有条目必须提供完整的配置字段。
+5. **可逆副作用 (Reversible Effects)**：所有通过 `ctx.on()`、`ctx.effect()`、`ctx.tools.register()` 注册的资源均由所属 Fiber 跟踪，在插件停用或热重载时自动逆向注销。
 
-```
-dsh-plugin-dev/
-├── SKILL.md      # 入口：frontmatter、8 条硬规则、6 个场景工作流、决策速查表、完成前检查清单
-├── references/   # 12 份详细标准，按需加载；索引见 references/README.md
-├── examples/     # 五个可复制、可运行的官方规范实战示例（涵盖生命周期、工具、服务、事件流水线、配置校验）
-│   ├── hello-plugin/
-│   ├── greet-tool/
-│   ├── service-provider/
-│   ├── event-interceptor/
-│   └── configurable-plugin/
-└── evals/        # description 的触发评测集与评测方法
-```
+---
 
-references 覆盖：插件形态与生命周期 · 服务与依赖注入 · 五种事件分发模式 · 插件配置 · 上下文/Fiber/注册表 API · 三种角色能力设计（Definition/Provider/Consumer）· 工具开发 · LLM 适配器协议 · 插件形态扩展（工具/钩子/UI/协议桥）· 打包与安装 · 仓库内 workspace 包 · 完整能力 seam 目录。
+## 二、三角色物理架构模型
 
-## 目录结构
+DSH 实现了严格的物理进程与职责隔离：
 
-```
-dsh-plugin-dev/
-├── SKILL.md                        # 技能入口：frontmatter、8 条硬规则、6 个场景工作流、检查清单
-├── LICENSE                         # MIT 许可证
-├── README.md / README.en.md        # 本说明（中文主 / 英文附）
-├── references/                     # 12 份详细标准（渐进式披露，按需加载）
-│   ├── README.md / README.en.md    #   目录索引：文件｜内容｜何时读
-│   ├── plugin-anatomy.md           #   插件形态、生命周期、Fiber、自动清理、HMR
-│   ├── services.md                 #   服务定义/提供/消费、inject、隔离
-│   ├── events.md                   #   五种事件分发模式、命名
-│   ├── config.md                   #   插件配置与 cordis.yml 行
-│   ├── context-api.md              #   上下文 API、Fiber 类、注册表、继承的框架 API
-│   ├── three-roles.md              #   能力三种角色（seam）设计
-│   ├── tools.md                    #   工具开发完整约定
-│   ├── llm-adapter.md              #   LLM 适配器协议
-│   ├── plugin-forms.md             #   四种扩展形态 + 功能→机制映射
-│   ├── packaging.md                #   打包、安装与层序
-│   ├── workspace-package.md        #   monorepo 内新建包的清单与命名
-│   └── seams.md                    #   核心 seam 与能力服务全表、架构映射
-├── examples/                       # 可复制、可运行的最小示例
-│   ├── README.md / README.en.md    #   示例索引
-│   ├── hello-plugin/               #   最小插件（生命周期 / 自动清理）
-│   │   ├── README.md / README.en.md
-│   │   ├── index.js
-│   │   ├── package.json
-│   │   └── cordis.patch.yml
-│   └── greet-tool/                 #   最小模型工具（defineTool）
-│       ├── README.md / README.en.md
-│       ├── index.js
-│       ├── package.json
-│       └── cordis.patch.yml
-└── evals/                          # description 触发评测集
-    ├── README.md / README.en.md    #   评测方法（训练/验证集划分）
-    └── trigger-queries.json        #   12 正例 + 9 负例
-```
+| 角色 | 运行环境 | 核心职责 | 安全与隔离机制 |
+| --- | --- | --- | --- |
+| **Browser** | 浏览器 / Desktop Webview | React 18 界面、浏览器端 Cordis 运行时、SlotRegistry 插槽、本地多语言 | 零本地文件系统与系统调用权限，通过 HTTP RPC 与 WebSocket 交互 |
+| **Host** | 常驻 Node.js 进程 | 运行核心 Cordis 大动脉服务、工具执行管线、会话日志持久化、Web 静态服务 | 具备宿主系统权限，管理敏感凭据与单调安全守卫 |
+| **Worker** | 独立子进程 (Native Runner) | 执行高风险外部命令（PowerShell、Bash）、隔离沙箱脚本与重计算任务 | Windows Job Object 隔离 Token 或 Linux cgroup 限制，崩溃不影响 Host |
 
-## 安装
+对于涉及 Web UI 的插件，必须遵循**双面插件 (Dual-Face)** 规范：Node 端提供 `lib/index.js`（供 Loader 条目树识别），Browser 端提供 `lib/client.js`（通过 `dsh.client` 声明并由 SlotRegistry 挂载）。
 
-技能名为 `dsh-plugin-dev`，Agent Skills 规范要求所在文件夹同名；本仓库名为 `dsh-plugin-dev-skills`。克隆时直接指定目标文件夹名即可一步到位：
+---
+
+## 三、技术参考文档索引 (References)
+
+| 文档分类 | 章节链接 | 核心内容概述 |
+| --- | --- | --- |
+| **微内核与服务** | [plugin-anatomy.md](./references/plugin-anatomy.md) | 函数插件与 Service 类插件解剖、`name`、`inject` 与生命周期 |
+| | [services.md](./references/services.md) | 核心大动脉服务矩阵、依赖拓扑解析与 TypeScript 类型合并声明 |
+| | [context-api.md](./references/context-api.md) | Cordis 上下文树、`ctx.plugin`、`ctx.effect` 与作用域库 |
+| | [seams.md](./references/seams.md) | 八大能力切面全表映射、依赖倒置法则与可替换设计 |
+| **配置与表单** | [config.md](./references/config.md) | Schemastery 校验、`cordis.patch.yml` 补丁语法与全量替换语义 |
+| | [plugin-forms.md](./references/plugin-forms.md) | 设置表单投影、条目 ID 寻址、乐观版本控制与原子持久化 |
+| **事件与管线** | [events.md](./references/events.md) | 五大事件派发模式对比矩阵与 DSH 核心生命周期事件清单 |
+| | [tools.md](./references/tools.md) | `ToolRuntime` 管理、`defineTool` DSL、单调守卫与 PTC 投影 |
+| | [llm-adapter.md](./references/llm-adapter.md) | LLM 适配器接入、`StreamChunk` 协议与互斥 Token 计量准则 |
+| **工程与架构** | [packaging.md](./references/packaging.md) | Bundle 与 Profile 规范、`package.json` 清单与安装流 |
+| | [workspace-package.md](./references/workspace-package.md) | Monorepo 多包工作区联调、本地相对路径安装与实时 HMR |
+| | [three-roles.md](./references/three-roles.md) | Browser/Host/Worker 三角色隔离、双面 UI 插件与 IPC 网络 |
+
+---
+
+## 四、实战示例库 (Examples)
+
+技能内置了 5 个即装即用的标准示例工程：
+- [examples/greet-tool/](./examples/greet-tool/)：基于 `defineTool` 的最小模型工具插件。
+- [examples/hello-plugin/](./examples/hello-plugin/)：基于 `ctx.effect` 的最小生命周期扩展插件。
+- [examples/service-provider/](./examples/service-provider/)：自定义 Service 基类与跨插件服务注入示例。
+- [examples/event-interceptor/](./examples/event-interceptor/)：基于 `ctx.tools.guard` 的单调安全守卫与审计插件。
+- [examples/configurable-plugin/](./examples/configurable-plugin/)：基于 Schemastery 的强类型配置与校验插件。
+
+---
+
+## 五、快速开始
+
+安装并激活插件至 DSH 运行环境中：
 
 ```bash
-git clone https://github.com/zimodzh/dsh-plugin-dev-skills.git ~/.claude/skills/dsh-plugin-dev
+# 1. 向默认 web profile 添加插件组合包
+dsh plugin add ./path/to/my-plugin
+
+# 2. 导出并验证合并后的完整配置树
+dsh --profile web --dump-config
+
+# 3. 启动 DSH Web 实例
+dsh web
 ```
-
-把目标目录换成你所用 agent 的对应路径（见下表）；也可以下载 release 压缩包，解压后把文件夹改名为 `dsh-plugin-dev`。
-
-无需构建、无需脚本依赖、无需任何配置——以上说的是技能本身。实际开发 DSH 插件则需要一个可用的 DSH 环境：Node.js、pnpm，以及示例中用到的 `dsh`。
-
-| Agent | 项目级 | 用户级 |
-| --- | --- | --- |
-| DeepSeek Harness | `<project>/.dsh/skills/`（rank 100）或 `<project>/.agents/skills/`（rank 200） | `~/.dsh/skills/`（rank 400） |
-| Claude Code | `<project>/.claude/skills/` | `~/.claude/skills/` |
-| Codex | `<project>/.codex/skills/` | `~/.codex/skills/` |
-| VS Code Copilot | `<project>/.agents/skills/` | `~/.agents/skills/` |
-| 其它兼容 agent | 按该 agent 的技能目录约定 | 同上 |
-
-验证：向 agent 提问"开发一个 DSH 插件 / 写一个 DSH 工具"，技能应被触发；在 DSH 里也可以直接用 `skill(dsh-plugin-dev)` 工具加载确认。
-
-## 版本对应
-
-内容蒸馏自 [DeepSeek Harness 官方文档站](https://deepseek-harness.github.io/deepseek-harness/guide/quickstart)（2026-08 快照），并遵循官方「接口以生成参考为准」的原则：技能内容与仓库生成参考不一致时，**以生成参考为准**。发现偏差欢迎[提 issue 或 PR](https://github.com/zimodzh/dsh-plugin-dev-skills/issues)。
-
-## 触发评测
-
-[`evals/trigger-queries.json`](evals/trigger-queries.json) 是 description 的回归评测集（12 条正例 + 9 条负例）。修改 description 前请先跑评测并记录通过率；方法论（含训练/验证集划分、防过拟合）见 [`evals/README.md`](evals/README.md)。
-
-## 示例
-
-- `examples/hello-plugin` —— 最小插件（bundle 格式）：`dsh plugin --profile demo add ./examples/hello-plugin` 后 `dsh --profile demo` 启动，应看到加载日志和每 5 秒一次的心跳，卸载时自动清理。
-- `examples/greet-tool` —— 最小模型工具：安装后对 agent 说 "Use the greet tool to greet Ada."，应收到 "Hello, Ada!"。
-
-完整步骤见 [examples/README.md](examples/README.md)。
-
-## 范围边界
-
-覆盖**仓库内、文件式**的 DSH 插件开发：插件包、cordis.yml 行、patch overlay、工具、适配器、组合包、profile、仓库内 workspace 包。不覆盖会话内动态插件（`cordis_define`/`cordis_run` 流）与 agent preset 组合编辑——这两类由各部署的专项技能或官方工具负责。
-
-## 维护与贡献
-
-- 更新任何 references 前，先核对[官方文档](https://deepseek-harness.github.io/deepseek-harness/guide/quickstart)对应页面（文档站或源码生成区块），并在 PR 中注明来源。
-- 遵守 Agent Skills 约束：name 为 kebab-case 且与目录一致；description ≤ 1024 字符（DSH 目录注入提醒默认 500）；正文渐进式披露。
-- 欢迎 PR：修正、更多示例、扩充评测集、其它语言版本。
-
-## License
-
-MIT——见 [LICENSE](LICENSE)。

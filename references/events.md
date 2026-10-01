@@ -1,122 +1,99 @@
-# 事件系统
+# 事件系统与派发模式
 
-事件是 Cordis 插件间通信的核心机制。Harness 大量使用事件来实现松耦合的扩展点。事件监听器也是效果：通过 ctx.on() 注册的监听器归当前 fiber 所有，在插件卸载时自动移除。
+事件是 Cordis 插件间解耦通信的核心机制。DeepSeek Harness (DSH) 大量使用事件来实现可拔插扩展点、流程拦截与状态感知。通过 `ctx.on()` 注册的所有事件监听器均受所属 Fiber 作用域管理，在插件卸载时自动注销（可逆效果）。
 
-## 基本用法
+## 五大事件派发模式 (Dispatch Modes)
 
-```ts
-ctx.on('event-name', (payload) => { /* 处理事件 */ })
-ctx.emit('event-name', payload)
-```
+Cordis 规定：每个事件必须有明确的派发模式，且只能由其对应的方法派发。理解这五种模式是编写高内聚、正确插件的关键：
 
-ctx.on(name, listener, options?) 返回一个用于移除监听器的 disposer；options 可为布尔值（prepend 简写）或 EventOptions：
+| 派发模式 | 派发方法 | 是否等待 (Awaited) | 执行顺序与调度 | 返回值规范 | 典型应用场景 |
+| --- | --- | --- | --- | --- | --- |
+| **emit** | `ctx.emit(name, ...args)` | 否（同步） | 按注册顺序依次调用监听器 | 无返回值 (`void`) | 状态通知、指标采集、日志记录、UI 广播 |
+| **waterfall** | `ctx.waterfall(name, ...args)` | 否（同步） | 按注册顺序串行链式传递，后一个监听器接收前一个的返回值 | 返回最终加工的值 | 提示词前缀组装、配置数据加工、请求参数规范化 |
+| **parallel** | `ctx.parallel(name, ...args)` | 是 (`Promise.all`) | 异步并发执行所有监听器 | 返回全部结果数组 (`Promise<T[]>`) | 批量清理、多渠道并发通知、独立数据校验 |
+| **serial** | `ctx.serial(name, ...args)` | 是 (`await` 循环) | 按注册顺序依次等待每个监听器执行完毕 | 返回全部结果数组 (`Promise<T[]>`) | 顺序迁移、需严格依赖前序步骤的初始化 |
+| **bail** | `ctx.bail(name, ...args)` | 是 (短路阻断) | 按注册顺序依次执行，一旦某监听器返回非 `undefined` 立即终止并返回 | 返回首个非空阻断值 (`Promise<T | undefined>`) | 权限阻断卫士、错误拦截恢复、工具调用拦截 |
 
-```ts
-interface EventOptions {
-  prepend?: boolean   // 插到同事件既有监听器之前
-  global?: boolean    // 无视上下文过滤器检查仍接收该事件
-}
-```
+## 监听器注册与选项
 
-ctx.once(name, listener, options?) 与 on 相同，但监听器首次调用后自行注销。
-
-## 五种分发模式
-
-| 模式 | 语义 | 何时用 |
-| --- | --- | --- |
-| emit | 同步广播：同步运行所有监听器、不等待、返回值被忽略 | 通知型事件（状态变更、日志） |
-| parallel | 并发执行所有监听器，Promise 在全部 settle 后兑现 | 无顺序要求的异步通知 |
-| bail | 同步短路：按顺序调用，第一个非 null/false/undefined 的返回值成为结果 | 拦截检查（权限、校验） |
-| serial | 顺序执行并依次等待异步监听器，直到一个提前终止（bail 值） | 有序初始化/阶段流程 |
-| waterfall | 流水线：每个监听器包装下游返回值形成处理链；**必须调用 next()** | 转换、组装、可插拔策略 |
-
-DispatchMode = 'emit' | 'parallel' | 'serial' | 'bail' | 'waterfall'。事件声明及其分发模式由各子系统页面生成。
-
-### emit / parallel — 广播
-
-```ts
-ctx.emit('my-plugin/ready', { id: 'worker-1' })        // 同步，不等待
-await ctx.parallel('my-plugin/ready', { id: 'worker-1' })  // 并发并等待全部完成
-ctx.on('my-plugin/ready', ({ id }) => console.log(id + ' is ready'))
-```
-
-### bail — 短路
-
-```ts
-const result = ctx.bail('some-check', input)
-ctx.on('some-check', (input) => {
-  if (shouldBlock(input)) return 'blocked'   // 非空返回 → 短路并成为结果
-  // 返回 null / false / undefined → 继续下一个监听器
-})
-```
-
-### serial — 顺序执行
-
-```ts
-await ctx.serial('setup-phase', context)
-```
-
-### waterfall — 流水线（关键规则）
-
-```ts
-const output = await ctx.waterfall('my-plugin/transform', input, async () => input)
-
-ctx.on('my-plugin/transform', async (_input, next) => {
-  const downstream = await next()   // next() 是强制的
-  return downstream.trim()
-})
-```
-
-**waterfall 监听器必须调用 next()。** 不调用会否决整个下游——这是故意的设计，用于拦截/网关逻辑；否则必须调用并把结果返回。
-
-## 类型安全的事件
-
-用 TypeScript 声明合并给事件提供类型：
-
-```ts
-declare module '@deepseek-ai/cordis' {
-  interface Events {
-    'my-plugin/ready': (payload: { id: string }) => void
-    'my-plugin/check': (input: string) => boolean | undefined
-    'my-plugin/transform': (input: string, next: () => Promise<string>) => Promise<string>
-  }
-}
-// 之后 ctx.on / ctx.emit / ctx.parallel / ctx.serial / ctx.bail / ctx.waterfall 都能正确推导
-```
-
-## 事件命名
-
-Harness 的 Cordis 事件遵循 namespace/action 命名，例如 agent/step、agent/request、agent/request-error、tools/result、session/event。完整签名与触发模式见子系统页面生成的 cordis-surface 区块（以生成为准）。
-
-## Cordis 事件 vs 持久会话事件
-
-- turn/*、step/*、tool/call、tool/result、compaction/* 是**持久化的会话事件**类型，不是同名 Cordis 事件。
-- 需要观察它们时，监听 session/event 并检查 event.type，而不是 ctx.on('tool/result')。
-
-```ts
-ctx.on('session/event', (event) => {
-  if (event.type === 'tool/result') { /* ... */ }
-})
-```
-
-## 示例：日志插件
+### 1. 基础监听与销毁器
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
-import '@deepseek-ai/dsh-tools'
 
-export const name = 'tool-logger'
 export function apply(ctx: Context) {
-  ctx.on('tools/result', (exec, result) => {
-    console.log('[tool] ' + exec.name + ' ' + JSON.stringify(exec.arguments))
-    const text = result.content
-      .map(block => block.type === 'text' ? block.text : '')
-      .join('')
-    console.log('[tool result] ' + text.slice(0, 100))
+  // 注册监听器，返回对应的注销函数 (Disposer)
+  const dispose = ctx.on('custom-event', (data) => {
+    console.log('Received:', data)
   })
+
+  // 单次监听
+  ctx.once('one-time-event', () => {
+    console.log('Fired once and auto-disposed')
+  })
+
+  // 当插件卸载时，ctx 范围内的监听器会自动注销，无需手动调用 dispose()
 }
 ```
 
-## 框架继承事件
+### 2. EventOptions 控制
 
-除 harness 自有事件外，每个插件还能看到框架层事件：internal/plugin、internal/status、internal/service、internal/update（waterfall，fiber 配置更新）、internal/get、internal/set、internal/listener、internal/dispatch、hmr/change、hmr/reload、exit、loader/config-update、loader/entry-init、loader/partial-dispose、loader/patch-context。完整清单与签名见 Inherited Cordis API 页。
+`ctx.on(name, listener, options?)` 支持传入配置项控制监听优先级与作用域：
+
+```ts
+interface EventOptions {
+  prepend?: boolean   // 插到同事件既有监听器队列的最前面（高优先级）
+  global?: boolean    // 忽视上下文作用域过滤器，强制全局接收该事件
+}
+
+// 示例：高优先级优先拦截
+ctx.on('tools/pre-execute', async (call) => {
+  // 率先执行拦截逻辑
+}, { prepend: true })
+```
+
+## DSH 官方核心事件清单
+
+DSH 核心子系统定义了以下标准事件，插件可通过监听这些事件参与运行循环：
+
+### 1. 生命周期事件 (Lifecycle)
+- `ready`: 所有初始插件和服务加载就绪后触发（`emit`）。
+- `dispose`: 当前上下文或插件即将被卸载时触发（`emit`）。
+- `before-apply`: 插件应用前触发。
+- `app-boot/config-reload`: HMR 配置热重载完成并稳定后广播（`emit`）。
+
+### 2. Agent 执行循环事件 (Agent & Turn)
+- `agent/turn-start`: 轮次开始，接收当前 `TurnContext` 与会话信息。
+- `agent/turn-end`: 轮次正常完成，可用于持久化确认或统计耗时。
+- `agent/step-start`: 单步执行开始（包括模型调用与工具调用准备）。
+- `agent/step-end`: 单步执行结束。
+- `agent/request-error`: LLM 请求失败时触发的阻断拦截点（`bail` 模式）。监听器在修复或等待后返回 `{ kind: 'retry' }`，可触发安全重试而不使会话崩溃。
+
+### 3. 工具执行管线事件 (Tools Pipeline)
+- `tools/pre-execute`: 工具调用参数解析完成、即将执行前的流水线（`waterfall` / `bail`）。可用于参数改写或前置鉴权阻断。
+- `tools/execute`: 实际工具调度执行。
+- `tools/post-execute`: 工具执行成功后触发，接收执行结果与上下文。
+
+## 类型化事件扩展 (Declaration Merging)
+
+为自定义插件事件提供强类型提示，需在模块中对 `@deepseek-ai/cordis` 的 `Events` 接口进行声明合并：
+
+```ts
+export interface GitCommitPayload {
+  hash: string
+  message: string
+  author: string
+}
+
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    // 声明为同步事件 (emit)
+    'git/commit'(payload: GitCommitPayload): void
+
+    // 声明为异步阻断事件 (bail)
+    'git/pre-commit'(payload: { stagedFiles: string[] }): boolean | Promise<boolean>
+  }
+}
+```
+
+合并后，调用 `ctx.on('git/commit', ...)` 或 `ctx.emit('git/commit', ...)` 时，TypeScript 将全程提供参数签名校验与补全。

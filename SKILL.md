@@ -1,139 +1,298 @@
 ---
 name: dsh-plugin-dev
-description: 开发 DeepSeek Harness (DSH) 插件的标准与权威参考：编写/修改/审查/调试 DSH/Cordis 插件、服务、事件、插件配置、模型工具、LLM 适配器、三种角色拆分、打包安装、workspace 包、cordis.yml 组合时使用；提到 DSH 插件、Cordis、plugin、服务、事件、工具、适配器即触发。 The authoritative standard for developing DeepSeek Harness (DSH) plugins — create, modify, review or debug DSH/Cordis plugins, services, events, config, model tools, LLM adapters, three-role capabilities, packaging, and cordis.yml composition.
+description: 开发 DeepSeek Harness (DSH) 插件的标准与权威参考：编写/修改/审查/调试 DSH/Cordis 插件、核心服务、事件系统、插件配置、模型工具、LLM 适配器、双面 UI 插件、三角色拆分、打包安装、workspace 多包工程、cordis.patch.yml 组合时使用；提到 DSH 插件、Cordis、plugin、服务、事件、工具、适配器即触发。 The authoritative standard for developing DeepSeek Harness (DSH) plugins — create, modify, review or debug DSH/Cordis plugins, services, events, config, model tools, LLM adapters, dual-face client-ui plugins, three-role architecture, packaging, and cordis.patch.yml composition.
 license: MIT
-compatibility: 适用于任何支持 Agent Skills 的 agent。内容面向 DeepSeek Harness 的 Cordis 插件生态（@deepseek-ai/* 包）。
+compatibility: 适用于任何支持 Agent Skills 规范的环境；代码遵循 ECMAScript 2022+ / TypeScript 5+；运行于 DSH 0.2.0-rc.2+ 生产基线。
 metadata:
-  author: Stardust
-  version: "1.2.0"
+  framework: cordis
+  target: deepseek-harness
+  baseline: 0.2.0-rc.2
 ---
 
-# 开发 DSH 插件标准
+# DSH 插件开发权威指南
 
-本技能是开发 DeepSeek Harness（DSH）插件的唯一标准：它把 DSH 官方文档中分散在教程、参考手册与生成目录里的约定，收敛为可执行的工作流、硬规则与检查清单。DSH 的一切都是插件——模型适配器、工具注册表、会话日志乃至 agent loop 本身——因此按本技能行事，就是在按 DSH 自己的架构方式扩展它。
+DeepSeek Harness (DSH) 是基于 Cordis 微内核构建的可拔插 Agent Harness。在 DSH 中，**一切皆为插件 (Everything is a Plugin)**：会话日志、工具注册表、提示词生成器、LLM 适配器、UI 界面以及执行循环本身均为可替换的插件。
 
-## 适用范围
+本文档是开发、审查、调试 DSH 插件的核心速查与操作指南。深入的类型定义与架构机理参见 `references/` 目录下的专项技术文档。
 
-- 仓库内、文件式的 DSH 插件开发：编写插件包、注册 cordis.yml 行、patch overlay、开发工具、接模型、打包安装。
-- DSH monorepo 内的 workspace 包开发（packages/<group>/<pkg>）也属本技能（references/workspace-package.md）。
-- 本技能**不**覆盖：会话内动态插件（cordis_define/cordis_run 流）与 agent preset 组合编辑——这两类由各部署的专项技能或官方工具覆盖。
+---
 
-## 硬规则（任何场景都必须遵守）
+## 核心架构原则速查
 
-1. **接口以生成参考为准。** 服务名、公开方法、事件签名、ctx 键均以仓库自动生成的子系统页面与 TypeScript 接口为准；不要凭服务名、示例或旧代码推断完整 API，也不要维护另一份静态清单。
-2. **所有贡献都是副作用。** 通过 ctx 做的一切注册（事件监听、工具、适配器、ctx.effect）在插件卸载时自动撤销；不要在模块作用域创建进程级/页面级副作用；不返回 disposer 的第三方订阅要主动查清清理机制。
-3. **waterfall 监听器必须调用 next()。** 不调用 next() 即有意短路下游（用于拦截/网关），不是可选项。
-4. **失败要响亮。** apply 抛异常则进程终止；配置校验失败则明确报错；schema 应表达自身完备的约束，不要在运行时悄悄吞掉错误。
-5. **必需依赖用 inject 声明，可选依赖用 ctx.get() 判空。** 不要用 inject 规避 undefined 检查；也不要直接访问未声明注入的 ctx.xxx——未声明的服务经服务解析器求值可能得到 undefined。
-6. **配置一律 Schemastery。** 导出 interface Config 与同名 Schema，默认值写在 schema 里；不导出普通对象充当 Config；凡不同部署可能改值的参数都必须进配置。
-7. **工具 execute 返回规范 JSON 值，不返回内容块。** 面向人类的文本放 output.render；部署策略/钩子不要内建进工具体。
-8. **模型可见即已记录。** 新增任何模型可见输入，都要落在会话日志可重建的机制里（新增持久事件或经 agent.inject()），并有运行时不变式断言。
+1. **零特权内核**：不存在固化的特权逻辑。所有能力通过向共享 `Context` 挂载服务或监听事件提供。
+2. **核心服务大动脉 (The Core Spine)**：
+   - `ctx.sessions` (`@deepseek-ai/dsh-session`)：仅追加事件日志与唯一真源（注意为复数）。
+   - `ctx.systemPrompt` (`@deepseek-ai/dsh-system-prompt`)：系统提示词组装与工具 Schema 生成。
+   - `ctx.tools` (`@deepseek-ai/dsh-tools`)：工具注册、单调守卫、PTC 投影与多模态渲染。
+   - `ctx.agents` (`@deepseek-ai/dsh-agent`)：活跃 Agent 注册表与发起者作用域（注意为复数）。
+   - `ctx.agentLoop` (`@deepseek-ai/dsh-agent-loop`)：实现 `AgentFactory` 的默认执行循环驱动器。
+   - `ctx.llm` (`@deepseek-ai/dsh-llm`)：提供方无关消息流式协议与适配器接入。
+   - `ctx.settings` (`@deepseek-ai/dsh-settings`)：配置表单与补丁持久化服务。
+3. **五大事件派发模式**：
+   - `emit`: 同步通知，无返回值；
+   - `waterfall`: 同步串行链式加工，返回最终结果；
+   - `parallel`: `Promise.all` 并发等待，返回结果数组；
+   - `serial`: 顺序 `await` 等待，返回结果数组；
+   - `bail`: 短路阻断，首个非 `undefined` 返回值立即终止后续监听。
+4. **配置落点与全量替换规约**：
+   - **废弃警告**：`$DSH_HOME/settings.yaml` 已完全废弃，修改无效。
+   - **唯一落点**：`$DSH_HOME/profiles/<profile>/cordis.patch.yml`。
+   - **全量替换 (Wholesale Replacement)**：对条目的 `config` 覆盖是整块替换，不做深合并。修改既有条目必须写全全部保留字段。
+5. **可逆副作用 (Reversible Effects)**：所有通过 `ctx.on()`、`ctx.effect()`、`ctx.tools.register()` 注册的资源受所属上下文生命周期管理，插件卸载时自动回滚。
 
-## 标准工作流
+---
 
-### 场景 A：新建一个插件
+## 场景速查与代码模板
 
-1. 确定插件要贡献什么（服务？工具？监听？），用 references/seams.md 的「新行为的归属位置」表选择机制。
-2. 创建 src/<name>.ts，导出 name、inject（可选）、apply(ctx, config?)。先写函数形态；要对外提供服务时再换 Service 类形态。
-3. 本地开发回路（源码 checkout）：
+### 场景 A：创建最小函数插件
 
-```bash
-mkdir -p scratch-plugin/src
+适用于无状态逻辑、事件监听与轻量扩展。
+
+```ts
+import type { Context } from '@deepseek-ai/cordis'
+import Schema from '@deepseek-ai/schemastery'
+
+export const name = 'my-minimal-plugin'
+export const inject = ['sessions']
+
+export interface Config {
+  verbose?: boolean
+}
+
+export const Config: Schema<Config> = Schema.object({
+  verbose: Schema.boolean().default(false),
+})
+
+export function apply(ctx: Context, config: Config) {
+  ctx.on('agent/turn-start', (turn) => {
+    if (config.verbose) {
+      console.log('Turn started for session:', turn.session.id)
+    }
+  })
+}
 ```
 
+详细规范参见 [references/plugin-anatomy.md](./references/plugin-anatomy.md)。
+
+---
+
+### 场景 B：开发面向模型的工具 (Tool)
+
+通过 `defineTool` 注册强类型工具，支持参数校验、单调安全守卫与多模态渲染。
+
+```ts
+import type { Context } from '@deepseek-ai/cordis'
+import { defineTool } from '@deepseek-ai/dsh-tools'
+
+export const name = 'my-calculator-tool'
+export const inject = ['tools']
+
+export function apply(ctx: Context) {
+  // 1. 注册工具
+  ctx.tools.register(defineTool({
+    name: 'calculate',
+    description: 'Perform a basic mathematical calculation.',
+    parameters: {
+      expression: {
+        type: 'string',
+        required: true,
+        description: 'Mathematical expression to evaluate',
+      },
+    },
+    output: {
+      schema: { type: 'number' },
+      render: (_args, value) => [
+        { type: 'text', text: `Result: ${value}` }
+      ],
+    },
+    async execute(args) {
+      // 执行计算逻辑
+      return Number(eval(args.expression))
+    },
+  }))
+
+  // 2. 注册安全把关守卫（单调安全法则：任何守卫返回 string 均阻断）
+  ctx.tools.guard((call) => {
+    if (call.toolName === 'calculate' && call.args.expression.includes('process')) {
+      return 'Security violation: Process access is forbidden in calculate.'
+    }
+  })
+}
+```
+
+详细规范参见 [references/tools.md](./references/tools.md)。
+
+---
+
+### 场景 C：提供自定义服务 (Service Provider)
+
+适用于封装长生命周期资源或向其他插件暴露 API。
+
+```ts
+import { Service, type Context } from '@deepseek-ai/cordis'
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    kvStorage: KvStorageService
+  }
+}
+
+export class KvStorageService extends Service {
+  static inject = ['settings']
+  private store = new Map<string, any>()
+
+  constructor(ctx: Context) {
+    super(ctx, 'kvStorage', true)
+  }
+
+  public get(key: string) { return this.store.get(key) }
+  public set(key: string, val: any) { this.store.set(key, val) }
+
+  protected override start() { /* 启动就绪 */ }
+  protected override stop() { this.store.clear() }
+}
+
+export const name = 'kv-storage'
+export function apply(ctx: Context) {
+  ctx.plugin(KvStorageService)
+}
+```
+
+详细规范参见 [references/services.md](./references/services.md)。
+
+---
+
+### 场景 D：接入自定义 LLM 适配器 (LlmAdapter)
+
+将第三方模型或本地端侧模型通过流式分发协议无缝接入 DSH。
+
+```ts
+import type { Context } from '@deepseek-ai/cordis'
+import { LlmAdapter, type GenerateOptions, type StreamChunk } from '@deepseek-ai/dsh-llm'
+
+export class MyCustomLlmAdapter extends LlmAdapter {
+  async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+    // 1. 发起网络流式调用（禁用类库内置重试）
+    // 2. 输出可见文本增量
+    yield { type: 'text-delta', text: 'Hello from custom adapter!' }
+
+    // 3. 上报精确 Token 统计（inputTokens 与 cachedTokens 互斥，reasoningTokens 已内含在 outputTokens）
+    yield {
+      type: 'usage',
+      inputTokens: 100,
+      cachedTokens: 50,
+      outputTokens: 20,
+    }
+
+    // 4. 终结标记
+    yield { type: 'finish', reason: 'stop' }
+  }
+}
+
+export const name = 'my-custom-llm'
+export const inject = ['llm']
+
+export function apply(ctx: Context) {
+  const adapter = new MyCustomLlmAdapter()
+  ctx.llm.registerAdapter(adapter, {
+    providers: ['my-provider'],
+  })
+}
+```
+
+详细规范参见 [references/llm-adapter.md](./references/llm-adapter.md)。
+
+---
+
+### 场景 E：开发 Web Client-UI 双面插件
+
+前端界面必须遵循双面架构（Dual-Face），通过 SlotRegistry 注入组件，由打包器编译并管理样式生命周期。
+
+1. **`package.json`** 声明 `dsh.client`:
+```json
+{
+  "name": "dsh-client-my-widget",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js"
+  },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "inject": ["@deepseek-ai/dsh-client-ui-slots"]
+    }
+  }
+}
+```
+
+2. **`lib/index.js`** (Host 端):
+```ts
+import type { Context } from '@deepseek-ai/cordis'
+export const name = 'dsh-client-my-widget'
+export function apply(ctx: Context) { /* 供宿主扫描与配置管线注册 */ }
+```
+
+3. **`lib/client.js`** (Browser 端):
+```tsx
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import React from 'react'
+
+const ActionButton: React.FC = () => <button className="my-btn">Action</button>
+
+export function apply(ctx: ClientContext) {
+  ctx.slots.inject('conversation.input.dock', () =>
+    ctx.slots.register({
+      name: 'conversation.input.dock',
+      id: 'my-action-btn',
+      order: 10,
+    }, ActionButton)
+  )
+}
+```
+
+详细规范参见 [references/three-roles.md](./references/three-roles.md)。
+
+---
+
+### 场景 F：组合包打包与 Profile 安装
+
+1. **编写 `cordis.patch.yml`**：
 ```yaml
-# scratch-plugin/cordis.yml —— patch overlay；插件路径必须是绝对路径
 - insert:
-    - id: hello
-      name: '/absolute/path/to/deepseek-harness/scratch-plugin/src/my-plugin.ts'
+    - id: my-plugin-entry
+      name: 'dsh-client-my-widget'
+      config:
+        enabled: true
 ```
 
+2. **使用 CLI 安装进 Profile**：
 ```bash
-pnpm dsh web --patch ./scratch-plugin/cordis.yml   # 打开 http://127.0.0.1:3080
+# 安装进默认 Web profile 并激活
+dsh plugin add ./path/to/my-plugin
+
+# 验证配置树解析无误
+dsh --profile web --dump-config
 ```
 
-4. 验证加载与卸载：启动日志出现、停用时资源确实清理（references/plugin-anatomy.md）。
+详细规范参见 [references/packaging.md](./references/packaging.md) 与 [references/workspace-package.md](./references/workspace-package.md)。
 
-### 场景 B：给模型加一个工具
+---
 
-1. inject: ['tools']，用 defineTool 定义（name/description/parameters/output/execute）。
-2. 按 references/tools.md 的 execute 约定实现：schema DSL 声明参数与输出、execute 返回规范值、遵守 exec.signal、可选 presentationMeta/UI 卡片。
-3. 需要策略时挂 tools/* 事件（pre-execute/guard/execute/post-execute/result），不要把策略写死在工具体里（权限门禁示例见 references/plugin-forms.md）。
-4. 重启后让模型实际调用验证。
+## 技术参考文档索引
 
-### 场景 C：可替换能力（多种提供方）
-
-1. 按 references/three-roles.md 拆 Definition / Provider / Consumer 三个包（按需合并角色，不要预防性拆分）。
-2. Definition 拥有 Request/Result 类型与抽象 Service；Provider 实现；Consumer 暴露为工具或服务消费方。
-3. 在 cordis.yml 只列 Provider 与 Consumer 行；换提供方只换一行。
-
-### 场景 D：接入新的模型提供方
-
-1. 继承 LlmAdapter 实现 stream()，按 StreamChunk 协议输出分片；错误用带稳定 code 的 LlmError（或在带内以 finish { kind: 'error' | 'aborted' } 结束）；每个 HTTP 请求合并 attributionHeaders() 并传递 signal。
-2. ctx.llm.registerAdapter(['<provider>'], adapter)；可选覆写 resolveModel()/listModels()。
-3. 在组合中配置 agent-loop 的 provider/model 验证。详见 references/llm-adapter.md（含 7 条协议义务）。
-
-### 场景 E：打包与安装交付
-
-1. 建组合包：package.json 声明 dsh.bundle（指向 cordis.patch.yml），patch 行按包名引用插件；仅供 import 的库包不声明 dsh.bundle。
-2. 安装：dsh plugin --profile <name> add <pkg>；先 dsh --profile <name> --dump-config 验证层，再启动。
-3. 记住层顺序与整行替换语义（references/packaging.md）。
-
-### 场景 F：在 DSH monorepo 内新建包
-
-按 references/workspace-package.md 的逐文件清单执行：创建包（package.json 不变式/tsconfig/src/README）→ 根配置注册 → 包拓扑与命名（角色词表）→ README Model Experience 结构 → 验证命令。
-
-## 决策速查
-
-| 我要…… | 机制 | 详情 |
-| --- | --- | --- |
-| 向其他插件公开能力 | Service（类形态） | references/services.md |
-| 消费已有能力 | inject 或 ctx.get() | references/services.md |
-| 插件间通信 / 扩展点 | ctx.on / ctx.emit 等事件（五种分发模式） | references/events.md |
-| 让用户可配置 | Config + Schemastery | references/config.md |
-| 给模型加能力 | defineTool → ctx.tools.register（或原始 JSON Schema） | references/tools.md |
-| 接新模型提供方 | LlmAdapter + ctx.llm.registerAdapter | references/llm-adapter.md |
-| 拆可替换能力 | 三种角色（Definition/Provider/Consumer） | references/three-roles.md |
-| 分发插件 | 组合包 + profile | references/packaging.md |
-| 查内置服务 / 归属位置 | seam 目录、架构映射 | references/seams.md |
-| 作用域/服务存储/Fiber API | ctx.extend/isolate/provide/mixin、fiber.* | references/context-api.md |
-| 钩子 / UI / 协议桥插件 | 四种扩展形态 + 功能→机制映射 | references/plugin-forms.md |
-| 在仓库内新建包 / 命名 | workspace 包清单 + 角色词表 | references/workspace-package.md |
-
-## 完成前检查清单
-
-- [ ] 接口查过生成参考（服务/事件/ctx 键均以生成为准），没有凭名字猜 API。
-- [ ] 所有注册走 ctx（事件/工具/适配器/effect），卸载可清理；顺序敏感的清理放在同一个 ctx.effect 里。
-- [ ] 必需依赖注入声明正确；可选依赖有 undefined 处理。
-- [ ] 有配置的插件：Config 用 Schemastery，默认值进 schema，无效配置在加载时响亮失败。
-- [ ] 有工具：execute 返回规范 JSON 值；render 负责人类可读；策略走 tools/* 事件；遵守 exec.signal；并发安全声明了 isConcurrencySafe（未声明 → exclusive）。
-- [ ] 有 waterfall 监听：调用并返回 next()（除非有意短路）。
-- [ ] 有 LLM 适配器：StreamChunk 协议完整（块配对、index 按首次出现、usage 在 finish 前、arguments 全程原始 JSON 字符串）；错误走两条合法路径之一；不支持的字段抛 UNSUPPORTED；需要原生回放时发 finish.replayState；传了 attributionHeaders 与 signal。
-- [ ] 组合行与层序正确；新增行在 --dump-config 中可见；HMR/重启后无残留注册。
-- [ ] 若模型可见内容变化：落在日志可重建的机制内。
-- [ ] 新建 workspace 包：package.json 不变式、恰一个 aggregate、命名符合角色词表、README 有 Model Experience 结构，且 constraints/typecheck/lint/build/hygiene 全绿。
-
-## 参考文件（按需加载，不要一次全读）
-
-> 完整索引与「何时读」对照表见 references/README.md。
-
-- references/plugin-anatomy.md —— 写/改插件、处理生命周期或 HMR 时读
-- references/services.md —— 定义或消费服务、注入依赖时读
-- references/events.md —— 用事件通信、监听扩展点时读
-- references/config.md —— 让插件可配置时读
-- references/context-api.md —— 用作用域、服务存储或 Fiber API 时读
-- references/three-roles.md —— 拆分可替换能力时读
-- references/tools.md —— 开发模型工具时读
-- references/llm-adapter.md —— 接入新模型提供方时读
-- references/plugin-forms.md —— 写钩子/UI/协议桥插件时读
-- references/packaging.md —— 打包安装、交付 plugin 时读
-- references/workspace-package.md —— 在 monorepo 内新建包时读
-- references/seams.md —— 查内置服务、归属位置或架构映射时读
-
-## 验证
-
-- 格式自检：name 为 kebab-case 且与目录名一致；description 非空且简洁（本技能控制在 500 字符内）；正文用标准 Markdown；所有引用的 references 文件真实存在。
-- 目录命名：本技能名（name）为 dsh-plugin-dev，与托管仓库名 dsh-plugin-dev-skills 不同——克隆/解压后必须把文件夹命名为 dsh-plugin-dev（与 name 一致），否则按目录名寻址的加载器可能发现不了本技能。
-- 有 skills-ref CLI 的环境可执行：skills-ref validate ./dsh-plugin-dev
-- 触发回归：修改 description 后运行 evals/trigger-queries.json 评测集（方法见仓库 evals/README.md）。
-- 行为验证：按场景 A 走通一个最小插件（加载日志 + 卸载清理），再按场景 B 走通一个 greet 工具。
+- [references/services.md](./references/services.md)：核心服务大动脉与依赖注入
+- [references/config.md](./references/config.md)：Schemastery 校验与补丁全量替换规约
+- [references/events.md](./references/events.md)：五大事件派发模式与核心事件清单
+- [references/tools.md](./references/tools.md)：ToolRuntime、单调守卫、PTC 模式与多模态输出
+- [references/llm-adapter.md](./references/llm-adapter.md)：LLM 适配器接入与流式协议
+- [references/three-roles.md](./references/three-roles.md)：Browser/Host/Worker 三角色与双面 UI 插件
+- [references/packaging.md](./references/packaging.md)：Bundle 打包与 Profile 安装工作流
+- [references/workspace-package.md](./references/workspace-package.md)：Monorepo 工作区多包联调与实时 HMR
+- [references/plugin-anatomy.md](./references/plugin-anatomy.md)：插件解剖学与生命周期
+- [references/context-api.md](./references/context-api.md)：Context 上下文树与作用域隔离
+- [references/seams.md](./references/seams.md)：八大切面架构映射与依赖倒置
+- [references/plugin-forms.md](./references/plugin-forms.md)：设置表单与配置持久化

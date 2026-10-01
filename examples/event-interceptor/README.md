@@ -1,36 +1,22 @@
-# event-interceptor
+# event-interceptor 示例插件
 
-<p align="center">
-  <samp>
-    <strong>中文</strong> ·
-    <a href="./README.en.md">English</a>
-  </samp>
-</p>
+演示 DeepSeek Harness (DSH 0.2.0-rc.2) 中工具安全防护与执行审计的官方标准写法。
 
-事件拦截与流水线中间件示例（bundle 格式，纯 JavaScript，无需构建）。演示如何利用 Cordis 的 `waterfall` 机制拦截工具执行、实施安全门禁，并通过广播事件进行审计追踪。
+## 核心机制
 
-## 演示内容
+1. **单调安全守卫 (`ctx.tools.guard`)**：
+   - 符合 DSH 工具执行保护管线的安全设计；
+   - 遵循**单调安全法则**：任何守卫只要返回字符串错误原因，调用即被判定为阻断，任何其他守卫无法越权放行；
+   - 卸载时返回的 Disposer 自动回滚，零副作用残留。
+2. **事件总线审计 (`tools/post-execute`)**：
+   - 监听工具执行结果事件，收集耗时与执行状态，供合规审计与日志追踪。
 
-1. **流水线拦截（Waterfall）**：挂载 `tools/pre-execute` 拦截点，展示调用 `next()` 继续执行与返回 `{ kind: 'deny', reason: '...' }` 提前短路。
-2. **硬规则遵守**：显式演示官方硬规则——**waterfall 监听器必须调用 next()**，避免误漏调用导致工具执行流水线卡死挂起。
-3. **不可变结果审计**：监听 `tools/result` 广播事件，在工具调用结束时输出审计日志。
-4. **生命周期自解绑**：通过 `ctx.on` 注册的事件监听器随插件卸载自动解除绑定，不残留进程级监听泄露。
-
-## 安装与验证
+## 安装与测试
 
 ```bash
-# 安装到指定 profile
-dsh plugin --profile demo add ./examples/event-interceptor
+# 1. 复制到工作区并安装
+dsh plugin add ./examples/event-interceptor
 
-# 检查配置层插入
-dsh --profile demo --dump-config
-
-# 启动运行
-dsh --profile demo
+# 2. 验证配置树
+dsh --profile web --dump-config
 ```
-
-## 扩展建议
-
-- **权限确认**：可在中间件中返回 `{ kind: 'ask', message: '...' }` 触发人工交互确认。
-- **参数改写**：可在调用 `next()` 前对参数进行脱敏、规范化处理。
-- 相关标准见 `references/events.md`（五种分发模式）与 `references/plugin-forms.md`（钩子插件与权限门禁）。

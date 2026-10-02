@@ -1,82 +1,150 @@
 # 事件系统与派发模式
 
-事件是 Cordis 插件间解耦通信的核心机制。DeepSeek Harness (DSH) 大量使用事件来实现可拔插扩展点、流程拦截与状态感知。通过 `ctx.on()` 注册的所有事件监听器均受所属 Fiber 作用域管理，在插件卸载时自动注销（可逆效果）。
+事件是 Cordis 插件间解耦通信的核心机制。DSH 大量使用事件实现可拔插扩展点、流程拦截与状态感知。通过 `ctx.on()` 注册的所有监听器均受所属 Fiber 作用域管理，插件卸载时自动注销（可逆效果）。
 
-## 五大事件派发模式 (Dispatch Modes)
+## 五大事件派发模式（官方权威表格）
 
-Cordis 规定：每个事件必须有明确的派发模式，且只能由其对应的方法派发。理解这五种模式是编写高内聚、正确插件的关键：
+Cordis 规定：每个事件必须有明确的派发模式，且只能由其对应方法派发。新事件通过 `@mode` 标签记录模式，使生成目录能将声明与分发调用点交叉校验。
 
-| 派发模式 | 派发方法 | 是否等待 (Awaited) | 执行顺序与调度 | 返回值规范 | 典型应用场景 |
-| --- | --- | --- | --- | --- | --- |
-| **emit** | `ctx.emit(name, ...args)` | 否（同步） | 按注册顺序依次调用监听器 | 无返回值 (`void`) | 状态通知、指标采集、日志记录、UI 广播 |
-| **waterfall** | `ctx.waterfall(name, ...args)` | 否（同步） | 按注册顺序串行链式传递，后一个监听器接收前一个的返回值 | 返回最终加工的值 | 提示词前缀组装、配置数据加工、请求参数规范化 |
-| **parallel** | `ctx.parallel(name, ...args)` | 是 (`Promise.all`) | 异步并发执行所有监听器 | 返回全部结果数组 (`Promise<T[]>`) | 批量清理、多渠道并发通知、独立数据校验 |
-| **serial** | `ctx.serial(name, ...args)` | 是 (`await` 循环) | 按注册顺序依次等待每个监听器执行完毕 | 返回全部结果数组 (`Promise<T[]>`) | 顺序迁移、需严格依赖前序步骤的初始化 |
-| **bail** | `ctx.bail(name, ...args)` | 是 (短路阻断) | 按注册顺序依次执行，一旦某监听器返回非 `undefined` 立即终止并返回 | 返回首个非空阻断值 (`Promise<T | undefined>`) | 权限阻断卫士、错误拦截恢复、工具调用拦截 |
+| 模式 | 派发方法 | 是否 await | 分发顺序 | 返回值 |
+| --- | --- | --- | --- | --- |
+| emit | `ctx.emit(name, ...args)` | 否（同步） | 按注册顺序观察 | 否 |
+| waterfall | `ctx.waterfall(name, ...args)` | 否（同步） | 按注册顺序观察（环绕中间件） | 是（最终加工值） |
+| parallel | `ctx.parallel(name, ...args)` | 是（并发） | 所有监听器并行观察 | 否（只 await 全部 settle） |
+| serial | `ctx.serial(name, ...args)` | 是（按序） | 按注册顺序依次 await | 是（结果数组） |
+| bail | `ctx.bail(name, ...args)` | 否（同步） | 按序观察直到某监听器返回 bail 值 | 是（首个 bail 值） |
+
+## Waterfall 语义（重要：不是传值链）
+
+`ctx.waterfall` 是**环绕中间件（around-middleware）**，**不是**"后一个监听器接收前一个返回值"的简单传值链：
+
+- 监听器接收 `(...args, next)`；调用 `next()` 执行下游，下游返回值经 `next()` 回到当前包装层，可再包装后外传。
+- **不调用 `next()` 直接返回即短路**。
+- 协作式监听器可修改共享请求/决策对象后委托，也可**整体替换结果**（下游只看到替换后的值）。
+- 单决策事件中短路是设计意图：策略监听器不调 `next()` 直接返回；观察/标注类必须委托。
+- 仅当必须早于普通注册运行时才使用 `prepend: true`。
+
+```ts
+ctx.waterfall('my-pipeline', initial, (ctx, value, next) => {
+  // 可以修改 value 后委托
+  return next({ ...value, injected: true })
+  // 或者短路直接返回
+  // return { blocked: true }
+})
+```
 
 ## 监听器注册与选项
 
-### 1. 基础监听与销毁器
+### 基础监听与销毁器
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
 
 export function apply(ctx: Context) {
-  // 注册监听器，返回对应的注销函数 (Disposer)
   const dispose = ctx.on('custom-event', (data) => {
     console.log('Received:', data)
   })
 
-  // 单次监听
   ctx.once('one-time-event', () => {
     console.log('Fired once and auto-disposed')
   })
 
-  // 当插件卸载时，ctx 范围内的监听器会自动注销，无需手动调用 dispose()
+  // 插件卸载时 ctx 范围内的监听器自动注销，无需手动 dispose()
 }
 ```
 
-### 2. EventOptions 控制
-
-`ctx.on(name, listener, options?)` 支持传入配置项控制监听优先级与作用域：
+### EventOptions 控制
 
 ```ts
 interface EventOptions {
-  prepend?: boolean   // 插到同事件既有监听器队列的最前面（高优先级）
-  global?: boolean    // 忽视上下文作用域过滤器，强制全局接收该事件
+  prepend?: boolean // 插到同事件既有监听器队列最前面（高优先级）
+  global?: boolean  // 忽视上下文作用域过滤器，强制全局接收
 }
 
-// 示例：高优先级优先拦截
 ctx.on('tools/pre-execute', async (call) => {
   // 率先执行拦截逻辑
 }, { prepend: true })
 ```
 
-## DSH 官方核心事件清单
+### parallel 的 thisArg 重载
 
-DSH 核心子系统定义了以下标准事件，插件可通过监听这些事件参与运行循环：
+`ctx.parallel` 支持先传 `thisArg` 作为监听器的 `this` 绑定（`NoInfer<ThisType<Events[K]>>`）。
 
-### 1. 生命周期事件 (Lifecycle)
-- `ready`: 所有初始插件和服务加载就绪后触发（`emit`）。
-- `dispose`: 当前上下文或插件即将被卸载时触发（`emit`）。
-- `before-apply`: 插件应用前触发。
-- `app-boot/config-reload`: HMR 配置热重载完成并稳定后广播（`emit`）。
+## DSH 官方核心事件（按子系统与模式）
 
-### 2. Agent 执行循环事件 (Agent & Turn)
-- `agent/turn-start`: 轮次开始，接收当前 `TurnContext` 与会话信息。
-- `agent/turn-end`: 轮次正常完成，可用于持久化确认或统计耗时。
-- `agent/step-start`: 单步执行开始（包括模型调用与工具调用准备）。
-- `agent/step-end`: 单步执行结束。
-- `agent/request-error`: LLM 请求失败时触发的阻断拦截点（`bail` 模式）。监听器在修复或等待后返回 `{ kind: 'retry' }`，可触发安全重试而不使会话崩溃。
+事件按子系统组织，模式是公开约定的一部分。以下为官方文档确认的事件及模式：
 
-### 3. 工具执行管线事件 (Tools Pipeline)
-- `tools/pre-execute`: 工具调用参数解析完成、即将执行前的流水线（`waterfall` / `bail`）。可用于参数改写或前置鉴权阻断。
-- `tools/execute`: 实际工具调度执行。
-- `tools/post-execute`: 工具执行成功后触发，接收执行结果与上下文。
+### 1. Agent 生命周期与协调（ctx.agents / dsh-agent）
+
+| 事件 | 模式 | 说明 |
+| --- | --- | --- |
+| `agent/created` | serial | 可 throw 否决创建；AgentLoop 在监听器全部完成前保持排队输入 |
+| `agent/status` | emit | 状态变化（idle/running）通知 |
+| `agent/pre-step` | waterfall | 返回 `PreStepDecision`：`{kind:'reject'}` 或 `{kind:'enter'; messages; startsRequestSeries?}` |
+| `agent/request` | waterfall | 替换冻结的 LlmCallConfig（提供方/模型必须存在） |
+| `agent/request-error` | **waterfall** | 处理者返回 `{kind:'retry'}` 且不调 `next()` 则重试，否则失败终态 |
+| `agent/turn-stopping` | serial | 可 steer 后再读 inbox |
+| `agent/inbox/inserted` | `claimed` | `discarded` | emit | 收件箱有序持久列表变更 |
+| `agent/assistant-stream` | emit | 实时流分片（瞬态，回放读持久 settlement） |
+| `agent/error` | emit | 错误通知 |
+| `agent/disposed` | emit | Agent 被 dispose（不是第三个 status） |
+
+注意：**轮次/步骤边界是持久会话事件，不是 agent emit**。
+
+### 2. 工具执行管线（ctx.tools / dsh-tools）
+
+| 事件 | 模式 | 说明 |
+| --- | --- | --- |
+| `tools/pre-execute` | waterfall | allow/deny/cancel/ask 决策；**参数在此阶段禁止改写**（历史/审计/UI/执行一致） |
+| `tools/execute` | waterfall | 环绕包装（截止时间/重试/指标）；只能替换 signal |
+| `tools/post-execute` | waterfall | accept（替换展示 content 或 value 二选一）或 block（转含纠正反馈的 isError） |
+| `tools/result` | emit | 观察冻结的权威结果；观察者失败隔离 |
+| `tools/change` | emit | 故意不 scope 过滤（全局变化影响所有 agent 下次组装） |
+| `tools/ptc-dispatch-log` | waterfall | 只能修改持久日志副本（程序已拿到完整 value，模型两者都看不到） |
+
+### 3. 会话与持久化（ctx.sessions / dsh-session）
+
+| 事件 | 模式 | 说明 |
+| --- | --- | --- |
+| `session/event` | emit | post-commit fire-and-forget 广播 |
+| `session/created` | emit | 同步 throw 可否决并回滚 |
+| `session/disposed` | emit | 会话销毁 |
+| `session/flush` | parallel | 无 waterfall veto；flush(session) 是唯一刷盘入口（禁止裸 ctx.parallel('session/flush',…)） |
+| `api-session/added` | `removed` | `status` | `error` | `activity` | emit | API 层会话状态 |
+
+### 4. LLM 流（ctx.llm / dsh-llm）
+
+| 事件 | 模式 | 说明 |
+| --- | --- | --- |
+| `llm/stream` | waterfall | 可短路整个流分发 |
+| `llm/adapters-updated` | emit | 负载为空；每次 commit 点触发，消费方重读 listProviders/listModels |
+
+### 5. 系统提示词（ctx.systemPrompt）
+
+| 事件 | 模式 | 说明 |
+| --- | --- | --- |
+| `system-prompt/change` | emit | 注册/注销提示词段落；故意不 scope 过滤 |
+| `system-prompt/assemble` | waterfall | Scoped 过滤；返回值为权威；complete 段在 waterfall 后恢复为唯一段落 |
+
+### 6. 环境与内部钩子事件（Inherited Cordis API）
+
+| 事件 | 模式 | 说明 |
+| --- | --- | --- |
+| `internal/plugin` | — | fiber 创建 |
+| `internal/status` | — | fiber 生命周期状态变化 |
+| `internal/service` | — | 服务绑定拦截钩子（无核心生产者） |
+| `internal/update` | waterfall | fiber 配置更新正在应用 |
+| `internal/config` | waterfall | 配置校验前解析 |
+| `internal/get` | `internal/set` | waterfall | 从存储读/写服务 |
+| `internal/listener` | — | 监听器注册 |
+| `internal/dispatch` | — | 派发至监听器 |
+| `exit` | — | 信号退出 |
+| `loader/config-update` | `loader/entry-init` | `loader/partial-dispose` | `loader/patch-context` | — | loader 重载生命周期 |
+| `loader/volatile-update` | — | 波动配置不重挂载直接提交进运行 fiber，**只派发给所属 fiber** |
+
+内部钩子事件多为 Waterfall/拦截类，不是广播通知。**拦截和策略优先用事件，直接能力调用优先用服务方法**。
 
 ## 类型化事件扩展 (Declaration Merging)
-
-为自定义插件事件提供强类型提示，需在模块中对 `@deepseek-ai/cordis` 的 `Events` 接口进行声明合并：
 
 ```ts
 export interface GitCommitPayload {
@@ -89,11 +157,10 @@ declare module '@deepseek-ai/cordis' {
   interface Events {
     // 声明为同步事件 (emit)
     'git/commit'(payload: GitCommitPayload): void
-
-    // 声明为异步阻断事件 (bail)
+    // 声明为阻断事件 (bail)
     'git/pre-commit'(payload: { stagedFiles: string[] }): boolean | Promise<boolean>
   }
 }
 ```
 
-合并后，调用 `ctx.on('git/commit', ...)` 或 `ctx.emit('git/commit', ...)` 时，TypeScript 将全程提供参数签名校验与补全。
+事件名先声明（声明合并）+ `@mode` 标分发模式，再按对应方法派发，**不能混用**。

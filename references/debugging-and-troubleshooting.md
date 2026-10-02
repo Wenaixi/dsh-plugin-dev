@@ -221,7 +221,62 @@ export function apply(ctx) {
 
 ---
 
-## 六、插件管理器目录与安装日志落点
+## 六、免启动反证法：直接调宿主的公开函数
+
+DSH 的宿主包大量导出**纯读取、不需要启动 Web GUI** 的公开函数。遇到「界面没出来 / 文案没生效 / 卡片空白」这类问题时，先直接调它拿真值，比启服务 + 拿 token + 抓 Cookie 快两个数量级。
+
+### 1. 典型可用入口
+
+| 公开函数 | 所在包 | 回答什么问题 |
+| --- | --- | --- |
+| `readPluginMeta(spec, parentURL)` | `@deepseek-ai/dsh-app-boot` | 卡片标题 / 描述 / 图标能不能读到 |
+| `resolveBundleDir(bin, name, installAnchor, profileDir)` | `@deepseek-ai/dsh-app-boot` | 某个 bundle 从哪个目录解析 |
+| `bundleManifest(location, name)` | 同上 | 该 bundle 的 manifest 与 `dsh.bundle` 声明 |
+| `resolveDshHome()` | 同上（`dsh-home-paths` 同语义） | 当前配置数据根算出来是哪个 |
+
+### 2. 跨平台调用的两个坑
+
+- **必须 `pathToFileURL`**：Windows 上 `import('C:/.../lib/index.js')` 直接抛 `ERR_UNSUPPORTED_ESM_URL_SCHEME`（协议 `c:` 不被默认 ESM 加载器接受）。正确写法：
+  ```js
+  const boot = await import(pathToFileURL(dshPkg + '/lib/index.js').href)
+  ```
+- **parentURL 要指向包自己的 package.json**，不是任意基准：
+  ```js
+  const meta = boot.readPluginMeta(pkgName, pathToFileURL(join(pkgDir, 'package.json')).href)
+  ```
+
+### 3. 复制粘贴可跑的对照探针
+
+写一个循环把「有描述的包」和「没描述的包」都过一遍，差异一眼可见：
+
+```js
+import { pathToFileURL } from 'node:url'
+import { join } from 'node:path'
+
+const boot = await import(pathToFileURL(dshAppBoot + '/lib/index.js').href)
+const nm = profileDir + '/node_modules/'
+for (const [spec, dir] of [
+  ['your/pkg',        nm + '@scope/your-pkg'],
+  ['known-good/pkg',  nm + 'known-good-pkg'],   // 挑一个确定有描述的做对照
+]) {
+  const m = boot.readPluginMeta(spec, pathToFileURL(join(dir, 'package.json')).href)
+  console.log(spec, '=>', m === undefined ? 'NO METADATA' : JSON.stringify(m.title))
+}
+```
+
+期望输出里「NO METADATA」的那一行就是待查对象；两者都不是 undefined 但只有 good 那个有 `description` 时，差异在 locale 与 manifest description 的兜底链上。
+
+### 4. 打包内容也要单独验证
+
+`files` 字段写错不会让开发环境报错，只有发布后才消失。发布前用 dry-run 看真实入库清单：
+
+```bash
+npm pack --dry-run --json    # 逐条断言 locale/、icon、lib/ 都在 files 列表里
+```
+
+---
+
+## 七、插件管理器目录与安装日志落点
 
 每个 profile 就是一个独立 pnpm 项目，目录结构与用途：
 

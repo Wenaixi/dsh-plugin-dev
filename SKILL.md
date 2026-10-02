@@ -381,7 +381,13 @@ await pg.evaluate("""() => {
 
 **总原则：静默失败必须靠"回读真值"发现，不能靠看界面。** 每次写操作后回读接口或磁盘，值没变就是没生效。
 
-### 4. 装到旧版本时的两条立即验证
+### 4. 免启动反证：宿主公开函数能直接问真值
+
+DSH 导出大量纯读取函数，不必启 Web GUI、不必拿 token 就能判定「元数据读不读得到」「bundle 从哪解析」。Windows 上 `import()` 必须走 `pathToFileURL`，否则抛 `ERR_UNSUPPORTED_ESM_URL_SCHEME`。可跑探针与典型入口表见 [debugging-and-troubleshooting.md](./references/debugging-and-troubleshooting.md) 第六节。
+
+**对照反证是最快的定位手段**：把「表现正常的包」和「出问题的包」一起过一遍同一个宿主函数，差异落在哪个字段上，根因边界就在哪。
+
+### 5. 装到旧版本时的两条立即验证
 - `pnpm add <pkg> --config.minimum-release-age=0`（关闭 24 小时发布冷却期）或 `pnpm add <pkg>@<exact-version>`（精确版本绕过冷却期）能立刻拿到正确版本，即坐实根因是解析策略而非网络；
 - **清缓存对上述根因无效**，用 `npm install <pkg> --dry-run` 与 pnpm 结果横向对比可快速隔离。完整推导、参数实验与决策表见 [install-resolution-traps.md](./references/install-resolution-traps.md)。
 
@@ -391,10 +397,12 @@ await pg.evaluate("""() => {
 
 本技能只提供纯文本规范，不含任何脚本或示例工程。交付前逐项确认：
 
-1. `package.json`：`name`/`version`/`type: module` 齐备；`dsh.bundle.id` 非空；双面插件声明 `dsh.client.platform` + `dsh.client.module` + `exports["./client"]`；
+1. `package.json`：`name`/`version`/`type: module` 齐备；`dsh.bundle.id` 非空；双面插件声明 `dsh.client.platform` + `dsh.client.module` + `exports["./client"]`；**只要声明了 `exports`，就必须同时放行 `"./package.json"` 与 `"./locale/*.json"`，否则插件卡片只剩包名**；有 `icon` 则须为包内相对路径且 <= 256 KiB；
 2. `cordis.patch.yml`：含真实 `- insert:` 声明（非注释）；条目的 `id` 与 `dsh.bundle.id` 一致、`name` 与 `package.json` 的 `name` 一致；
 3. 入口文件存在且导出 `apply`：`node --check index.js`（双面再加 `node --check lib/client.js`）无报错；
 4. 双面插件的 Client 半侧经 `ctx.slots.inject/register` 挂载，组件只接收 props；
 5. 真实启动验收：端口监听 + 首页 200；`--dump-config` 通过只代表 YAML 可解析。
+6. 打包清单核对：`npm pack --dry-run --json` 确认 `locale/`、图标、`lib/` 全部入库——`files` 写错只在发布后暴露；
+7. 卡片元数据可读：直接调 `readPluginMeta` 返回非 `undefined` 且 `error` 为空。
 
 带条件导出对象的 `exports`（`{ types, default }`）是合法写法，校验时取 `default` 或 `import` 字段。

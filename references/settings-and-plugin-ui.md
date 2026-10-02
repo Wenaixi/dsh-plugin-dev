@@ -238,6 +238,25 @@ ${specifier}/locale/en.json
 
 对照反证：没有声明 `exports` 的包走 Node 的 legacy 目录查找，反而能正常读到 manifest——所以**"加 exports 之后描述反而没了"是这类包最典型的回归**。
 
+图标的字节上限来自 `MAX_ICON_BYTES = 256 * 1024`（`dsh-app-boot` 源码常量），同一函数还会校验：必须是包内相对路径（绝对路径、带协议头、逃出 manifest 目录的路径全部拒绝），后缀必须是 svg/png/jpg/jpeg/webp，且必须是普通文件。README 用的 `logo.png` 往往远超 256 KiB，**不能直接复用做 `icon`**，另存一份小尺寸副本。
+
+### 3. 改完必须跑的两道验证
+
+`files` 字段写错在开发环境完全无感（本地包是完整目录），只有发布后才消失。两道验证各自堵一个漏洞：
+
+```bash
+# 1. 打包清单：locale/、icon 是否真的进 npm 包
+npm pack --dry-run --json
+```
+
+```js
+// 2. 宿主读不读得到：直接调公开函数，免启动、免 token
+const meta = readPluginMeta(pkgName, pathToFileURL(join(pkgDir, 'package.json')).href)
+// 期望：title/description 为 { en, zh } 或字符串，icon 以 data:image/ 开头，error 为 none
+```
+
+宿主读不到时会返回 `undefined`（不是抛错、不是空对象），排查时先判 `undefined` 再看内容。完整探针脚本与跨平台调用坑见 [debugging-and-troubleshooting.md](./debugging-and-troubleshooting.md) 第六节。
+
 ---
 
 ## 五、开发决策树与最佳实践速查

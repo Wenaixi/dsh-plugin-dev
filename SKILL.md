@@ -283,7 +283,7 @@ export function apply(ctx) {
 
 - **多工程合规性批量校验**：
   ```bash
-  node scripts/validate_plugin.mjs examples/hello-plugin examples/service-provider examples/configurable-plugin examples/greet-tool examples/event-interceptor
+  node scripts/scaffold_plugin.mjs /tmp/test-plugin && node scripts/validate_plugin.mjs /tmp/test-plugin
   ```
 - **新建标准插件工程骨架**：
   ```bash

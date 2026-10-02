@@ -1,6 +1,0 @@
-# dsh-settings-tab-plugin 补丁配置
-- insert:
-    - id: settings-tab-plugin
-      name: dsh-settings-tab-plugin
-      config: {}
-      disabled: false

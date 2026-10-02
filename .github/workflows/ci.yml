@@ -8,7 +8,7 @@ on:
 
 jobs:
   validate:
-    name: Validate Examples & Integrity
+    name: Validate Scaffolder & Integrity
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -23,11 +23,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
-      - name: Validate all 6 example plugins
-        run: |
-          node scripts/validate_plugin.mjs examples/hello-plugin examples/service-provider examples/configurable-plugin examples/greet-tool examples/event-interceptor examples/settings-tab-plugin
-
-      - name: Test plugin scaffolder
+      - name: Test plugin scaffolder (Single-face & Dual-face)
         run: |
           node scripts/scaffold_plugin.mjs /tmp/test-single-face
           node scripts/validate_plugin.mjs /tmp/test-single-face

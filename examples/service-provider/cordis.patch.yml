@@ -1,6 +1,0 @@
-# dsh-memory-cache 补丁配置
-- insert:
-    - id: memory-cache
-      name: dsh-memory-cache
-      config: {}
-      disabled: false

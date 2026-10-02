@@ -1,6 +1,0 @@
-# dsh-hello-plugin 补丁配置
-- insert:
-    - id: hello-plugin
-      name: dsh-hello-plugin
-      config: {}
-      disabled: false

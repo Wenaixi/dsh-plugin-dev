@@ -15,7 +15,6 @@
 你可以通过以下方式为项目做出贡献：
 1. **报告 Bug 或过时信息**：发现 DSH 新版本 API 变更、旧文档中的错误描述或示例工程无法加载；
 2. **补充架构与技术参考**：提交针对 DSH 核心服务、Seam 接口或特定场景的深度参考；
-3. **完善实战示例工程**：在 `examples/` 目录下新增具有代表性的优质插件示例；
 4. **改进工具脚本与评测集**：优化 `scripts/` 下的校验/脚手架脚本，或扩充 `evals/` 中的触发评测用例。
 
 ---
@@ -34,7 +33,7 @@ cd dsh-plugin-dev
 ### 2. 自动化合规性校验
 在提交任何修改前，必须运行随包提供的校验工具验证全部示例工程：
 ```bash
-node scripts/validate_plugin.mjs examples/hello-plugin examples/service-provider examples/configurable-plugin examples/greet-tool examples/event-interceptor
+node scripts/scaffold_plugin.mjs /tmp/test-plugin && node scripts/validate_plugin.mjs /tmp/test-plugin
 ```
 确保所有工程输出 `校验通过`，退出码为 0。
 
@@ -42,10 +41,10 @@ node scripts/validate_plugin.mjs examples/hello-plugin examples/service-provider
 如需贡献新的示例插件，推荐使用内置脚手架生成标准骨架：
 ```bash
 # 生成基础单面插件
-node scripts/scaffold_plugin.mjs examples/my-new-plugin
+node scripts/scaffold_plugin.mjs /tmp/my-new-plugin
 
 # 生成双面 UI 插件（含 React 客户端与 Slots 插槽骨架）
-node scripts/scaffold_plugin.mjs examples/my-ui-plugin --dual-face
+node scripts/scaffold_plugin.mjs /tmp/my-ui-plugin --dual-face
 ```
 
 ---

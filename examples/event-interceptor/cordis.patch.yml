@@ -1,6 +1,0 @@
-# dsh-tool-interceptor 补丁配置
-- insert:
-    - id: tool-interceptor
-      name: dsh-tool-interceptor
-      config: {}
-      disabled: false

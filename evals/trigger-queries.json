@@ -185,6 +185,22 @@
     {
       "query": "在企业内网环境下如何配置 DSH 的全局 HTTP 代理让所有插件请求生效",
       "should_trigger": true
+    },
+    {
+      "query": "如何在 DSH 插件中拉起一个可以持续通过 send_message 交互的子智能体会话",
+      "should_trigger": true
+    },
+    {
+      "query": "为什么模型编辑文件时会报 stale observation 错误底层文件观察策略是怎么工作的",
+      "should_trigger": true
+    },
+    {
+      "query": "怎么通过 Agent Client Protocol (ACP) 让外部程序与 DSH 会话建立通信",
+      "should_trigger": true
+    },
+    {
+      "query": "在写代码工具时怎么确保并发修改不会盲目覆盖外部进程刚刚保存的文件",
+      "should_trigger": true
     }
   ]
 }

@@ -75,3 +75,7 @@
 ### 十四、沙箱底层物理隔离、图像转储与出站网络代理 (Sandbox, Image Offload & Proxy)
 - **[sandbox-internals-and-proxy.md](./sandbox-internals-and-proxy.md)**：
   沙箱内核机制与网络代理指南——Windows WRITE_RESTRICTED 令牌与 DACL 交集检查原理、Linux Landlock LSM 路径封锁、沙箱结果三状态严格判别法 (Policy Denial vs Runner Failure vs Exit Code)、多模态长对话 `image-offload` 图像外置转储与重试自愈、以及 Undici 全局调度器出站网络代理 (`dsh-http-proxy`) 透明支持。
+
+### 十五、子智能体引擎、文件系统安全观察与 ACP 协议 (Subagents, FS Policy & ACP)
+- **[subagents-fs-policy-and-acp.md](./subagents-fs-policy-and-acp.md)**：
+  子智能体生命周期与文件安全策略指南——`ctx.subagents` 服务切面、三大提供方 (`spawn-in-process` 独立运行 / `fork-in-process` 继承分叉 / `acp` 远程进程)、单次 (`start`) vs 持续通信 (`startContinuable`)、文件系统弱引用观察表与防覆盖锁机制 (`fs-observation-policy`)、以及自动化 Agent Client Protocol (ACP)。

@@ -113,6 +113,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 │ 需要在全局设置窗口左侧加专属 Tab / 插件页展示卡片？► 场景 I: 设置与插件 UI (Settings) │
 │ 需要在右侧栏/输入框/会话顶部加挂件或支持深浅色主题？► 场景 J: Web 全量插槽与主题 (Slots) │
 │ 想要向用户呈递最终交付物卡片(打开/预览)或弹窗提问？► 场景 O: 多模态与交付物 (Deliverables)│
+│ 多智能体多轮持续通信、文件防覆盖锁或 ACP 自动化？ ─► 场景 U: 子智能体与文件策略 (Subagent) │
 │ 用户在输入框打字想要斜杠补全(/)或自定义人类命令？ ─► 场景 S: 斜杠命令与输入触发 (Commands) │
 │ 深入沙箱底层限制权限、多模态图片溢出或配置出站代理？► 场景 T: 沙箱内核隔离与代理 (Sandbox) │
 │ 插件需要服务端强校验存储数据或管理持续 PTY 伪终端？► 场景 R: 领域存储与持续终端 (Storage)│
@@ -155,6 +156,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 | **R** | 服务端强模式持久化业务数据、管理长任务持续伪终端 | 存储与终端原语：使用 `ctx.storage.domain` 读写强类型表、使用 `ctx.terminal` 管理 PTY | [storage-terminals-and-checkpoints.md](./references/storage-terminals-and-checkpoints.md) |
 | **S** | 注册人类斜杠命令、输入框光标补全浮层与快捷键 | 命令与输入触发：使用 `ctx.commands` 注册 `/command`、双面插件注入 input-trigger | [slash-commands-and-input-triggers.md](./references/slash-commands-and-input-triggers.md) |
 | **T** | 沙箱内核级隔离、多模态图片压缩转储与网络代理 | 底层安全与基础设施：理解 Windows ACL/Landlock 原理、image-offload 恢复、undici 代理 | [sandbox-internals-and-proxy.md](./references/sandbox-internals-and-proxy.md) |
+| **U** | 子智能体持续多轮交互、文件系统防覆盖锁与 ACP 协议 | 委派与文件安全：使用 `ctx.subagents.startContinuable`、理解 fs-observation 读后写规则 | [subagents-fs-policy-and-acp.md](./references/subagents-fs-policy-and-acp.md) |
 
 ---
 

@@ -183,8 +183,8 @@ ctx.effect(() => {
   - `ctx.emit(name, ...args)`：同步广播，无返回值。
   - `ctx.waterfall(name, ...args)`：同步链式加工，返回最终值。监听器接收 `(...args, next)`，调用 `next()` 执行下游；不调 `next()` 直接返回即短路。协作式监听器可修改共享请求对象后委托，也可整体替换结果。
   - `ctx.parallel(name, ...args)`：异步并发（`Promise.all`）等待全部 settle，无返回值。
-  - `ctx.serial(name, ...args)`：按注册顺序依次 await，返回结果数组。
-  - `ctx.bail(name, ...args)`：按注册顺序观察，直到某个监听器返回 bail 值（非 undefined）即终止。
+  - `ctx.serial(name, ...args)`：按注册顺序依次 `await`，直到第一个 bail 值（非 null/false/undefined）即返回该值（`Promisify<ReturnType>`，不是结果数组）。
+  - `ctx.bail(name, ...args)`：**同步**按序调用，直到某个监听器返回 bail 值（非 null/false/undefined）即返回该值。
 - `EventOptions`：`prepend?`（插到队列最前）、`global?`（忽视作用域过滤器强制全局接收）。
 - 事件是"通知加规约"：先通过 TS 声明合并注册事件名并标注 `@mode` 分发模式，再按对应方法派发，不能混用。
 

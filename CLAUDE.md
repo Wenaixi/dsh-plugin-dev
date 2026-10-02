@@ -19,22 +19,22 @@
 | ScopeLib | 无 (纯函数库) | `@deepseek-ai/dsh-scope` | `createScope` / `scopeOf` / `scopeTarget` 零依赖作用域库 |
 | ConfigEditor / Settings | `ctx.settings` | `@deepseek-ai/dsh-settings` | 配置表单与补丁持久化服务 |
 
-### B. Cordis 五大事件派发模式 (Dispatch Modes)
+### B. Cordis 五大事件派发模式 (Dispatch Modes，官方权威)
 1. **emit**：同步广播，按注册顺序通知，无返回值，不等待异步。
-2. **waterfall**：同步瀑布流传递，后一个监听器接收前一个监听器的返回值并加工传递，返回最终值。
-3. **parallel**：异步并发广播，使用 `Promise.all` 同时执行，返回结果数组。
-4. **serial**：异步串行执行，按注册顺序依次 `await`，返回结果数组。
-5. **bail**：异步短路阻断，按序执行遇到第一个非 undefined / 命中条件的值即终止，返回该阻断值。
+2. **waterfall**：**同步环绕中间件**，监听器收 `(...args, next)`，调 `next()` 执行下游、不调即短路（可整体替换结果），返回最终加工值。**不是传值链**。
+3. **parallel**：异步并发（`Promise.all`）等待**全部 settle**，返回 `Promise<void>`，**不是结果数组**。
+4. **serial**：依次 `await` 直到第一个 bail 值（非 null / 非 false / 非 undefined），返回该值。
+5. **bail**：**同步**按序调用直到第一个同步 bail 值，返回该值。
 
 ### C. 配置系统重大修正 (SETTINGS & PATCH SEMANTICS)
 1. **废弃警告**：`$DSH_HOME/settings.yaml` 已完全废弃！启动时会被自动重命名为 `settings.yaml.imported` 并不再生效。严禁教导用户修改 settings.yaml！
-2. **真实落点**：用户与插件配置的唯一合法落点是 Profile 的补丁文件：
-   `$DSH_HOME/profiles/<profile>/cordis.patch.yml`。
+2. **三层落点（+ overlay）**：组合包自带 patch（按 bundles 列表序）→ `$DSH_HOME/profiles/<profile>/cordis.patch.yml` → `$DSH_HOME/cordis.patch.yml` → 每个 `--patch` overlay（按 argv 顺序）。后层按行胜出。
 3. **全量替换语义**：Patch 中条目的 `config` 字段是**整体替换，不进行深合并 (Replaced wholesale, not deep-merged)**。修改已有插件配置时必须传入完整字段，不能仅传增量字段。
 4. **补丁语法**：
    - 新增插件：使用 `- insert: [ { id, name, config, disabled } ]`
    - 覆盖/扩展已有插件：直接使用 `- id: <target-id>, config: { ... }`
    - 条件禁用：支持 `disabled: !!js '!process.env.VAR'`
+   - `ctx.configEditor`（core）在应用文件锁与 HMR 队列下持久化 profile 补丁、再协调 Loader 条目；设置表单层（settings）只投影与校验，落盘永远走 patch。
 
 ### D. 工具开发体系 (ToolRuntime)
 - **注册方式**：推荐 `defineTool({ name, description, parameters, output, execute })`。
@@ -54,24 +54,26 @@
    - 浏览器 Cordis 运行时：浏览器内运行专有 Cordis 实例，仅在模块首次被消费时惰性物化 (materialize)。
    - HMR 热重载：由 `@deepseek-ai/dsh-client-hmr` 驱动，基于 SSE 派发图更新，自动执行 `tearDownEntryFiber` 回收旧 fiber 与样式。
 3. **UI 挂载与扩展规范**：
-   - **Slot 插槽注册**：严禁直接操作外部 DOM，统一通过 `ctx.slots.inject(slotKey, () => ctx.slots.register(meta, Component))` 挂载组件。
-   - **核心 Slot 键位**：`root`（AppFrame 根布局）、`sidebar.*`（工作区、设置入口、角标）、`conversation.*`（输入框底座、上下文选择器）、`settings.general.item`（通用设置项）、`settings.plugins.tab`（内置插件标签页）。
+   - **Slot 插槽注册**：严禁直接操作外部 DOM，统一通过 `ctx.slots.inject(slotKey, () => ctx.slots.register(meta, Component))` 挂载组件；组件**绝不收到 ctx**；跨包 UI 一律 inject + register，严禁 import 他包组件运行时。
+   - **官方 slot 层级树**：`root` → `sidebar.*`（.brand/.workspaces/.settings）、`main.*`（plugins.*、conversation.session/view/chat.node/composer/input.*）、`rightbar.session→sidebar.right.pane.tab`、`shell.*`（leading/overlay）；已知注入点 `settings.general.item`、`settings.models.provider-card`、`settings.plugins.tab`。
+   - **cardinality/scope**：single/list/keyed/chain × root/session-maybe/session；调试用 `cordis_inspect what:"client"`。
    - **样式注入与回收**：CSS 编译进 bundle，物化时创建带 `data-plugin` 属性的 `<style>` 标签；插件注销或 HMR 时由 `removeOwnedStyles()` 精确清理。
-   - **设置持久化**：通过 `ctx.configForms` 读写偏好，服务端直接写入当前 Profile 的 `cordis.patch.yml`。
+   - **client 包**：`dsh.client.platform='web'`、注入 `@deepseek-ai/dsh-client-ui-settings`；浏览器半侧**只挂在裸包名行**；`./client` 为 lazy-CJS factory。
 
 ### F. 三角色架构模型与真实 IPC 通信机制 (Three Roles & IPC Architecture)
 1. **角色分工**：
    - **Browser (客户端)**：React 18 + 浏览器端 Cordis 运行时，驱动 SlotRegistry 界面呈现与本地状态。
    - **Host (Node.js 宿主)**：DSH 核心服务总线 (The Core Spine: sessions, tools, agents, llm, settings, clientModules) 与 Web 服务器。
    - **Worker (工作进程 / 沙箱)**：独立子进程，运行 Native Runner（PowerShell、Bash、Python），隔离高风险与重计算任务。
-2. **IPC 通信通道**：
+2. **IPC 通信通道（官方 Typert Remote 架构）**：
    - **Browser <-> Host**：
-     - 一元 RPC：HTTP POST `/api/...`，严格结构化 JSON 响应信封，支持 Multipart 二进制分块与 ArrayBuffer 恢复。
-     - 流式长连接：WebSocket `/api/remote.mux`，双向多路复用通道，投递 Agent StreamChunk、会话日志、终端 PTY 流与断线重连 generation 对账。
-   - **Host <-> Worker**：
-     - 专用控制通道：基于专有文件描述符 `SUBPROCESS_CONTROL_FD` (`control: 'pipe'`) 与标准 stdio 管道。
-     - Runner 协议：Host 下发 `WindowsStartRequest` / `LinuxLaunchRequest` 与 `WindowsTerminateRequest`；Worker 响应 `WindowsRunnerResult` 与退出码 / 错误。
-     - 内存保护：Worker 捕获子进程输出，发生海量输出时自动落盘至 `spillPath` 临时文件，避免主管道阻塞溢出。
+     - 生成式 Remote：直接调用 `ctx.remote.<namespace>`、作用域调用 `agentCtx.remote.<namespace>`；`@Remote` / `@RemoteScope` 才把方法开放给 Client；HTTP 一元 RPC 落在 `POST /api/<namespace>/<method>`；`ctx.remote.$on()` 转发 allowlist 事件（root）+ scoped waterfall 事件（session）。
+     - **不存在** Client Runtime / HostFrame / `events.mux` / `events.host` / 通用 `resync()`；`page()` 仅用于更早历史与 gap repair；普通通知不重放、可靠恢复需 baseline/cursor/显式 query。
+   - **Host <-> Worker（`ctx.subprocess`）**：
+     - `spawn(spec)` 同步返回活跃 handle；`argv` 绝不 shell 解释；stdio 全显式、seam 零默认；`SubprocessCollect` 溢出保 TAIL + 可选 `spillPath` 落盘（offset reader `readFrom`）。
+     - `spawnTerminal`：唯一非管道原语，拥有终端分配/前台组/信号/整体清停；就绪/scrollback/沙箱归 PTY 消费方。
+     - `done` 只报 close 词汇（exitCode/signal），不带超时/取消分类。
+   - **沙箱（`ctx.sandbox`）**：`SandboxMode = read-only | workspace-write | danger-full-access` **只管文件效果**（不管网络/进程可见性）；danger 不经 ctx.sandbox；策略逐调用携带；无后端 fail-closed（`SandboxUnavailableError`）；denial=沙箱正常拦截、runner failure=命令从未执行、**退出状态永不能证明 runner 失败**。
 
 ## 3. 文档纠错与更新计划表 (已全部圆满完成)
 - [x] 1. 重构 `references/services.md`（纠正 ctx.sessions, ctx.agents, ctx.llm, 补充完整核心服务矩阵）

@@ -10,9 +10,11 @@ Cordis 规定：每个事件必须有明确的派发模式，且只能由其对�
 | --- | --- | --- | --- | --- |
 | emit | `ctx.emit(name, ...args)` | 否（同步） | 按注册顺序观察 | 否 |
 | waterfall | `ctx.waterfall(name, ...args)` | 否（同步） | 按注册顺序观察（环绕中间件） | 是（最终加工值） |
-| parallel | `ctx.parallel(name, ...args)` | 是（并发） | 所有监听器并行观察 | 否（只 await 全部 settle） |
-| serial | `ctx.serial(name, ...args)` | 是（按序） | 按注册顺序依次 await | 是（结果数组） |
-| bail | `ctx.bail(name, ...args)` | 否（同步） | 按序观察直到某监听器返回 bail 值 | 是（首个 bail 值） |
+| parallel | `ctx.parallel(name, ...args)` | 是（并发） | 所有监听器并行观察，全部 settle 后兑现 | 否（`Promise<void>`，不是结果数组） |
+| serial | `ctx.serial(name, ...args)` | 是（按序） | 依次 `await` 直到第一个 bail 值 | 是（首个 bail 值，`Promisify<ReturnType>`，不是结果数组） |
+| bail | `ctx.bail(name, ...args)` | 否（同步） | 同步按序调用直到第一个同步 bail 值 | 是（首个 bail 值） |
+
+**bail 值判定**：非 `null`、非 `false` 且非 `undefined` 的第一个值。`on` 返回 disposer（`() => boolean`）；布尔 options 是 `prepend` 简写；`EventOptions = { prepend?, global? }`（`global: true` 忽略上下文过滤器）；全部事件方法均有 `thisArg` 首参重载。
 
 ## Waterfall 语义（重要：不是传值链）
 

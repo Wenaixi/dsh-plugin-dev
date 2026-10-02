@@ -1,9 +1,4 @@
 # DSH Webhook 外部触发、无头模式 (Headless) 与 PTC 长工作流权威指南 (DSH 0.2.0-rc.2)
-
-> **⚠️ 核心定位声明**
-> **本文件是辅助开发 DeepSeek Harness (DSH) 插件中 Webhook 自动化集成、Headless 命令行运行与 PTC 工作流的权威技术规范。**
-> **本项目本身是一个 Skill，绝不是 DSH 插件本身！**
-
 ---
 
 ## 一、Webhook 外部自动化触发架构 (`ctx.webhookRuntime`)

@@ -30,24 +30,9 @@ DSH 是基于 Cordis 微内核构建的高可扩展 Agent Harness。在 DSH 架�
 ## 一、核心架构原则
 
 1. **零特权微内核**：不存在固化的特权逻辑。所有业务与平台能力均通过向共享 `Context` 挂载服务或监听事件提供。
-2. **核心服务大动脉 (The Core Spine)**（含官方 core/seam/bundle 角色）：
-   - `ctx.sessions`（core，`@deepseek-ai/dsh-session`）：仅追加事件日志与唯一真源。
-   - `ctx.systemPrompt`（core）：提示词装配与工具 Schema 生成。
-   - `ctx.tools`（core）：工具注册表、单调守卫、PTC 模式与多模态渲染。
-   - `ctx.agents`（core）：活跃 Agent 注册表与发起者作用域。
-   - `ctx.agentLoop`（**bundle**，`@deepseek-ai/dsh-agent-loop`）：唯一的具体循环插件；扩展包依赖 dsh-agent 的事件与服务，**绝不直接依赖此包**。
-   - `ctx.llm`（**seam**，`@deepseek-ai/dsh-llm`）：提供方无关消息流式协议与适配器接入。
-   - `ctx.settings` + `ctx.configEditor`（core）：配置表单投影与补丁持久化。
-3. **五大事件派发模式**：
-   - `emit`：同步通知，无返回值；
-   - `waterfall`：**同步环绕中间件**（监听器收 `(...args, next)`，调 `next()` 执行下游、不调即短路），返回最终加工值——不是简单传值链；
-   - `parallel`：`Promise.allSettled` 并发等待**全部 settle**，返回 `Promise<void>`（若有失败项全部 settle 后汇总抛出 `AggregateError`，绝非结果数组）；
-   - `serial`：依次 `await` 直到首个 bail 值（非 null/false/undefined）即短路返回（返回首个 bail 值，**绝非结果数组**）；
-   - `bail`：同步调用直到首个 bail 值，返回该 bail值。
-4. **配置落点与全量替换规约**：
-   - **废弃警告**：`$DSH_HOME/settings.yaml` 已完全废弃，修改无效。
-   - **三层落点（+ overlay）**：组合包 patch → `$DSH_HOME/profiles/<profile>/cordis.patch.yml` → `$DSH_HOME/cordis.patch.yml` → `--patch` overlay（按 argv 顺序）。后层按行胜出。
-   - **全量替换 (Wholesale Replacement)**：对条目的 `config` 覆盖是整块替换，不做深合并。
+2. **核心服务大动脉 (The Core Spine)**：**单复数是硬约束**——`ctx.sessions`、`ctx.agents`、`ctx.agentTeams`、`ctx.tools` 为复数；`ctx.systemPrompt`、`ctx.configEditor`、`ctx.schedule`、`ctx.planMode`、`ctx.llm` 为单数。`ctx.agentLoop` 是唯一的具体循环包（bundle），扩展插件依赖 `dsh-agent` 的事件与服务即可。完整 core/seam/bundle 角色矩阵见 [services.md](./references/services.md)。
+3. **五大事件派发模式**：`emit` 同步广播返回 `void`；`waterfall` 是同步环绕中间件（收 `(...args, next)`，不调 `next()` 即短路）；`parallel`/`serial`/`bail` 都在遇到首个 bail 值（非 null/false/undefined）时短路。源码级调度算法与 `isBailed` 边界见 [events.md](./references/events.md)。
+4. **配置落点与全量替换规约**：`$DSH_HOME/settings.yaml` 已废弃；四层补丁（组合包 → profile → 全局 → `--patch`）后层按行胜出；条目 `config` **整体替换，不做深合并**，改一个字段必须写全该层所需字段。详见 [config.md](./references/config.md)。
 5. **可逆副作用 (Reversible Effects)**：所有经 `ctx.on()`、`ctx.effect()`、`ctx.tools.register()` 注册的资源由所属 Fiber 跟踪，插件停用或热重载时自动逆向注销。
 
 ---
@@ -66,16 +51,7 @@ UI 插件必须遵循**双面插件 (Dual-Face)** 规范：Node 端 `lib/index.j
 
 ## 三、技术参考文档索引 (References)
 
-| 文档分类 | 章节链接 | 核心内容概述 |
-| --- | --- | --- |
-| **微内核与服务** | [plugin-anatomy.md](./references/plugin-anatomy.md) | 插件解剖学深模块：三种形态、Context 树、生命周期、派发模式、四角色矩阵、设置表单（含原 context-api/seams/plugin-forms） |
-| | [services.md](./references/services.md) | 官方服务矩阵（core/seam/bundle 角色）、`inject` 声明、Service 生命周期与命名规则 |
-| **配置与补丁** | [config.md](./references/config.md) | Schemastery 校验、三层补丁落点与生效层顺序、全量替换语义、settings.yaml 废弃 |
-| **事件与管线** | [events.md](./references/events.md) | 五大派发模式（waterfall=环绕中间件）与官方事件清单 |
-| | [tools.md](./references/tools.md) | 执行流水线、单调守卫、schemas 白名单、PTC 模式与 UI 展示边界 |
-| | [llm-adapter.md](./references/llm-adapter.md) | 适配器注册签名、StreamChunk 分片协议、Token 计量与错误契约 |
-| **工程与架构** | [packaging.md](./references/packaging.md) | Bundle/Profile 互斥、层顺序、git 安装授权、workspace 联调（含原 workspace-package） |
-| | [three-roles.md](./references/three-roles.md) | 三角色隔离、双面 UI 插件、Slots 层级树、IPC 与沙箱 |
+完整参考目录（23 篇，按 15 个主题分类）见 [references/README.md](./references/README.md)，其中包含本项目全部专题文档的导航与一句话概述：插件解剖学、核心服务矩阵、配置与补丁、事件与工具流水线、Web 插槽与主题、设置与插件中心 UI、跨端 Remote RPC、MCP 工具桥接、系统提示词与状态投影、多模态交付物、Webhook 与无头运行、内置中间件、领域存储与伪终端、斜杠命令与输入触发器、沙箱内核与网络代理、子智能体与文件锁、安装解析陷阱、官方上游核验与本地调试排毒。
 
 ---
 

@@ -8,7 +8,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 > **【核心定位】** 本文件是辅助开发者和 AI 助手开发、审查、调试 DSH (DeepSeek Harness) 插件的权威参考技能（Skill），**不是 DSH 插件自身**。
 >
 > **【必须调用要求与事实核验指引】**
-> - **必须调用**：进行任何 DeepSeek Harness (DSH) 插件开发、调试、审查或配置任务时，**必须调用本 Skill**，严禁凭模糊记忆猜测 API、服务挂载属性与配置字段；
+> - **必须调用**：进行任何 DeepSeek Harness (DSH) 插件开发、调试、审查或配置任务时，**必须调用本 Skill**；API、服务挂载属性与配置字段一律以本技能文档与官方类型声明为准，不要凭印象推断；
 > - **权威参考路由**：进行具体插件设计与编码前，必须通过第六节【场景决策与开发导引矩阵】路由到对应的权威参考文档（[`references/*.md`](./references/README.md)），全景主题导航见 [`references/README.md`](./references/README.md)；
 > - **鼓励并要求核验真实细节**：涉及具体服务契约、参数类型、Schema 结构或版本行为时，**强烈鼓励并要求查验真实细节**（官方上游仓库 `deepseek-ai/deepseek-harness`、本地已安装官方包的 `lib/index.d.ts` / `lib/index.js` 源码与类型声明、以及运行时 `ctx.tools.schemas()` 等真源，详见 [`references/official-upstream-and-docs.md`](./references/official-upstream-and-docs.md)），拒绝盲目断言。
 
@@ -38,9 +38,9 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
    - `@deepseek-ai/dsh-scope`：**纯函数库**（`createScope`/`scopeOf`），**不挂载任何服务**。
 3. **Cordis 五大事件派发模式**：
    - `emit`：同步顺序广播，返回 `void`；
-   - `waterfall`：**同步环绕中间件**（监听器接收 `(...args, next)`，调 `next()` 驱动下游，不调即短路，可整体替换最终返回值，**绝非普通传值链**）；
-   - `parallel`：`Promise.allSettled` 并发等待**全部 settle**，返回 `Promise<void>`（**绝非结果数组**），失败项汇总抛出 `AggregateError`；
-   - `serial`：依次 `await` 直到首个 bail 值（非 null/false/undefined），返回该 bail 值（**绝非结果数组**）；
+   - `waterfall`：**同步环绕中间件**（监听器接收 `(...args, next)`，调 `next()` 驱动下游，不调即短路，可整体替换最终返回值）；
+   - `parallel`：`Promise.allSettled` 并发等待**全部 settle**，返回 `Promise<void>`，失败项汇总抛出 `AggregateError`；
+   - `serial`：依次 `await` 直到首个 bail 值（非 null/false/undefined），返回该 bail 值；
    - `bail`：同步调用直到首个 bail 值，返回该 bail 值。
 4. **配置补丁四层生效与全量替换语义**：
    - 生效顺序：bundles 自带 patch -> profile patch -> 用户全局 patch -> CLI `--patch` overlays（后层胜出）；
@@ -188,7 +188,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 
 ---
 
-## 三、快速开始与代码范例
+## 七、快速开始与代码范例
 
 ### 场景 A：轻量生命周期插件
 ```js
@@ -265,7 +265,7 @@ import React from 'react'
 
 export const name = 'dsh-custom-ui/client'
 
-// 客户端组件严禁直接接收 ctx
+// 客户端组件只接收 slots 注入的 props
 function CustomWidget() {
   return <div className="p-4 bg-card rounded shadow">自定义状态面板</div>
 }
@@ -280,46 +280,26 @@ export function apply(ctx) {
 
 ---
 
-## 四、生产运维与防坑宝典
+## 八、生产运维与防坑宝典
 
-### 1. `--dump-config` 假阳性避坑
-- `dsh --dump-config` 通过仅代表 YAML 配置语法合规，**绝不证明插件能正常启动（不导入模块、不校验 peerDependencies）**；
-- 真实启动验证必须通过 3 步：
-  ```bash
-  # 1. 检查端口
-  netstat -ano | findstr "127.0.0.1:3080" | findstr LISTENING
-  # 2. 检查启动日志带 token 链接并请求获取 303 + Set-Cookie
-  # 3. 带 Cookie 请求根路径必须返回 200 text/html
-  ```
+### 1. 两条最常见的假阳性信号
+- `dsh --dump-config` 退出码为 0 只代表 YAML 语法合规，它不加载插件代码、不校验 peerDependencies。真实启动验收的三步命令（端口监听 + 鉴权跳转 + 首页 200）见 [config.md](./references/config.md) 第四节。
+- `pnpm` 报 `Done` 不代表安装成功：DSH 在安装后还有一道兼容性闸门，失败会回滚 `package.json`/`pnpm-lock.yaml`/`node_modules`。判定路径见 [install-resolution-traps.md](./references/install-resolution-traps.md)。
 
-### 2. 依赖安装与 OOM 防御
-- 规避 `pnpm` 处理 250+ 子包时的内存溢出崩溃，推荐标准命令：
-  ```bash
-  cd ~/.dsh/profiles/web
-  npm install --legacy-peer-deps --no-audit --no-fund
-  ```
-
-### 3. 版本兼容性强制豁免
+### 2. 版本兼容性强制豁免
 - 第三方包尚未标记适配新版 DSH 时执行：
   ```bash
   dsh plugin --profile <profile> allow-version <pkg>@<ver> --dsh-version <exact> --accept-risk
   ```
 - **豁免是最后手段**：报错说「版本不兼容」时，版本号往往是包管理器解析出来的陈旧版本，不是人选的。先确认解析版本与根因（pnpm 24 小时发布冷却期、semver 预发布排序），修版本选择优先于申请豁免。完整推导见 [install-resolution-traps.md](./references/install-resolution-traps.md)。
 
-### 4. 装到旧版本的快速自检
-```powershell
-# 关闭 pnpm 发布冷却期（v11+ 默认 1440 分钟），仅本次生效
-pnpm add <pkg> --config.minimum-release-age=0
-# 精确版本绕过冷却期与 semver 预发布排除
-pnpm add <pkg>@<exact-version>
-```
-- 若关闭冷却期或改用精确版本后立刻拿到正确版本，根因即冷却期或预发布排序；
-- profile 级永久关闭：编辑 `$DSH_HOME/profiles/<name>/pnpm-workspace.yaml` 追加 `minimumReleaseAge: 0`；
-- **清缓存对上述根因无效**，用 `npm install <pkg> --dry-run` 与 pnpm 结果横向对比可快速隔离。
+### 3. 装到旧版本时的两条立即验证
+- `pnpm add <pkg> --config.minimum-release-age=0`（关闭 24 小时发布冷却期）或 `pnpm add <pkg>@<exact-version>`（精确版本绕过冷却期）能立刻拿到正确版本，即坐实根因是解析策略而非网络；
+- **清缓存对上述根因无效**，用 `npm install <pkg> --dry-run` 与 pnpm 结果横向对比可快速隔离。完整推导、参数实验与决策表见 [install-resolution-traps.md](./references/install-resolution-traps.md)。
 
 ---
 
-## 五、工作区辅助脚本
+## 九、工作区辅助脚本
 
 - **多工程合规性批量校验**：
   ```bash

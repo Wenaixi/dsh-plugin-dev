@@ -65,7 +65,7 @@ DSH 采用微内核架构，没有特权核心，所有核心能力均以 Cordis
 
 ### 6. 作用域纯函数库 (ScopeLib)
 - **所属包**：`@deepseek-ai/dsh-scope`
-- **规范说明**：纯函数库，导出 `createScope`, `scopeOf`, `scopeTarget`。**绝不在 Context 上挂载任何服务**，严禁使用 `ctx.scope` 形式调用。
+- **规范说明**：纯函数库，导出 `createScope`, `scopeOf`, `scopeTarget`，以直接导入调用；它不在 Context 上挂载任何服务（不存在 `ctx.scope`）。
 
 ### 7. 外部信息桥接 (Modsearch Bridge)
 - **所属包**：`@liustack/modsearch`（替代旧版 Exa Filter）

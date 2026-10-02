@@ -1,9 +1,4 @@
 # DSH 沙箱底层隔离 (Windows ACL / Landlock)、图像转储与出站网络代理权威指南 (DSH 0.2.0-rc.2)
-
-> **⚠️ 核心定位声明**
-> **本文件是辅助开发 DeepSeek Harness (DSH) 插件中沙箱权限隔离、多模态图像转储与网络代理的权威技术规范。**
-> **本项目本身是一个 Skill，绝不是 DSH 插件本身！**
-
 ---
 
 ## 一、沙箱底层物理隔离原理 (Windows ACL 与 Linux Landlock)

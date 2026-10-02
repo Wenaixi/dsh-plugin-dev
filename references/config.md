@@ -52,15 +52,24 @@ export function apply(ctx: Context, config: Config) {
 
 `$DSH_HOME/settings.yaml` 是早期版本的历史文件，**现已完全废弃**。在 DSH 启动时，`@deepseek-ai/dsh-settings` 的 `importLegacyDocument()` 会将其自动改名为 `settings.yaml.imported`，并将其中的节区导入至配置补丁。修改 `settings.yaml` 或 `settings.yaml.imported` **不会产生任何效果**。
 
-### 唯一合法落点：cordis.patch.yml
+官方当前文档（0.2.0-rc.2）的任何页面均不再出现 settings.yaml：配置写入统一由 `@deepseek-ai/dsh-config-editor` 持久化到 profile 配置补丁（capability-seams 页原文："Persists profile config patches under the application file lock and HMR queue, then reconciles Loader entries"），设置表单层（settings 子系统）只负责投影与校验，落盘永远走 patch。
 
-用户和安装脚本修改配置的真实落点是对应 Profile 目录下的补丁文件：
+### 配置落点是三层补丁（+ overlay）
+
+用户和安装脚本修改配置的真实落点全部是 `cordis.patch.yml` 系列补丁，共三个层级（官方 publish 页确认的生效顺序）：
 
 ```
-$DSH_HOME/profiles/<profile>/cordis.patch.yml
+1. dsh.profile.bundles 各包的 patch（按列表顺序，先 @deepseek-ai/dsh-base）
+   —— 组合包自带配置层（如 dsh-hello-plugin/cordis.patch.yml）
+2. profile 自身 cordis.patch.yml：$DSH_HOME/profiles/<profile>/cordis.patch.yml
+   —— 用户针对该运行装配体的配置（默认 Web 界面为 profiles/web/cordis.patch.yml）
+3. $DSH_HOME/cordis.patch.yml
+   —— 机器本地偏好层（跨 profile 生效）
+4. 每个 --patch overlay（按 argv 顺序）
+   —— 本地开发验证用（pnpm dsh web --patch ./scratch-plugin/cordis.yml）
 ```
 
-例如对于默认 Web 界面，路径为 `$DSH_HOME/profiles/web/cordis.patch.yml`。
+后应用的层按行胜出。官方语义："patch 会替换目标行的整个 config 值，而不是深度合并各键"。`ctx.configEditor`（core 角色）正是在应用文件锁与 HMR 队列下持久化这些 profile 配置补丁、再协调 Loader 条目的服务。
 
 ## 补丁写入语义与语法
 

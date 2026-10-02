@@ -77,16 +77,21 @@
      - `done` 只报 close 词汇（exitCode/signal），不带超时/取消分类。
    - **沙箱（`ctx.sandbox`）**：`SandboxMode = read-only | workspace-write | danger-full-access` **只管文件效果**（不管网络/进程可见性）；danger 不经 ctx.sandbox；策略逐调用携带；无后端 fail-closed（`SandboxUnavailableError`）；denial=沙箱正常拦截、runner failure=命令从未执行、**退出状态永不能证明 runner 失败**。
 
-## 3. 文档纠错与更新计划表 (已全部圆满完成)
-- [x] 1. 重构 `references/services.md`（纠正 ctx.sessions, ctx.agents, ctx.llm, 补充完整核心服务矩阵）
-- [x] 2. 重构 `references/config.md`（彻底移除 settings.yaml 废弃内容，详述 cordis.patch.yml 与全量替换语义）
-- [x] 3. 重构 `references/events.md`（纠正 5 大派发模式，详细补充核心生命周期与 Agent/Tool 事件）
-- [x] 4. 重构 `references/tools.md`（补充 presentAs, guard, restrict, ContentBlock 多模态输出投影）
-- [x] 5. 重构 `references/llm-adapter.md`（补充 LlmRuntime.registerAdapter, ReplayEnvelope, 重试策略与 StreamChunk）
-- [x] 6. 重构 `references/three-roles.md`（更新现代 Web Client-UI 插件开发标准与 IPC 通信）
-- [x] 7. 重构 `references/packaging.md` 与 `references/workspace-package.md`（对齐 0.2.0-rc.2 bundle 与 profile 规范）
-- [x] 8. 重构 `references/plugin-anatomy.md`、`references/context-api.md`、`references/seams.md`、`references/plugin-forms.md`
-- [x] 9. 更新 `SKILL.md` 主入口（对齐最新术语与权威指引）
-- [x] 10. 校验并修复 `examples/` 下的 5 个示例插件配置与代码
-- [x] 11. 重写 `references/README.md` 与 `references/README.en.md`
-- [x] 12. 重写根目录 `README.md` 与 `README.en.md`
+## 3. 文档纠错与更新计划表（两轮深度校准，全部完成）
+
+第一轮（旧基线 0.2.0-rc.2 重构）：services/config/events/tools/llm-adapter/three-roles/packaging/plugin-anatomy/SKILL.md/README 全部重构，删除冗余 .en.md 与失效链接。
+
+第二轮（官方 44 页逐页核实 + 7 组子代理深度审计后的权威校准，本会话完成）：
+
+- [x] A. 五大派发模式按 cordis-api 原文修正：waterfall=环绕中间件（next() 短路/整体替换）、parallel 返回 `Promise<void>`（非结果数组）、serial 返回首个 bail 值（非结果数组）、bail 同步、bail 值=非 null/false/undefined；`on` 返回 disposer、EventOptions=prepend/global、thisArg 重载（agent-a）
+- [x] B. Context API：extend/isolate/intercept 语义、get(strict) 只返回活动提供方、provide 唤醒依赖方、accessor/mixin 随 fiber 移除、Context.is 全局品牌（agent-a）
+- [x] C. 工具执行流水线按 tool-execution-pipeline 官方精确顺序：tool/call 先记录 → presentCall → pre-execute → 单调 guard（deny/abstain）→ approval allowed-once → execute → 工具 execute → FS Gate → 工具自有事件 → projectContent → post-execute → 规范化 → finalizeContent → tools/result（同步）→ tool/result（持久化）→ presentResult；denied 仍进 projectContent（agent-e）
+- [x] D. tools.md 补官方工具归属表（run_code→tool-run-code、bash/pwsh→tool-bash/pwsh、edit/read→tool-fs、glob/grep→tool-fs-search、skill→tool-skill、subagent 系、job_*、goal 系、session_* 等），目录以 `ctx.tools.schemas()` 运行时结果为准（agent-e）
+- [x] E. three-roles.md 补 Typert api-gateway 契约：`@Remote`/`@RemoteScope` 才开放 Client、签名硬约束（禁解构/默认值/rest/可选）、协作取消 signal 最后一参、stream mode 经 /api/remote.mux（唯一合法用途）、错误码、构建流程（agent-e）
+- [x] F. events.md 补持久会话事件族（persistence-catalog 约 60 个）：5 类 SurfaceEventType、surfaceOp append/replace、ignorable 缺席=必需、类型指纹 SHA-256（agent-e）
+- [x] G. events.md 补宿主事件：workspace/session-activity（waterfall）、workspace/session-stop（parallel）、plan/mode、skills/change（agent-e）
+- [x] H. services.md 补宿主可选能力：ctx.planMode（PlanModeController、plan:policy order 50、软性指引）、ctx.workspaceRegistry（成员资格双条件、delete 不动会话日志）、dsh-agent-instructions 非 workspace 消费方；skills 注册表六级 rank 100-600、/**/SKILL.md 不支持、模型目录只用 name+description（agent-e）
+- [x] I. config.md 补生成器目录规则：config-catalog/persistence-catalog/tool-catalog 由 gen-*.ts 产出、verify-* 校验、禁止手改；运行时 seam 字段不能经 cordis.yml 设置（agent-e）
+- [x] J. CLAUDE.md 自身：A 节矩阵升级官方 core/seam/bundle 角色列、F 节 IPC 对齐 Typert Remote 架构（agent-a/b/f）
+- [x] K. 子代理产物清理：.doccheck/、docs-cache/、dsh-docs/、fetch-cache/、dsh-subsystems-doc-audit.md 已从工作树删除；examples/README.en.md、references/README.en.md 等冗余英文文件按 skill-designer-agent-skills 规范删除
+- [x] L. 失效链接清扫：grep 全库无 seams.md/context-api.md/plugin-forms.md/workspace-package.md 残留（CLAUDE.md 历史表除外，本表即为其新版本）

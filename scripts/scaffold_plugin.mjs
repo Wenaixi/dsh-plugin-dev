@@ -115,7 +115,7 @@ DSH 插件组合包。
 
 ## 安装与装载
 
-在所在 profile 的 `package.json` 中声明依赖并在 `cordis.patch.yml` 中组合生效。
+在所在 profile 的 \`package.json\` 中声明依赖并在 \`cordis.patch.yml\` 中组合生效。
 `
 writeFileSync(join(dir, 'README.md'), readmeMd)
 

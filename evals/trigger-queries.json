@@ -129,6 +129,14 @@
     {
       "query": "我想写个插件动态向模型系统提示词追加一段约束规则",
       "should_trigger": true
+    },
+    {
+      "query": "生成了 Excel 报表后怎么在 DSH 界面上给用户弹出一个可以原生打开的文件交付物卡片",
+      "should_trigger": true
+    },
+    {
+      "query": "在工具调用过程中怎么向用户发起一个单选或多选确认卡片",
+      "should_trigger": true
     }
   ]
 }

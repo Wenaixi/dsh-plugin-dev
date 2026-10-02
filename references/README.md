@@ -51,3 +51,7 @@
 ### 八、本地联调与故障排查 (Debugging & Troubleshooting) (Debugging & Troubleshooting)
 - **[debugging-and-troubleshooting.md](./debugging-and-troubleshooting.md)**：
   本地开发调试三大极速回路（`--patch` 覆盖、本地路径添加、临时沙盒）、双面插件前端排查技巧（`__DSH_BOOT__`、`__ModuleLoader__`、Combo 404）、Top 8 高频故障排查速查表（PENDING 挂起、配置冲掉、组件传 ctx 报错等）、黑匣子日志分析。
+
+### 九、多模态附件、人机交互与最终交付物呈递 (Multimodal & Deliverables)
+- **[multimodal-and-deliverables.md](./multimodal-and-deliverables.md)**：
+  多模态与人机交互权威指南——最终交付物卡片 (`present` 工具与前端 Deliverables 原生打开/预览)、人机协同结构化提问 (`ask_user_question` 与 `ctx.userQuestions` 挂起/恢复)、多模态图像附件规范化存储 (`dsh-attachment-local`)、以及长上下文工具结果智能剪枝 (`compaction-tool-result-pruner`)。

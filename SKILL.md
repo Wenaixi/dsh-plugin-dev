@@ -46,7 +46,67 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 
 ---
 
-## 二、场景决策与开发导引矩阵
+## 二、DSH 插件开发标准五步工作流 (5-Step Standard Workflow)
+
+无论开发哪种形态的插件，均推荐遵循以下严格的工程化闭环步骤：
+
+```
+[步骤 1: 架构选型] ──► [步骤 2: 生成骨架] ──► [步骤 3: 核心实现] ──► [步骤 4: 极速联调] ──► [步骤 5: 验收交付]
+   确定形态与依赖         调用 scaffold 脚本       生命周期与插槽/服务     --patch 临时叠加       批量校验与死链检测
+```
+
+1. **步骤 1：架构选型与依赖规划**
+   - **输入**：业务需求描述；
+   - **执行**：查阅下方【快速分流路由图】，确定插件形态（纯函数、面向模型工具、服务提供方、LLM适配器、双面UI等），确定所需注入的服务（`inject: ['tools', ...]`）；
+   - **输出**：确定的插件形态、所需服务清单、包名（如 `dsh-my-plugin`）。
+2. **步骤 2：生成工程骨架与依赖声明**
+   - **输入**：目标目录路径；
+   - **执行**：使用随包工具一键生成合规骨架（单面 `node scripts/scaffold_plugin.mjs <dir>`，双面追加 `--dual-face`）；
+   - **输出**：包含规范 `package.json`、`cordis.patch.yml`、入口 `index.js` 的工程骨架。
+3. **步骤 3：编写核心业务逻辑与生命周期**
+   - **输入**：业务逻辑与 API 接口；
+   - **执行**：编写功能代码。遵循核心铁律：所有副作用进入 `ctx.effect`、工具执行经 16 阶段流水线、React 组件绝不传 `ctx`、敏感密钥使用 `ctx.credentials` 引用模式；
+   - **输出**：完整实现的业务代码。
+4. **步骤 4：本地极速联调与排错验证**
+   - **输入**：未发布的本地插件代码；
+   - **执行**：使用 `dsh --profile web --patch ./my-plugin/cordis.patch.yml` 0 侵入启动测试；检查控制台 `window.__DSH_BOOT__` 与 `cfg.err`；
+   - **输出**：在 Web GUI 或终端中正常激活并生效的插件功能。
+5. **步骤 5：自动化验收与合规校验**
+   - **输入**：完成测试的插件目录；
+   - **执行**：运行 `node scripts/validate_plugin.mjs <dir>` 验证包规范；若有 Markdown 文档执行死链检测；
+   - **输出**：全部绿色通过的交付物。
+
+---
+
+## 三、关键安全决策检查点 (Safety Checkpoints)
+
+在进行自动化开发或自主推进时，遇到以下情况**必须触发暂停确认**，防止破坏宿主生产环境：
+
+- **⚠️ 检查点 1（修改全局 Profile 配置前）**：
+  在向当前活跃 profile 的 `cordis.patch.yml` 写入永久改动前，必须确认备份原文件（如 `cordis.patch.yml.bak`），防止配置错误导致整个 Web 宿主无法启动；
+- **⚠️ 检查点 2（执行高危系统调用与写文件前）**：
+  在调用 `ctx.subprocess.spawn` 执行破坏性文件删除或外部安装时，必须明确参数为扁平数组（严格零 Shell 解释），并提示用户确认当前沙箱模式（`read-only` / `workspace-write`）；
+- **⚠️ 检查点 3（添加带有未适配 peerDependencies 的插件时）**：
+  若遇到第三方包报 peer 不兼容，必须暂停提示用户并明确告知风险，再执行 `allow-version ... --accept-risk` 豁免。
+
+---
+
+## 四、异常边界与状态快速回滚指南 (Rollback & Recovery)
+
+若插件联调过程中出现系统异常，请按以下预案秒级恢复：
+
+1. **Web 宿主启动崩溃 (required plugin did not activate)**：
+   - 立即检查 `~/.dsh/profiles/<profile>/cfg.err`；
+   - 撤销最近一次在 `cordis.patch.yml` 中插入的条目，或将该条目置为 `disabled: true` 即可秒级恢复启动。
+2. **插件卡在 PENDING 状态无法就绪**：
+   - 检查该插件的 `inject` 列表，定位缺失的服务名称；将其从 `inject` 移除，改用代码内部 `ctx.get('service')` 动态降级容错。
+3. **前端页面白屏或样式错乱**：
+   - 检查浏览器控制台 Network 是否有 Combo 路由 404；
+   - 在控制台运行 `localStorage.clear()` 清理脏配置，或在宿主执行硬重启刷新 HMR 缓存。
+
+---
+
+## 五、场景决策与开发导引矩阵
 
 ```text
 ┌─ 插件开发需求快速分流路由 ────────────────────────────────────────────────────────┐

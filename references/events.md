@@ -114,21 +114,51 @@ ctx.on('tools/pre-execute', async (call) => {
 | `session/flush` | parallel | 无 waterfall veto；flush(session) 是唯一刷盘入口（禁止裸 ctx.parallel('session/flush',…)） |
 | `api-session/added` | `removed` | `status` | `error` | `activity` | emit | API 层会话状态 |
 
-### 4. LLM 流（ctx.llm / dsh-llm）
+### 4. 持久会话事件族（persistence-catalog，约 60 个事件）
+
+所有事件以 `type` 为判别键的真判别联合（switch 直接收窄 `data`，无 cast）；信封 `{type, seq, time, data}` + 可选 `ignorable` + 条件 `surfaceOp`/`sourceEventSeqs`。
+
+| 事件族 | 说明 |
+| --- | --- |
+| `add-on/msg`、`hook/invoked`、`hook/result` | 钩子与附加消息（仅日志扩展，不投影模型历史） |
+| `llm/retry`、`llm/retry-ready` | LLM 重试相关 |
+| `goal/change`、`plan/mode` | 目标与计划模式状态（plan/mode 仅记日志、整值替换、持久可回放、**绝不进入模型 transcript**；客户端只收 {active,pending}） |
+| `sandbox/mode` | 沙箱模式会话状态 |
+| `feedback/*`、`approval/*` | 反馈与审批（allowed-once 记录） |
+| `session/title`、`session/title-scheduled` | 会话标题 |
+| `tool/workflow/*` | 工具工作流（多工具编排） |
+| `workspace/changes` | 工作区变更（仅日志扩展） |
+| `compaction/*` | 压缩相关 |
+| `turn/start`、`turn/end`、`step/start`、`step/end` | 轮次与步骤边界（持久事实） |
+| `tool/call`、`tool/result`、`tool/ptc-dispatch`、`tool/ptc-dispatch-end` | 工具调用持久化 |
+| `user/message`、`assistant/attempt`、`assistant/message`、`developer/message`、`system/message`、`request/header`、`request/context`、`session/end-seed` | 消息与请求 |
+
+**SurfaceEventType 只有 5 类**：`system/message` | `developer/message` | `user/message` | `assistant/message` | `tool/result`——只有它们可携带 `surfaceOp`（`'append'` 或 `{op:'replace', startSeq, endSeq}`，replace 用于压缩、须含全部被遮蔽表面节点），因此产生模型历史；log-only 事件不产生。`ignorable` 缺席=必需，读者遇未识别**必需**事件必须拒绝重建会话而非静默丢弃。机器可读 schema 在 `docs/persistence-schema.json`；类型指纹 SHA-256（注释/位置/别名/readonly 不影响，元组顺序/属性名/值类型/可选性影响）。
+
+### 5. LLM 流（ctx.llm / dsh-llm）
 
 | 事件 | 模式 | 说明 |
 | --- | --- | --- |
 | `llm/stream` | waterfall | 可短路整个流分发 |
 | `llm/adapters-updated` | emit | 负载为空；每次 commit 点触发，消费方重读 listProviders/listModels |
 
-### 5. 系统提示词（ctx.systemPrompt）
+### 6. 系统提示词（ctx.systemPrompt）
 
 | 事件 | 模式 | 说明 |
 | --- | --- | --- |
 | `system-prompt/change` | emit | 注册/注销提示词段落；故意不 scope 过滤 |
 | `system-prompt/assemble` | waterfall | Scoped 过滤；返回值为权威；complete 段在 waterfall 后恢复为唯一段落 |
 
-### 6. 环境与内部钩子事件（Inherited Cordis API）
+### 7. 宿主事件（workspace / plan / skills）
+
+| 事件 | 模式 | 说明 |
+| --- | --- | --- |
+| `workspace/session-activity` | waterfall | 归档前询问"还有什么在跑"，非空拒绝不写入；无提供方组合可自由归档 |
+| `workspace/session-stop` | parallel | `stopActivity` 时先写归档再派发停止；活动族键 turn/job/subagent/schedule |
+| `plan/mode` | emit | 计划模式 `{active:boolean}`：仅记日志、整值替换、持久可回放、**绝不进入模型 transcript** |
+| `skills/change` | emit | 技能注册表失效通知（无 diff，重查 `ctx.skills.list()`） |
+
+### 8. 环境与内部钩子事件（Inherited Cordis API）
 
 | 事件 | 模式 | 说明 |
 | --- | --- | --- |

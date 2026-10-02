@@ -27,6 +27,16 @@ DeepSeek Harness (DSH 0.2.0-rc.2) 采用清晰的物理分层与进程隔离架�
 └────────────────────────────────────────────────────────┘
 ```
 
+## 目录
+
+- [三大角色的物理边界与职责](#三大角色的物理边界与职责)
+- [前端插件的双面架构 (Dual-Face Architecture)](#前端插件的双面架构-dual-face-architecture)
+- [浏览器端插件加载、Slots 插槽与样式管理](#浏览器端插件加载slots-插槽与样式管理)
+- [进程间通信 (IPC) 协议](#进程间通信-ipc-协议)
+- [常见误解](#常见误解)
+
+---
+
 ## 三大角色的物理边界与职责
 
 | 角色 | 运行环境 | 核心职责 | 权限与安全边界 |
@@ -56,8 +66,12 @@ DeepSeek Harness (DSH 0.2.0-rc.2) 采用清晰的物理分层与进程隔离架�
     "./client": { "types": "./lib/types/client/index.d.ts", "default": "./lib/client.js" }
   },
   "dsh": {
-    "bundle": { "patch": "./cordis.patch.yml" },
-    "client": { "platform": "web", "inject": ["@deepseek-ai/dsh-client-ui-settings"] }
+    "bundle": { "id": "client-ui-example", "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "module": "./lib/client.js",
+      "inject": ["@deepseek-ai/dsh-client-ui-settings"]
+    }
   },
   "peerDependencies": {
     "@deepseek-ai/dsh": ">=0.2.0-rc.1",
@@ -67,6 +81,8 @@ DeepSeek Harness (DSH 0.2.0-rc.2) 采用清晰的物理分层与进程隔离架�
 ```
 
 注意：官方当前 client 注入包是 `@deepseek-ai/dsh-client-ui-settings`（旧文档中的 `dsh-client-ui-slots` / `dsh-client-connection` 拆分已合并为平台运行时 + 注入式组合）。**浏览器半侧只挂在说明符恰为裸包名的那一行上**；子路径导出挂载的行永远不带半侧。
+
+**三个必填字段缺一不可**：`dsh.bundle.id`（组合包标识，`cordis.patch.yml` 里的 `id` 必须与之一致）、`dsh.client.module`（客户端入口相对路径，必须真实存在）、`exports["./client"]`（子路径导出，指向同一个 client 文件）。随包校验器 `validate_plugin.mjs` 会对这三项做静态检查，本文的示例可直接通过校验。
 
 ## 浏览器端插件加载、Slots 插槽与样式管理
 
@@ -113,6 +129,8 @@ export function apply(ctx: ClientContext) {
 
 **组件绝不收到 ctx**：owner props 传父已知值、共享视图状态走声明的 store、service/model 留 apply closure 只投影 callback/observable。
 
+**为什么组件不能拿到 ctx**：React 组件的生命周期由 React Fiber 驱动，而 Cordis 上下文有严格的局部依赖跟踪与可逆生命周期。把 `ctx` 当 Props 传进组件会造成闭包泄漏、HMR 无法正确解构上下文、以及跨作用域状态污染。组件所需状态全部经宿主插槽定义的 `props` 传入；需要触发服务端操作时，用 props 传入的回调函数，或经 Client 侧的 `ctx.remote` 通信。
+
 #### 标准 Slot 层级（官方 slots 页）
 
 ```
@@ -126,6 +144,30 @@ root
 ```
 
 已知注入点示例：`settings.general.item`、`settings.models.provider-card`、`settings.plugins.tab`、`main.conversation→conversation.session/view/chat.node/composer/input.*`、`rightbar.session→sidebar.right.pane.tab`、`shell.leading/overlay`。
+#### 常用 Slot 标识清单（按层级）
+
+| 层级 | Slot 标识 | Cardinality | Scope | 典型用途 |
+| --- | --- | --- | --- | --- |
+| `sidebar.*` | `sidebar.brand` | single | root | 侧边栏品牌区域 |
+| | `sidebar.workspaces` | list | root | 工作区列表项 |
+| | `sidebar.settings` | list | root | 侧边栏底部设置入口 |
+| | `sidebar.files` | list | session | 会话关联的文件树视图 |
+| | `sidebar.terminal` | list | session | 侧边栏终端集成面板 |
+| `main.*` | `main.chat` | single | session | 主聊天交互区 |
+| | `conversation.session` | single | session | 会话状态外壳 |
+| | `conversation.view` | list | session | 消息流呈现视口 |
+| | `conversation.chat.node` | chain | session | 消息节点流水线包裹/拦截 |
+| | `conversation.composer` | list | session | 输入框下方功能区 |
+| | `conversation.input.attachments` | list | session | 输入框附加能力条 |
+| `rightbar.*` | `sidebar.right.pane.tab` | keyed | session | 右侧抽屉栏扩展 Tab（原 `rightbar.session`） |
+| `shell.*` | `shell.leading` | list | root | 顶部全局横幅通知 |
+| | `shell.overlay` | list | root | 全局模态框 / 浮层 |
+| `settings.*` | `settings.general.item` | list | root | 常规设置条目 |
+| | `settings.models.provider-card` | list | root | 模型提供方卡片 |
+| | `settings.plugins.tab` | keyed | root | 插件管理 Tab 面板 |
+| | `settings.section` | list | root | 扩展设置区块 |
+
+Cardinality 选错会导致重复渲染或完全不渲染；调试实时插槽树用 `cordis_inspect what:"client"`。
 
 **标准 hooks**：全 scope 有 `useSessions` / `useSessionStatus` / `useSessionRetainInfo` / `useWorkspaces` / `usePanelInfo`；session 系另有 `sessionId` / `useSession` / `useProjection` / `useConversation` / `useInput` / `useChat` / `useTrajectory`；store 与 locale 推导 `useStore` / `t`。
 

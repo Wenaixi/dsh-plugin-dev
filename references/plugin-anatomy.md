@@ -1,36 +1,38 @@
 # 插件解剖学 (Plugin Anatomy)
 
-在 DeepSeek Harness (DSH) 中，一切能力皆为插件。Cordis 插件是一等公民对象，通过声明依赖（`inject`）、提供或消费服务、监听或分发事件，向运行上下文注入功能。本文件是插件开发的核心枢纽：涵盖插件形态、Context 上下文 API、作用域、可逆副作用与生命周期、核心能力切面（Seam）依赖倒置，以及设置表单与配置持久化契约。
+> 本文件是「插件是什么、怎么挂、怎么活下来」的权威定义。三角色与双面插件/Slots 见 [three-roles.md](./three-roles.md)，Cordis Context Proxy 内核见 [cordis-context-internals.md](./cordis-context-internals.md)，设置表单见 [config.md](./config.md)。
+
+## 目录
+
+- [1. 插件三种形态](#1-插件三种形态)
+- [2. 插件标准要素解剖](#2-插件标准要素解剖)
+- [3. Context 上下文 API 与作用域](#3-context-上下文-api-与作用域)
+- [4. 核心能力切面 (Seams) 与依赖倒置](#4-核心能力切面-seams-与依赖倒置)
+
+---
+
+在 DeepSeek Harness (DSH) 中，一切能力皆为插件。Cordis 插件是一等公民对象，通过声明依赖（`inject`）、提供或消费服务、监听或分发事件，向运行上下文注入功能。本文件覆盖：插件的三种形态、标准要素（`name`/`inject`/`Config`/可逆副作用）、Context API 与作用域，以及核心能力切面（Seam）的依赖倒置法则。
 
 ## 1. 插件三种形态
-
 官方权威定义：**插件是导出 `apply` 的 TypeScript 模块**，框架加载时以 `ctx`（上下文对象）调用它来注册能力。
-
 ### 1.1 函数插件 (Function Plugin)
-
 适用于大多数无状态扩展、工具注册、事件拦截或轻量业务集成：
-
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
-
 // 1. 显式插件标识（必须与导出同名）
 export const name = 'my-greeting-plugin'
-
 // 2. 静态依赖声明（确保服务已就绪后 apply 才执行）
 export const inject = ['tools']
-
 // 3. 强类型配置定义与 Schema 校验（默认值写在 Schema 内）
 export interface Config {
   prefix: string
   repeat: number
 }
-
 export const Config: Schema<Config> = Schema.object({
   prefix: Schema.string().default('Hello'),
   repeat: Schema.number().default(1),
 })
-
 // 4. 应用入口函数
 export function apply(ctx: Context, config: Config) {
   // apply 在所有 inject 声明的服务就绪后同步执行
@@ -42,18 +44,13 @@ export function apply(ctx: Context, config: Config) {
       return `${config.prefix}, ${args.name}!`.repeat(config.repeat).trim()
     },
   })
-
   // 注册的副作用（事件监听器、工具等）受 ctx 作用域管理，卸载时自动回滚
 }
 ```
-
 ### 1.2 对象插件 (Object Plugin)
-
 等价于函数形式，适用于希望把 name/inject/apply 聚合在同一对象的场景：
-
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
-
 export default {
   name: 'my-plugin',
   inject: ['tools'],
@@ -62,198 +59,60 @@ export default {
   },
 }
 ```
-
 ### 1.3 服务类插件 (Service Class Plugin)
-
 适用于管理长生命周期资源、对外公开专属服务方法、或维护复杂运行时状态的场景。当插件需要向其他插件提供服务时使用类形式：
-
 ```ts
 import { Service, type Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
-
 declare module '@deepseek-ai/cordis' {
   interface Context {
     taskQueue: TaskQueueService
   }
 }
-
 export interface TaskQueueConfig {
   concurrency: number
 }
-
 export class TaskQueueService extends Service {
   static inject = ['sessions']
   static Config: Schema<TaskQueueConfig> = Schema.object({
     concurrency: Schema.number().default(5),
   })
-
   private runningCount = 0
-
   constructor(ctx: Context, public config: TaskQueueConfig) {
     // 第二个参数是挂载到 ctx 上的服务键名（name 即 ctx 挂载键）
     super(ctx, 'taskQueue', true)
   }
-
   protected override start(): void | Promise<void> {
     // 所有依赖就绪后调用；返回 Promise 时下游插件保持等待
   }
-
   protected override stop(): void | Promise<void> {
     // 优雅停机、释放连接池或未完成任务
   }
-
   public enqueue(task: () => Promise<void>) {
     // 公开的业务能力
   }
 }
-
 export const name = 'task-queue-service'
-
 export function apply(ctx: Context, config: TaskQueueConfig) {
   ctx.plugin(TaskQueueService, config)
 }
 ```
-
 **服务生命周期契约**：
 - **构造阶段**：`super(ctx, name)` 后服务立即注册到 `ctx.<name>`，并随所属 fiber 自动移除（无需手动注销）。
 - **start() 钩子**：所有依赖就绪后调用。若返回 Promise，依赖该服务的下游插件会保持等待。
 - **stop() 钩子**：服务所属插件被卸载或环境退出时触发。
 - 服务内部注册的事件与 `ctx.effect()` 资源均与 fiber 生命周期绑定，卸载时自动注销。
 
-## 2. 双面插件模型 (Dual-Face Plugin Anatomy)
+---
 
-在 DSH Web GUI 体系中，凡是需要贡献前端界面（如自定义侧边栏、聊天节点视图、设置表单卡片、状态指示器）的插件，均遵循**双面插件 (Dual-Face Architecture)** 规范：
-
-```
-+----------------------------------------------------------+
-|                    Dual-Face Plugin                      |
-+----------------------------+-----------------------------+
-|        Host 半侧           |         Client 半侧         |
-|      (Node.js 宿主)        |      (Browser 渲染层)       |
-+----------------------------+-----------------------------+
-| lib/index.js               | lib/client.js               |
-| export apply(ctx)          | export apply(ctx)           |
-| Cordis 服务 / 工具注册      | ctx.slots.inject 插槽组件   |
-+----------------------------+-----------------------------+
-```
-
-### 2.1 物理结构与 package.json 声明
-
-双面插件在 `package.json` 中必须同时声明主入口与 `./client` 导出，并提供 `dsh.client` 配置块：
-
-```json
-{
-  "name": "@my-scope/dsh-my-plugin",
-  "version": "0.1.0",
-  "main": "./lib/index.js",
-  "exports": {
-    ".": "./lib/index.js",
-    "./client": "./lib/client.js"
-  },
-  "dsh": {
-    "bundle": {
-      "patch": "./cordis.patch.yml"
-    },
-    "client": {
-      "platform": "web"
-    }
-  },
-  "peerDependencies": {
-    "@deepseek-ai/cordis": ">=0.2.0-rc.2",
-    "@deepseek-ai/dsh": ">=0.2.0-rc.2",
-    "react": ">=18.0.0"
-  }
-}
-```
-
-- **Host 半侧 (`lib/index.js`)**：导出 `apply(ctx)`。由服务端 Cordis Loader 在 Node 进程中挂载，负责注册工具、监听核心事件、发布 Remote 服务。
-- **Client 半侧 (`lib/client.js`)**：导出 `apply(ctx)`。由浏览器端独立的 Cordis 运行时加载，负责插槽组件注入与界面交互。
-
-### 2.2 惰性 CJS Bundle 与物化机制 (Materialization)
-
-1. **构建输出**：执行 `tsc -b && tsdown` 时，Client 半侧代码被打包为一个惰性 CJS bundle。
-2. **注册契约**：脚本加载时，仅向全局加载器注册工厂函数：`window.__ModuleLoader__.load({ id, factory })`，此时**不执行模块体代码，也不注入 CSS**。
-3. **按需物化**：当模块首次被消费（`import` 或 `require`）时，工厂函数被调用并缓存 (`loadCache`)。样式代码编译在 bundle 内部，物化时自动挂载带 `data-plugin` 属性的 `<style>` 标签。
-4. **HMR 自动回收**：插件卸载或热重载时，旧 fiber 及其拥有的 style 标签被 `removeOwnedStyles()` 精确清理。
-
-### 2.3 启动图注入与 Combo 路由
-
-- **启动图注入 (`window.__DSH_BOOT__`)**：Host 端的 `ctx.clientModules` 动态扫描所有声明了 `dsh.client` 且处于启用状态的插件，生成依赖图，直接内联注入到 HTML `<head>` 的 `window.__DSH_BOOT__` 清单中。
-- **Combo 批量路由**：浏览器通过单条多路复用请求按需批量下载插件脚本，路径格式为：
-  ```
-  /plugins/??<id1>/client.js,<id2>/client.js&rev=<composite-rev>
-  ```
-  受系统常量 `MAX_COMBO_URL_BYTES` 保护，若依赖插件列表超长则自动分页切分。
-
-### 2.4 Slots 插槽体系与组件无 ctx 铁律
-
-UI 插件绝不能直接操作宿主 DOM，必须通过插槽系统向宿主预设点位挂载 React 组件：
-
-```tsx
-// lib/client.tsx (Client 半侧)
-import type { Context } from '@deepseek-ai/cordis'
-import React from 'react'
-
-export function apply(ctx: Context) {
-  // 注入到会话输入框附加区域
-  ctx.slots.inject('conversation.input.attachments', () =>
-    ctx.slots.register(
-      {
-        order: 100, // 排序权重
-      },
-      // 核心铁律：React 组件绝不能接收 ctx！
-      // 只能接收宿主插槽传入的类型化 Props 或回调函数
-      ({ sessionId, disabled }: { sessionId: string; disabled?: boolean }) => {
-        return (
-          <button disabled={disabled} onClick={() => console.log('Clicked', sessionId)}>
-            My Attachment
-          </button>
-        )
-      }
-    )
-  )
-}
-```
-
-#### 核心铁律：组件绝不能接收 ctx (Zero-Context Component Rule)
-- **原因**：React 组件的生命周期由 React Fiber 驱动，而 Cordis 上下文拥有严格的局部依赖跟踪与可逆生命周期。若将 `ctx` 作为 Props 传给组件，会导致闭包泄漏、HMR 无法正常解构上下文、以及跨作用域状态污染。
-- **通信手段**：组件所需状态全部通过宿主插槽定义的 `props` 传入；若组件需要触发服务端操作，通过 props 传递的回调函数或自定义 hook 与 Client 侧的 `ctx.remote` 通信。
-
-#### 官方标准 Slot 层级树
-
-| 根节点 / 分支 | 典型 Slot 标识 | Cardinality（基数） | Scope（作用域） | 典型用途 |
-| --- | --- | --- | --- | --- |
-| **root** | `root` | single | root | 应用最外层骨架挂载 |
-| **sidebar.*** | `sidebar.brand` | single | root | 侧边栏品牌区域 |
-| | `sidebar.workspaces` | list | root | 工作区列表项 |
-| | `sidebar.settings` | list | root | 侧边栏底部设置入口 |
-| | `sidebar.files` | list | session | 会话关联的文件树视图 |
-| | `sidebar.terminal` | list | session | 侧边栏终端集成面板 |
-| **main.*** | `main.chat` | single | session | 主聊天交互区 |
-| | `conversation.session` | single | session | 会话状态外壳 |
-| | `conversation.view` | list | session | 消息流呈现视口 |
-| | `conversation.chat.node` | chain | session | 消息节点流水线包裹/拦截 |
-| | `conversation.composer` | list | session | 输入框下方功能区 |
-| | `conversation.input.attachments` | list | session | 输入框附加能力条 |
-| **rightbar.*** | `sidebar.right.pane.tab` | keyed | session | 右侧抽屉栏扩展 Tab（原 rightbar.session） |
-| **shell.*** | `shell.leading` | list | root | 顶部全局横幅通知 |
-| | `shell.overlay` | list | root | 全局模态框 / 浮层 |
-| **settings.*** | `settings.general.item` | list | root | 常规设置条目 |
-| | `settings.models.provider-card` | list | root | 模型提供方卡片 |
-| | `settings.plugins.tab` | keyed | root | 插件管理 Tab 面板 |
-| | `settings.section` | list | root | 扩展设置区块 |
-
-- **Cardinality（基数）**：`single`（唯一覆盖）、`list`（按 order 列表排布）、`keyed`（按 key 唯一索引替换）、`chain`（责任链环绕，提供 next 渲染后续组件）。
-- **Scope（作用域）**：`root`（全局单例）、`session-maybe`（会话可选）、`session`（强绑定当前会话生命周期）。
-
-## 3. 插件标准要素解剖
+## 2. 插件标准要素解剖
 
 1. **`name`（唯一标识）**：每个插件模块必须导出小写连字符命名的字符串 `name`，供 Cordis 跟踪生命周期与日志排查。
 2. **`inject`（依赖拓扑）**：声明运行所需的服务。列表位置不决定执行顺序，依赖关系才决定执行拓扑。声明形式有两种：数组（全部必需）或对象 `{ required: [...], optional: [...] }`。
 3. **`Config` 与 `Schema`**：导出 TypeScript 接口与同名运行时校验器，默认值直接写在 Schema 中。**不要导出普通对象作为 Config**——它不满足 Cordis 要求的 Standard Schema 接口。配置非法时插件加载失败并报告明确错误。
 4. **可逆副作用 (Reversible Effects)**：所有注册（工具、事件监听、中间件、服务）均受 Fiber 跟踪，卸载插件时自动逆向注销，零内存泄漏。通过 `ctx` 注册的任何东西——事件监听、工具、定时器——在插件卸载时都会被自动清理，无需手动 removeListener 或 clearInterval。
 
-## 4. Context 上下文 API 与作用域
+## 3. Context 上下文 API 与作用域
 
 `Context` 是 Cordis 运行时的根基，也是每个插件与微内核交互的唯一媒介。整个 DSH 系统由树状上下文（Context Tree）维系。
 
@@ -322,7 +181,7 @@ const isolatedCtx = ctx.isolate(['database'])
 isolatedCtx.plugin(SubPlugin)
 ```
 
-## 5. 核心能力切面 (Seams) 与依赖倒置
+## 4. 核心能力切面 (Seams) 与依赖倒置
 
 DSH 的设计精髓是**切面（Seam）化设计**：不存在特权或硬编码的内置逻辑，所有产品能力均被切分为抽象契约，由配置可替换的插件实现。DSH 官方将每种能力划分为四种角色之一：
 
@@ -385,67 +244,3 @@ DSH 的设计精髓是**切面（Seam）化设计**：不存在特权或硬编�
 - **严禁依赖具体实现包**：绝不直接 `import` 具体提供方实现（例如不要在业务代码中直接 `import { DefaultAgentLoop } from '@deepseek-ai/dsh-agent-loop'`），以确保底座在更换驱动器或沙箱环境时业务逻辑完全不受影响。
 - **命名规则**：单数 ctx 键用于 engine/runtime/policy/controller/resolver/store 等；复数键用于 registry 或拥有多个具名成员的服务（如 `ctx.sessions`、`ctx.agents`）。
 - **host 与 client 不得复用同一 Cordis Context 键**：TS 声明合并会同时看到两种类型。
-
-## 6. 设置表单与配置持久化 (Settings Forms)
-
-DSH 为插件提供统一的用户配置表单体系。插件导出的 Schemastery 配置契约会被自动反射为 Web GUI 设置界面的可视化表单控件，并在用户修改后持久化至配置补丁文件。
-
-### 5.1 核心服务与寻址
-
-- **`SettingsService` (`ctx.settings`, `@deepseek-ai/dsh-settings`)**：将当前激活 Profile 中的插件配置字段动态投影为前端表单描述符（Descriptors）。核心方法：`configure({auto?})`、`describe()`、`update(ns, patch, expectedRevision?)`、`replace(ns, section, expectedRevision?)`、`mutate(ns, ops, expectedRevision?)`。
-- **`ConfigEditor` (`@deepseek-ai/dsh-config-editor`)**：提供带文件锁的原子化持久化写入服务，目标为当前 Profile 的配置补丁。
-- **标识寻址**：表单系统基于当前 Profile 中条目的**局部唯一标识符（Entry ID）**进行命名空间寻址。若同一插件包挂载多个实例（如两个 MCP 客户端），只要 `id` 不同，前端设置面板就会呈现为多份独立表单。只有带明确 `id` 且导出非空 Schema 的条目才会生成表单。
-
-### 5.2 三种写入语义（官方权威）
-
-| 方法 | 语义 |
-| --- | --- |
-| `update(ns, patch)` | **合并**提交字段（默认语义） |
-| `replace(ns, section)` | 先将即时字段**重置为继承配置**，再应用提交字段（整体替换） |
-| `mutate(ns, ops)` | **路径级**寻址编辑，保留客户端响应中未包含的秘密值 |
-
-每次写入都会验证完整 Config，并在持久化前**拒绝过期修订号**（乐观并发控制）。
-
-### 5.3 表单描述符与乐观版本控制
-
-每个配置表单的描述符包含：
-- `resolvedValues`：当前生效的最终配置值（已合并默认值与用户覆盖）。
-- `inheritedValues`：由底层 Bundle 定义的基础默认配置。
-- `profileOverrides`：在当前 Profile 补丁中显式声明的覆盖字段。
-- `revision`：用于并发安全保护的递增版本号。前端提交时必须附带期望版本号，若中途有其他进程更新了文件，保存操作将因版本冲突安全中止。
-
-### 5.4 持久化写入语义规范
-
-1. **唯一写入目标**：当前 Profile 的补丁文件（`$DSH_HOME/profiles/<profile>/cordis.patch.yml`）。
-2. **全量替换规约 (Replaced Wholesale)**：写入的配置字段会完整替换该条目的 `config` 块，**不会执行深合并**。表单提交必须提交完整的已解析配置对象。
-3. **文件锁保护**：写入过程受文件锁保护，避免并发写入导致 YAML 语法损坏。
-4. **HMR 自动触发**：写入完成后，文件监听器自动检测到补丁变动，执行增量重载而无需重启应用。
-5. **即时字段 (Volatile)**：配置可用 `Volatile<T>` + `Schema.xxx().volatile()` 声明即时字段，运行时用 `.get()` 读取、跨字段校验用 `.check()`（Host 持久化前执行，不进表单 schema）；变更经 `loader/volatile-update` 事件推送（只派发给所属 fiber）。`role('secret')` 阻止值进入表单响应；凭据域值用凭据引用。
-
----
-
-## 8. Cordis 4.0.4 微内核 Context Proxy 隔离底层深度剖析
-
-在 DSH 中，`Context` 对象本质是一个受保护的 JavaScript Proxy，属性访问通过服务解析器（Service Resolver）动态分发。
-
-### 1. `ctx.isolate(key)` 服务作用域物理隔离槽
-当插件希望在子上下文（Child Context）中覆盖某个全局服务，但又不希望污染全局父级上下文时：
-```js
-// 在子上下文为 customCache 服务创建隔离槽
-const childCtx = ctx.isolate('customCache');
-
-// 子上下文注册的实现仅对自己及后代可见，父上下文完全感知不到
-childCtx.plugin(MyIsolatedCachePlugin);
-```
-- 隔离键被记录在 `Context[symbols.isolate]` 映射表中；
-- 实现了多 Agent 或多任务间的服务多租户隔离。
-
-### 2. `ctx.intercept(key, config)` 动态拦截代理
-允许针对特定服务的方法调用或属性读取挂载动态拦截器（Intercept Map），在不重写服务类的情况下实现切面监控或参数注入。
-
-### 3. `Context.is(value)` 全局跨 Realm 品牌检验
-Cordis 废弃了脆弱的 `value instanceof Context` 判定，改用全局 Symbol 品牌：
-```js
-Context.is[Symbol.toPrimitive] = () => Symbol.for("cordis.is");
-```
-- 使得即便在多包 Monorepo、不同 npm 副本或不同 iframe/Worker Realm 下，跨环境的 Context 对象依然能 100% 准确识别！

@@ -14,6 +14,8 @@
   **任何架构结论与官方源码冲突时，一律以源码为准。**
 
 ### 二、微内核与服务架构 (Microkernel & Spine)
+- **[cordis-context-internals.md](./cordis-context-internals.md)**：
+  Cordis 微内核底层的三个隔离原语——`ctx.isolate(key)` 服务作用域物理隔离槽、`ctx.intercept(key, config)` 动态拦截代理、`Context.is(value)` 全局 Symbol 品牌跨 Realm 检验。
 - **[services.md](./services.md)**：
   The Core Spine 核心大动脉服务单复数绝对铁律（`ctx.sessions`、`ctx.agents`、`ctx.agentTeams`、`ctx.tools` 为复数；`ctx.schedule`、`ctx.planMode`、`ctx.workspaceRegistry` 为单数；`ctx.llm` 为 Seam）、Service 类定义规范与依赖注入契约。
 - **[plugin-anatomy.md](./plugin-anatomy.md)**：

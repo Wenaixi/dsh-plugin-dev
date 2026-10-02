@@ -4,6 +4,18 @@
 
 ---
 
+## 目录
+
+- [一、配置系统重大废弃警告](#一配置系统重大废弃警告)
+- [二、权威四层叠加落点与全量替换语义](#二权威四层叠加落点与全量替换语义)
+- [三、补丁语法与动态表达式规范](#三补丁语法与动态表达式规范)
+- [四、权威工程运维与避坑准则](#四权威工程运维与避坑准则)
+- [五、Web Profile 官方生效的14 个 Bundles 清单](#五web-profile-官方生效的-14-个-bundles-清单)
+- [六、生成器目录规则 (Generator Catalogs)](#六生成器目录规则-generator-catalogs)
+- [七、设置表单与配置持久化](#七设置表单与配置持久化)
+
+---
+
 ## 一、配置系统重大废弃警告
 
 > **绝对严禁教导用户修改 `$DSH_HOME/settings.yaml`！**
@@ -145,3 +157,37 @@ dsh plugin --profile <profile> allow-version <pkg-name>@<version> --dsh-version 
 - 这三个目录由 `scripts/gen-*.ts` 脚本根据源码类型定义自动生成，并通过 `verify-*` 脚本在 CI 中校验；
 - **严禁任何开发者手动修改这三个目录中的文件**；
 - 运行时 Seam 字段在配置 Schema 中被显式剔除，无法通过静态 `cordis.yml` 进行持久化配置，必须由插件动态装载。
+## 七、设置表单与配置持久化 (Settings Forms)
+
+插件导出的 Schemastery 配置契约会被自动反射为 Web GUI 设置界面的可视化表单控件，并在用户修改后落盘到本文件第二节所述的补丁层。
+
+### 7.1 核心服务与寻址
+
+- **`SettingsService` (`ctx.settings`, `@deepseek-ai/dsh-settings`)**：将当前激活 Profile 中的插件配置字段动态投影为前端表单描述符（Descriptors）。核心方法：`configure({auto?})`、`describe()`、`update(ns, patch, expectedRevision?)`、`replace(ns, section, expectedRevision?)`、`mutate(ns, ops, expectedRevision?)`。
+- **`ConfigEditor` (`@deepseek-ai/dsh-config-editor`)**：提供带文件锁的原子化持久化写入服务，目标为当前 Profile 的配置补丁。设置层只做投影与校验，落盘永远走 patch。
+- **标识寻址**：表单系统基于当前 Profile 中条目的**局部唯一标识符 (Entry ID)** 做命名空间寻址。同一插件包挂载多个实例（如两个 MCP 客户端）时，只要 `id` 不同，前端就呈现为多份独立表单；只有带明确 `id` 且导出非空 Schema 的条目才会生成表单。
+
+### 7.2 三种写入语义
+
+| 方法 | 语义 |
+| --- | --- |
+| `update(ns, patch)` | **合并**提交字段（默认语义） |
+| `replace(ns, section)` | 先将即时字段重置为继承配置，再应用提交字段（整体替换） |
+| `mutate(ns, ops)` | **路径级**寻址编辑，保留客户端响应中未包含的秘密值 |
+
+每次写入都会验证完整 Config，并在持久化前拒绝过期修订号（乐观并发控制）。
+
+### 7.3 表单描述符与乐观版本控制
+
+- `resolvedValues`：当前生效的最终配置值（已合并默认值与用户覆盖）；
+- `inheritedValues`：由底层 Bundle 定义的基础默认配置；
+- `profileOverrides`：在当前 Profile 补丁中显式声明的覆盖字段；
+- `revision`：并发安全保护的递增版本号。前端提交时必须附带期望版本号，中途有其他进程更新文件则保存安全中止。
+
+### 7.4 持久化写入语义
+
+1. **唯一写入目标**：当前 Profile 的补丁文件 `$DSH_HOME/profiles/<profile>/cordis.patch.yml`。
+2. **全量替换规约**：写入的配置字段完整替换该条目的 `config` 块，不做深合并，语义见本文第二节。表单提交必须提交完整的已解析配置对象。
+3. **文件锁保护**：写入受文件锁保护，避免并发写入导致 YAML 语法损坏。
+4. **HMR 自动触发**：写入完成后文件监听器检测到补丁变动，执行增量重载而无需重启应用。
+5. **即时字段 (Volatile)**：`Volatile<T>` + `Schema.xxx().volatile()` 声明即时字段，运行时用 `.get()` 读取、跨字段校验用 `.check()`（Host 持久化前执行，不进表单 schema）；变更经 `loader/volatile-update` 事件推送给所属 fiber；`role('secret')` 阻止值进入表单响应，凭据域值用凭据引用。

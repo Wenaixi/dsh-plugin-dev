@@ -121,6 +121,14 @@
     {
       "query": "如何在 DSH 插件管理页面里显示我的插件卡片和配置项",
       "should_trigger": true
+    },
+    {
+      "query": "如何在 DSH 里配置 MCP 客户端连接外部 Context7 或 Python 工具服务器",
+      "should_trigger": true
+    },
+    {
+      "query": "我想写个插件动态向模型系统提示词追加一段约束规则",
+      "should_trigger": true
     }
   ]
 }

@@ -36,12 +36,18 @@
 - **[three-roles.md](./three-roles.md)**：
   Browser / Host / Worker 三角色物理隔离模型、子进程生成原语（`ctx.subprocess.spawn` 与 `spawnTerminal` 零 Shell 解释）、`SandboxMode`（仅限文件系统效果）与沙箱隔离。
 
-### 六、模型适配与打包分发 (LLM Adapters & Packaging)
+### 六、模型适配、MCP 外部工具桥接与打包分发 (LLM, MCP & Packaging)
+- **[mcp-and-tools-bridge.md](./mcp-and-tools-bridge.md)**：
+  DSH MCP 客户端集成与外部工具桥接指南——`@deepseek-ai/dsh-mcp-client` 协议桥、Streamable-HTTP 与 StdIO 双传输协议、`mcp__<serverName>__<rawName>` 命名空间强规范、生产环境启动容错（`failOnStartupError`）与单调守卫权限拦截。
 - **[llm-adapter.md](./llm-adapter.md)**：
   `ctx.llm`（LlmRuntime Seam）抽象协议、`LlmAdapter` 继承与 `stream()` 实现、7 种 `StreamChunk` 封闭判别联合完整定义代码。
 - **[packaging.md](./packaging.md)**：
   Bundle 与 Profile 互斥模型、`package.json` 规约、npm `--legacy-peer-deps` 规避 OOM 实战、`allow-version` 风险豁免机制、多包 Monorepo 工作区联调。
 
-### 七、本地联调与故障排查 (Debugging & Troubleshooting)
+### 七、系统提示词注入、会话事件流与状态投影 (Prompt & Projections)
+- **[system-prompt-and-projections.md](./system-prompt-and-projections.md)**：
+  系统提示词动态编排与会话状态投影——`ctx.systemPrompt` 有序段落（Sections）收集与 `system-prompt/assemble` 环绕中间件、会话事件流（SessionEvent）仅追加哲学、`ctx.sessionProjections` 事件溯源与纯函数折叠（Pure Folds）状态机、以及 `workspace-changes` 工作区代码变更自动化审计。
+
+### 八、本地联调与故障排查 (Debugging & Troubleshooting) (Debugging & Troubleshooting)
 - **[debugging-and-troubleshooting.md](./debugging-and-troubleshooting.md)**：
   本地开发调试三大极速回路（`--patch` 覆盖、本地路径添加、临时沙盒）、双面插件前端排查技巧（`__DSH_BOOT__`、`__ModuleLoader__`、Combo 404）、Top 8 高频故障排查速查表（PENDING 挂起、配置冲掉、组件传 ctx 报错等）、黑匣子日志分析。

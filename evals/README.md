@@ -4,7 +4,7 @@
 
 ## 评测集
 
-`trigger-queries.json` 包含 19 条 should-trigger（应触发）与 11 条 should-not-trigger（不应触发）查询（共 30 条）：
+`trigger-queries.json` 包含 21 条 should-trigger（应触发）与 11 条 should-not-trigger（不应触发）查询（共 32 条）：
 
 - **正例**：变着法考——不同措辞、繁简、错别字、中英文、直接点名与隐式描述（"加一个能读文件的工具"全程不提 DSH），以及多步工作流（打包安装、workspace 包）。
 - **负例**：一半是明显无关领域（天气、翻译、SQL、Chrome 扩展、GitHub Actions），一半是**易混淆近邻**（Koishi——同为 Cordis 系但目标框架不同；Claude Code hooks 配置——属于其它技能的领域）。

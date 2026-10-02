@@ -48,9 +48,11 @@
 - **[system-prompt-and-projections.md](./system-prompt-and-projections.md)**：
   系统提示词动态编排与会话状态投影——`ctx.systemPrompt` 有序段落（Sections）收集与 `system-prompt/assemble` 环绕中间件、会话事件流（SessionEvent）仅追加哲学、`ctx.sessionProjections` 事件溯源与纯函数折叠（Pure Folds）状态机、以及 `workspace-changes` 工作区代码变更自动化审计。
 
-### 八、本地联调与故障排查 (Debugging & Troubleshooting) (Debugging & Troubleshooting)
+### 八、本地联调与故障排查 (Debugging & Troubleshooting)
 - **[debugging-and-troubleshooting.md](./debugging-and-troubleshooting.md)**：
-  本地开发调试三大极速回路（`--patch` 覆盖、本地路径添加、临时沙盒）、双面插件前端排查技巧（`__DSH_BOOT__`、`__ModuleLoader__`、Combo 404）、Top 8 高频故障排查速查表（PENDING 挂起、配置冲掉、组件传 ctx 报错等）、黑匣子日志分析。
+  本地开发调试三大极速回路（`--patch` 覆盖、本地路径添加、临时沙盒）、双面插件前端排查技巧（`__DSH_BOOT__`、`__ModuleLoader__`、Combo 404）、Top 9 高频故障排查速查表（PENDING 挂起、配置冲掉、组件传 ctx 报错、安装解析到旧版本等）、安装失败排障六步路径、插件管理器目录结构与黑匣子日志分析。
+- **[install-resolution-traps.md](./install-resolution-traps.md)**：
+  插件安装版本解析三大陷阱的权威排查手册——pnpm 发布冷却期 `minimumReleaseAge: 1440`（24 小时，只装发布满 24h 的版本，新版本被排除后解析回退到最老合格版本）、semver 预发布排序（`-tag.N` 后缀被范围解析默认排除，`maxSatisfying(vers,'*')` 返回旧正式版）、DSH 兼容性闸门两段式预检与后检语义与精确版本豁免机制、profile 目录结构与 `minimumReleaseAge: 0` 配置落点、desktop profile 的 Electron 独占守卫。附可复现的参数实验、时间指纹判定法与排障决策表。
 
 ### 九、多模态附件、人机交互与最终交付物呈递 (Multimodal & Deliverables)
 - **[multimodal-and-deliverables.md](./multimodal-and-deliverables.md)**：

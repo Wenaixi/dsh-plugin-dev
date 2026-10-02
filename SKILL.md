@@ -147,6 +147,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 │ 想要桥接连接外部 MCP Server (HTTP 或 StdIO 工具)？ ─► 场景 M: MCP 客户端桥接 (MCP Client)│
 │ 动态向模型注入提示词段落或计算会话事件流投影？ ────► 场景 N: 提示词与事件投影 (Prompt)  │
 │ 浏览器前端需要调用 Node 宿主做高危或系统操作？ ────► 场景 K: 跨端通信 (Remote RPC)    │
+│ 装插件解析到旧版本/被 incompatible 拒绝？ ─────────► 场景 V: 安装解析陷阱 (Resolution)│
 │ 插件装载失败/卡在 PENDING/排查报错疑难杂症？ ───────► 场景 L: 极速联调与排错 (Debug)  │
 │ 接入第三方大模型厂商 API？ ────────────────────────► 场景 D: LLM 适配器 (LlmAdapter) │
 │ 多 Agent 团队协作与共享看板？ ──────────────────────► 场景 H: Agent Teams 架构       │
@@ -182,6 +183,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 | **S** | 注册人类斜杠命令、输入框光标补全浮层与快捷键 | 命令与输入触发：使用 `ctx.commands` 注册 `/command`、双面插件注入 input-trigger | [slash-commands-and-input-triggers.md](./references/slash-commands-and-input-triggers.md) |
 | **T** | 沙箱内核级隔离、多模态图片压缩转储与网络代理 | 底层安全与基础设施：理解 Windows ACL/Landlock 原理、image-offload 恢复、undici 代理 | [sandbox-internals-and-proxy.md](./references/sandbox-internals-and-proxy.md) |
 | **U** | 子智能体持续多轮交互、文件系统防覆盖锁与 ACP 协议 | 委派与文件安全：使用 `ctx.subagents.startContinuable`、理解 fs-observation 读后写规则 | [subagents-fs-policy-and-acp.md](./references/subagents-fs-policy-and-acp.md) |
+| **V** | 装插件解析到过时的旧版本、被 incompatible 拒绝、版本选择与预期不符 | 安装解析排障：读 `.plugin-manager/logs/` 确认解析版本，识别 pnpm 冷却期与 semver 预发布排序，配置 `minimumReleaseAge: 0` 或改用精确版本 | [install-resolution-traps.md](./references/install-resolution-traps.md) |
 
 ---
 
@@ -301,6 +303,18 @@ export function apply(ctx) {
   ```bash
   dsh plugin --profile <profile> allow-version <pkg>@<ver> --dsh-version <exact> --accept-risk
   ```
+- **豁免是最后手段**：报错说「版本不兼容」时，版本号往往是包管理器解析出来的陈旧版本，不是人选的。先确认解析版本与根因（pnpm 24 小时发布冷却期、semver 预发布排序），修版本选择优先于申请豁免。完整推导见 [install-resolution-traps.md](./references/install-resolution-traps.md)。
+
+### 4. 装到旧版本的快速自检
+```powershell
+# 关闭 pnpm 发布冷却期（v11+ 默认 1440 分钟），仅本次生效
+pnpm add <pkg> --config.minimum-release-age=0
+# 精确版本绕过冷却期与 semver 预发布排除
+pnpm add <pkg>@<exact-version>
+```
+- 若关闭冷却期或改用精确版本后立刻拿到正确版本，根因即冷却期或预发布排序；
+- profile 级永久关闭：编辑 `$DSH_HOME/profiles/<name>/pnpm-workspace.yaml` 追加 `minimumReleaseAge: 0`；
+- **清缓存对上述根因无效**，用 `npm install <pkg> --dry-run` 与 pnpm 结果横向对比可快速隔离。
 
 ---
 

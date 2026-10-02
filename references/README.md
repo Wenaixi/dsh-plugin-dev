@@ -79,3 +79,8 @@
 ### 十五、子智能体引擎、文件系统安全观察与 ACP 协议 (Subagents, FS Policy & ACP)
 - **[subagents-fs-policy-and-acp.md](./subagents-fs-policy-and-acp.md)**：
   子智能体生命周期与文件安全策略指南——`ctx.subagents` 服务切面、三大提供方 (`spawn-in-process` 独立运行 / `fork-in-process` 继承分叉 / `acp` 远程进程)、单次 (`start`) vs 持续通信 (`startContinuable`)、文件系统弱引用观察表与防覆盖锁机制 (`fs-observation-policy`)、以及自动化 Agent Client Protocol (ACP)。
+
+### 零、官方上游源码与官方文档核验指引 (Upstream & Docs)
+- [official-upstream-and-docs.md](./official-upstream-and-docs.md)：
+  官方一手资料权威索引——上游仓库 (`deepseek-ai/deepseek-harness`) 包清单与模块依赖图、本地已安装官方包的目录结构与类型声明速读法、官方文档站全部权威页面清单（中英双语入口）、事实核验三级证据强度与版本升级回溯流程。
+  **任何架构结论与官方源码冲突时，一律以源码为准。**

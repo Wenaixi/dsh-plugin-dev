@@ -106,7 +106,27 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 
 ---
 
-## 五、场景决策与开发导引矩阵
+## 五、官方一手资料核验指引 (Upstream Verification)
+
+本技能库所有结论均出自官方一手来源。**与官方源码冲突时，一律以源码为准。**
+
+| 证据强度 | 来源 | 用途 |
+| :--- | :--- | :--- |
+| 最弱 | 官方文档站散文 | 了解整体设计意图 |
+| 中等 | 官方仓库 `packages/<包名>/README.md` | 组合规则、配置语义、设计理由 |
+| 最强 | 本地 `lib/index.d.ts` 与 `lib/index.js` | 真实契约：`inject`、`Config`、`declare module` 挂载名 |
+| 运行时 | `ctx.tools.schemas()`、`ctx.get('<服务>')`、启动日志 | 最终判据，一切以宿主实际行为为准 |
+
+- 官方上游仓库：https://github.com/deepseek-ai/deepseek-harness 
+- 官方文档站（英文）：https://deepseek-harness.github.io/deepseek-harness/en/ 
+- 官方文档站（中文，去掉 `/en/` 即为中文版）：https://deepseek-harness.github.io/deepseek-harness/ 
+- 本地官方包目录：`<npm全局根>/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/` 与 `$DSH_HOME/profiles/<profile>/node_modules/`
+
+完整页面清单、单包结构速查与版本升级回溯流程见 [references/official-upstream-and-docs.md](./references/official-upstream-and-docs.md)。
+
+---
+
+## 六、场景决策与开发导引矩阵
 
 ```text
 ┌─ 插件开发需求快速分流路由 ────────────────────────────────────────────────────────┐

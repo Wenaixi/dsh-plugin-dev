@@ -8,26 +8,19 @@ on:
 
 jobs:
   validate:
-    name: Validate Scaffolder & Integrity
+    name: Validate Documentation Integrity
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x, 22.x]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js ${{ matrix.node-version }}
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: '22'
 
-      - name: Test plugin scaffolder & validator (Positive & Negative contract suite)
-        run: |
-          node scripts/test_validator.mjs
-
-      - name: Check for dead markdown links
+      - name: Check for dead markdown links and orphan references
         run: |
           node -e '
             const fs = require("fs");
@@ -43,23 +36,38 @@ jobs:
               return res;
             }
             const files = walk(".");
-            const regex = /\[([^\]]+)\]\(([^)]+)\)/g;
+            const linkRe = /\[([^\]]+)\]\(([^)]+)\)/g;
             let errors = 0;
+            const linked = new Set();
             for (const file of files) {
               const text = fs.readFileSync(file, "utf8");
               let m;
-              while ((m = regex.exec(text)) !== null) {
+              while ((m = linkRe.exec(text)) !== null) {
                 const url = m[2];
                 if (url.startsWith("http") || url.startsWith("#") || url.startsWith("mailto")) continue;
                 const clean = url.split("#")[0];
                 if (!clean) continue;
                 const p = path.resolve(path.dirname(file), clean);
                 if (!fs.existsSync(p)) {
-                  console.error(`Dead link in ${file}: ${url} -> ${p}`);
+                  console.error(`Dead link in ${file}: ${url}`);
+                  errors++;
+                } else if (path.basename(p).endsWith(".md")) {
+                  linked.add(path.basename(p));
+                }
+              }
+            }
+            // 孤儿文档：每篇 references/*.md 至少被别处链接一次
+            const refDir = path.join(".", "references");
+            if (fs.existsSync(refDir)) {
+              for (const name of fs.readdirSync(refDir)) {
+                if (!name.endsWith(".md")) continue;
+                if (name === "README.md") continue;
+                if (!linked.has(name)) {
+                  console.error(`Orphan reference (never linked): references/${name}`);
                   errors++;
                 }
               }
             }
             if (errors > 0) process.exit(1);
-            console.log("Dead link check passed: 0 dead links found across " + files.length + " files.");
+            console.log("Docs check passed: 0 dead links, 0 orphans across " + files.length + " files.");
           '

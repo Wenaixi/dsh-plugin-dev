@@ -216,17 +216,39 @@ export function apply(ctx) {
 DSH 前端提供了一套标准的主题 CSS 变量，支持自动跟随深色（Dark）和浅色（Light）模式无缝切换。
 
 ### 1. 官方核心颜色变量矩阵
-开发插件 UI 时，**严禁硬编码 `#ffffff` 或 `#000000`**，必须优先使用以下官方设计令牌（Tokens）：
+开发插件 UI 时，**严禁硬编码 `#ffffff` 或 `#000000`**，必须优先使用官方设计令牌（Tokens）。
+
+下表每一行都经本地官方包源码全量扫描核实（`dsh-client-ui-primitives` 与各 `dsh-client-ui-*` 的 `lib/client.js` 合计实际出现 415 个 `--dsw-*` 变量），**照抄即可生效**：
 
 | CSS 变量名 | 语义作用 |
 | :--- | :--- |
 | `var(--dsw-alias-label-primary)` | 主要文字颜色（最高对比度正文） |
 | `var(--dsw-alias-label-secondary)` | 次要文字颜色（副标题、辅助信息） |
 | `var(--dsw-alias-label-tertiary)` | 弱化文字颜色（占位符、小字提示） |
-| `var(--dsw-alias-surface-primary)` | 主背景色（面板、容器底色） |
-| `var(--dsw-alias-surface-secondary)` | 次级背景色（卡片悬停、输入框背景） |
-| `var(--dsw-alias-border-subtle)` | 分割线与细边框颜色 |
-| `var(--dsw-alias-accent-primary)` | 品牌高亮/主按钮激活色 |
+| `var(--dsw-alias-bg-layer-1)` | 分层背景色（卡片、列表行底色） |
+| `var(--dsw-alias-bg-layer-2)` | 次级分层背景色 |
+| `var(--dsw-alias-bg-layer-3)` | 三级分层背景色（Tag 底色） |
+| `var(--dsw-alias-border-l2)` | 常规分割线与细边框 |
+| `var(--dsw-alias-border-l3)` | 强调边框（控件描边） |
+| `var(--dsw-alias-border-l4)` | 强边框（Tag 描边） |
+| `var(--dsw-alias-state-business-primary)` | 品牌高亮 / 主按钮激活色 |
+| `var(--dsw-alias-state-success-primary)` | 成功态（done / success） |
+| `var(--dsw-alias-state-warn-primary)` | 警告态（attention / warning） |
+| `var(--dsw-alias-state-error-primary)` | 错误态（failure / danger） |
+| `var(--dsw-alias-state-idle-primary)` | 空闲态圆点 |
+| `var(--dsw-alias-interactive-bg-hover)` | 悬浮背景 |
+| `var(--dsw-radius-sm)` / `--dsw-radius-md` | 小 / 中圆角 |
+
+**常见误写（这些名字官方并不存在，写上去会静默失效、样式退化成浏览器默认）**：
+
+| 错误写法 | 正确写法 |
+| :--- | :--- |
+| `--dsw-alias-surface-primary` | `--dsw-alias-bg-layer-1` |
+| `--dsw-alias-surface-secondary` | `--dsw-alias-bg-layer-2` |
+| `--dsw-alias-border-subtle` | `--dsw-alias-border-l2` |
+| `--dsw-alias-accent-primary` | `--dsw-alias-state-business-primary` |
+
+CSS 变量未定义时不会报错，只会用兜底值——**所以别给 `var(--x, #fff)` 写硬编码兜底**，那等于把错误藏起来。变量拼错时应当直接在 DevTools 里查 Computed Style 确认真实值。
 
 ### 2. 样式安全注入与 HMR 自动回收铁律
 为避免插件卸载或热重载时样式残留，推荐使用标准的 **带标识 `<style>` 标签注入法**：
@@ -261,3 +283,60 @@ export function apply(ctx) {
   }, 'my-plugin: inject styles');
 }
 ```
+
+### 3. 首选官方 primitives，而非手写控件
+
+DSH 把跨插件复用的 UI 控件沉淀在 `@deepseek-ai/dsh-client-ui-primitives` 包里，官方插件无一例外地复用它——**手写开关、分段控件、状态点、标签、按钮都是重复劳动，且必然与宿主观感不一致**。
+
+引入方式：在 `package.json` 的 `dsh.client.inject` 里列出该包，在 factory 内 `require`。
+
+```json
+{
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "inject": ["@deepseek-ai/dsh-client-ui-primitives"]
+    }
+  },
+  "peerDependencies": { "react": "^18.2.0" }
+}
+```
+
+```js
+// lib/client.js（CJS factory 内）
+const P = require("@deepseek-ai/dsh-client-ui-primitives")
+
+// 分段选择器：完全受控，onChange 只在值真的变化时触发
+P.SegmentedControl({
+  id: "my-mode",
+  label: "运行模式",
+  value: mode,
+  options: [{ value: "a", label: "甲" }, { value: "b", label: "乙" }],
+  onChange: (next) => setMode(next),
+})
+
+// 开关：label 是无障碍必需项，不可省
+P.Switch({ checked: on, onChange: (n) => setOn(n), label: "启用某功能" })
+
+// 状态点 + 标签：配对表达「生效中 / 被覆盖 / 未设置 / 故障」
+P.StateDot({ state: "done", size: 10, appearance: "dot" })   // done|warning|ongoing|error|idle
+P.Tag({ tone: "success" }, "生效中")                        // outline|solid|neutral|quiet|success|info|warning|danger
+P.Button({ variant: "outline", size: "sm", onClick: reset }, "恢复默认")
+```
+
+常用契约（取自 `lib/types/*.d.ts`）：
+
+- `SegmentedControl`：`options` 至少两项；每段 id 为 `<id>-<value>`。
+- `Switch`：`label` 必填（无障碍），`title` 用于说明为何被锁。
+- `StateDot`：自身 `aria-hidden`，**必须与文字配对使用**。
+- `Tag`：只读标签，语义由 `tone` 承载，文字由渲染方给。
+
+用 primitives 之后，插件代码里应**只剩布局**（flex / gap / 宽度），不再有任何颜色、圆角、字号定义；视觉随宿主主题与官方版本自动演进。
+
+### 4. 客户端产物必须只有一个来源
+
+同一个文件被两条构建链产出（`tsc` 编一份、再被构建脚本覆写一份）时，**两份产物必然漂移**，且漂移时机取决于构建顺序，极难排查。
+
+正确做法：选一条链。若产物必须是无法由 `tsc` 直接生成的 CJS factory 形态（DSH 客户端的硬要求），就把生成逻辑放进构建脚本，并**删掉同名 TypeScript 源文件**，让 `exports` 只指向生成物。
+
+同时检查所有静态门禁脚本里对该源文件的路径引用——删源文件后门禁会因 `ENOENT` 直接崩溃，务必同步改为指向新的唯一来源。

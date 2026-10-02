@@ -52,6 +52,12 @@ DeepSeek Harness (DSH 0.2.0-rc.2) 采用清晰的物理分层与进程隔离架�
 - **Node 宿主半侧（`lib/index.js`）**：导出 `apply(ctx: Context): void`。即使插件无服务端逻辑，空实现 `apply()` 也必须存在，确保插件能注册进宿主 Loader 条目树。
 - **Browser 界面半侧（`lib/client.js`）**：导出 `apply(ctx: ClientContext): void`，且必须是**客户端模块系统的 lazy-CJS factory 格式**（向页面模块加载器登记包名 + `factory(require)`）。
 
+  加载器语义（来自 `@deepseek-ai/dsh-client-modules` 源码注释）：执行 bundle **只注册 factory**（`window.__ModuleLoader__.load({id, factory})`），模块体的全部副作用——包括 CSS 注入——都发生在 factory 闭包内，**物化时才运行**，而非脚本执行时。物化（`factory(require)` 返回 exports）在首次 import/require 时发生并记入 `loadCache`；factory 若 require 另一个已注册未物化的模块，会递归物化，因此加载顺序无需外部编排。
+
+  解析分支顺序：seed word 命中 shell 实例 → 已物化记录直接返回 exports → 图行则注册依赖 factory 与自身 factory → 已注册 factory 则物化 → 其余情况**大声抛错**（构建期 bundle 纯度门禁的运行时镜像）。
+
+  **硬约束**：factory 内是 CJS 作用域，不能出现 ESM `import`、顶层 `return`、JSX；依赖一律 `require`，收尾必须 `return module.exports`。三条各自对应的报错与可运行骨架见 [debugging-and-troubleshooting.md](./debugging-and-troubleshooting.md) 第 3 节。
+
 ### package.json 声明规范
 
 ```json
@@ -82,7 +88,7 @@ DeepSeek Harness (DSH 0.2.0-rc.2) 采用清晰的物理分层与进程隔离架�
 
 注意：官方当前 client 注入包是 `@deepseek-ai/dsh-client-ui-settings`（旧文档中的 `dsh-client-ui-slots` / `dsh-client-connection` 拆分已合并为平台运行时 + 注入式组合）。**浏览器半侧只挂在说明符恰为裸包名的那一行上**；子路径导出挂载的行永远不带半侧。
 
-**三个必填字段缺一不可**：`dsh.bundle.id`（组合包标识，`cordis.patch.yml` 里的 `id` 必须与之一致）、`dsh.client.module`（客户端入口相对路径，必须真实存在）、`exports["./client"]`（子路径导出，指向同一个 client 文件）。随包校验器 `validate_plugin.mjs` 会对这三项做静态检查，本文的示例可直接通过校验。
+**三个必填字段缺一不可**：`dsh.bundle.id`（组合包标识，`cordis.patch.yml` 里的 `id` 必须与之一致）、`dsh.client.module`（客户端入口相对路径，必须真实存在）、`exports["./client"]`（子路径导出，指向同一个 client 文件）。`exports` 也可以写成带条件导出对象的形式（`{ "types": ..., "default": "./lib/client.js" }`）。
 
 ## 浏览器端插件加载、Slots 插槽与样式管理
 

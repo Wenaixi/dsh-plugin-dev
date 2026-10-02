@@ -13,39 +13,21 @@
 ## 二、如何参与贡献
 
 你可以通过以下方式为项目做出贡献：
-1. **报告 Bug 或过时信息**：发现 DSH 新版本 API 变更、旧文档中的错误描述或示例工程无法加载；
+1. **报告 Bug 或过时信息**：发现 DSH 新版本 API 变更，或旧文档中的错误描述；
 2. **补充架构与技术参考**：提交针对 DSH 核心服务、Seam 接口或特定场景的深度参考；
-4. **改进工具脚本与评测集**：优化 `scripts/` 下的校验/脚手架脚本，或扩充 `evals/` 中的触发评测用例。
+3. **精简既有内容**：删除重复、过时或对「写插件」无增量价值的段落；
+4. **扩充触发评测集**：补充触发/不触发评测用例（记录在提交信息中）。
 
 ---
 
-## 三、本地开发与验证工作流
+## 三、本地校验
 
-本项目强调“零构建、可验证、无死链”的极简工程哲学。
+本项目是**纯文本规范集**，没有构建步骤、不含脚本、不含示例工程，零外部依赖。提交前的验证手段只有两条：
 
-### 1. 克隆与准备
-```bash
-git clone https://github.com/Wenaixi/dsh-plugin-dev.git
-cd dsh-plugin-dev
-```
-本项目无需繁重的构建打包步骤，所有示例与脚本基于原生 Node.js (>=18) ESM 运行。
+1. **死链核对**：全库 Markdown 内部链接必须指向真实存在的文件；
+2. **事实核对**：涉及 DSH 契约的表述必须能在官方源码、`lib/index.d.ts` 或运行时（`ctx.tools.schemas()`）中找到依据。
 
-### 2. 自动化合规性校验
-在提交任何修改前，必须运行随包提供的校验工具验证生成的工程骨架合规性：
-```bash
-node <技能根目录>/scripts/scaffold_plugin.mjs /tmp/test-plugin && node <技能根目录>/scripts/validate_plugin.mjs /tmp/test-plugin
-```
-确保所有工程输出 `校验通过`，退出码为 0。
-
-### 3. 生成新插件脚手架
-开发或测试新插件时，推荐使用内置脚手架生成标准骨架：
-```bash
-# 生成基础单面插件
-node <技能根目录>/scripts/scaffold_plugin.mjs /tmp/my-new-plugin
-
-# 生成双面 UI 插件（含 React 客户端与 Slots 插槽骨架）
-node <技能根目录>/scripts/scaffold_plugin.mjs /tmp/my-ui-plugin --dual-face
-```
+若需要机械化的包规范检查，可临时用官方插件管理器或自行编写一次性脚本，不要把工具固化进本仓库。
 
 ---
 
@@ -68,17 +50,18 @@ node <技能根目录>/scripts/scaffold_plugin.mjs /tmp/my-ui-plugin --dual-face
 <type>(<scope>): <subject>
 ```
 
-- `feat`: 新增插件示例、工具能力或核心章节
-- `fix`: 修复示例代码缺陷、纠正过时陈旧文档、修正 API 签名
+- `feat`: 新增专题参考文档、核心章节或场景路由
+- `fix`: 纠正过时陈旧文档、修正 API 签名与事实错误
 - `docs`: 文档优化、排版润色、完善说明
+- `refactor`: 拆分超载文件、收敛重复表述为单一真源
 - `perf`: 优化技能发现 SDO、降低 Token 开销
-- `chore`: 依赖更新、CI 配置、忽略规则调整
+- `chore`: 元数据、CI 配置、忽略规则调整
 
 ---
 
 ## 六、提交 Pull Request
 
 1. Fork 本仓库并基于 `main` 分支创建特性分支（如 `feat/new-seam-doc`）；
-2. 提交修改并确保本地 `validate_plugin.mjs` 100% 绿灯；
+2. 提交修改并完成本文第三节的两项本地校验；
 3. 推送分支并向本项目发起 Pull Request；
-4. 详尽填写 PR 模板中的变更说明与自检项，等待维护者审查与 CI 自动化测试通过。
+4. 详尽填写 PR 模板中的变更说明与自检项，等待维护者审查与 CI 死链扫描通过。

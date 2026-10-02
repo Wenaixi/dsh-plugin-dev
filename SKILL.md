@@ -59,7 +59,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
    - **输出**：确定的插件形态、所需服务清单、包名（如 `dsh-my-plugin`）。
 2. **步骤 2：生成工程骨架与依赖声明**
    - **输入**：目标目录路径；
-   - **执行**：使用随包工具一键生成合规骨架（单面 `node <技能根目录>/scripts/scaffold_plugin.mjs <dir>`，双面追加 `--dual-face`）；
+   - **执行**：按 [three-roles.md](./references/three-roles.md) 的 `package.json` 声明规范与 [config.md](./references/config.md) 的补丁语法，手工建立四件套：`package.json`（含 `dsh.bundle.id` 与 `dsh.client.module`）、`cordis.patch.yml`、Host 半侧入口、Client 半侧入口（如需 UI）；
    - **输出**：包含规范 `package.json`、`cordis.patch.yml`、入口 `index.js` 的工程骨架。
 3. **步骤 3：编写核心业务逻辑与生命周期**
    - **输入**：业务逻辑与 API 接口；
@@ -71,7 +71,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
    - **输出**：在 Web GUI 或终端中正常激活并生效的插件功能。
 5. **步骤 5：自动化验收与合规校验**
    - **输入**：完成测试的插件目录；
-   - **执行**：运行 `node <技能根目录>/scripts/validate_plugin.mjs <dir>` 验证包规范；若有 Markdown 文档执行死链检测；
+   - **执行**：逐项自检本项目 [CONTRIBUTING.md](./CONTRIBUTING.md) 第四节的五条硬性规范；对外发布前用 `dsh --profile web --dump-config` 确认补丁被解析（注意它不加载插件代码，阳性不等于能启动）；
    - **输出**：全部绿色通过的交付物。
 
 ---
@@ -247,28 +247,111 @@ export function apply(ctx) {
   },
   "dsh": {
     "bundle": { "id": "custom-ui" },
-    "client": { "platform": "web", "module": "./lib/client.js" }
+    "client": { "platform": "web", "inject": ["@deepseek-ai/dsh-client-ui-primitives"] }
   }
 }
 ```
-Browser 侧 `lib/client.js`：
-```jsx
-import React from 'react'
+Browser 侧 `lib/client.js`（**必须是 CJS factory 形态**；ESM import / 顶层 return / JSX 三者任一出现都会加载失败）：
 
-export const name = 'dsh-custom-ui/client'
+```js
+window.__ModuleLoader__.load({
+  id: '@scope/dsh-custom-ui',
+  factory: (require) => {
+    var module = { exports: {} }
+    var exports = module.exports
+    Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" })
 
-// 客户端组件只接收 slots 注入的 props
-function CustomWidget() {
-  return <div className="p-4 bg-card rounded shadow">自定义状态面板</div>
-}
+    const React = require("react")
+    const e = React.createElement
 
-export function apply(ctx) {
-  // 通过 slots 统一注入插槽
-  ctx.slots.inject('sidebar.right.pane.tab', () =>
-    ctx.slots.register({ id: 'custom-panel', title: '扩展面板' }, CustomWidget)
-  )
-}
+    // React 组件只接收 slots 注入的 props，绝不接收 ctx
+    function CustomWidget() {
+      return e("div", { className: "p-4 bg-card rounded shadow" }, "自定义状态面板")
+    }
+
+    function apply(ctx) {
+      ctx.slots.inject('sidebar.right.pane.tab', () =>
+        ctx.slots.register({ id: 'custom-panel', title: '扩展面板' }, CustomWidget)
+      )
+    }
+
+    exports.apply = apply
+    exports.inject = ["slots"]
+    return module.exports
+  }
+})
 ```
+
+配置面板请优先复用官方 `@deepseek-ai/dsh-client-ui-primitives` 的 `SegmentedControl` / `Switch` / `StateDot` / `Tag` / `Button`，不要手写控件；把配置面板挂到已安装插件卡片详情用 `plugins.bundle.config` 插槽。详见 [web-ui-slots-and-styling.md](./references/web-ui-slots-and-styling.md) 第四、三节与 [settings-and-plugin-ui.md](./references/settings-and-plugin-ui.md)。
+
+---
+
+## 七之二、真实浏览器验收（UI 插件必做）
+
+Host 侧接口 200 与「面板渲染正常」是两件事。UI 插件交付前必须在**真实浏览器**里点一遍，且每一步都要回读磁盘或接口核对落盘结果。
+
+### 1. 取访问地址
+
+`dsh <profile> --port <port>` 启动后 stdout 打印带 token 的一次性地址：
+
+```
+dsh web: http://127.0.0.1:<port>/?token=<launchToken>
+```
+
+token 每次重启都变。直接 `GET /api/*` 会 401，必须先换 Cookie：
+
+```js
+const auth = await fetch(url, { redirect: 'manual' })
+const cookie = (auth.headers.get('set-cookie') || '').split(';')[0]
+await fetch('http://127.0.0.1:<port>/api/...', { headers: { Cookie: cookie } })
+```
+
+### 2. Playwright 驱动本机 Chrome
+
+DSH 自带的 Playwright 不含浏览器二进制，必须指到本机 Chrome；页面导航用 `domcontentloaded` 而非 `networkidle`（WebSocket 长连接会让后者永远超时）：
+
+```python
+b = await p.chromium.launch(
+    executable_path=r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+    headless=True, args=["--no-sandbox"])
+pg = await c.new_page()
+pg.on("console", lambda m: errs.append(m.text) if m.type == "error" else None)
+pg.on("dialog", lambda d: asyncio.ensure_future(d.accept()))   # confirm() 会阻塞脚本
+await pg.goto(url, wait_until="domcontentloaded", timeout=20000)
+```
+
+**务必注册 dialog 处理器**：面板里的「确认后恢复默认」用的是 `confirm()`（playwright 默认直接 dismiss，会导致恢复默认永远不生效）。
+
+### 3. 全新的遮罩陷阱：`force=True` 不等于点到了元素
+
+Playwright 的 `click(force=True)` 只是把鼠标事件派发到**坐标点**，不做命中测试。若页面上有遮罩层（`role=presentation` 的 mask、引导层、过渡动画），事件会被遮罩吞掉——**DOM 里元素可读，React 的 onClick 却从未执行**，表现为「读操作全对、写操作全部无效」。
+
+这个假象极具迷惑性：截图看着面板好好的，断言也全绿，但配置一个都没落盘。
+
+判定：写操作后回读接口/磁盘，值没变即为命中失败，不是业务 bug。
+
+解法（按优先级）：
+
+```python
+# 最优：用 DOM 原生 click，命中元素自身，忽略遮罩；走的仍是同一条 React onClick 链路
+await pg.evaluate("""() => {
+  const el = [...document.querySelectorAll('button,[role=tab],[role=radio]')]
+    .filter(e => e.children.length === 0 && e.textContent.trim() === '激进')[0]
+  el.click()
+}""")
+
+# 次选：先关掉遮罩（点遮罩内的关闭按钮 / 按 ESC / 读 __DSH_BOOT__ 判断首启引导）
+```
+
+### 4. 验收清单（逐条回读，不靠肉眼）
+
+| 项 | 断言方式 |
+| :--- | :--- |
+| 无「Failed to load plugins」红条 | `inner_text('body')` 不含该串 |
+| 面板只渲染一份 | `locator("text=<面板文案>").count() == 1` |
+| 每个控件都点得动 | 点后回读接口字段确实变了 |
+| 落盘正确 | 直接读磁盘配置文件，不是只看接口 |
+| 控制台干净 | `len(errs) == 0` |
 
 ---
 
@@ -285,21 +368,33 @@ export function apply(ctx) {
   ```
 - **豁免是最后手段**：报错说「版本不兼容」时，版本号往往是包管理器解析出来的陈旧版本，不是人选的。先确认解析版本与根因（pnpm 24 小时发布冷却期、semver 预发布排序），修版本选择优先于申请豁免。完整推导见 [install-resolution-traps.md](./references/install-resolution-traps.md)。
 
-### 3. 装到旧版本时的两条立即验证
+### 3. 四条「看起来对但没生效」的经典陷阱
+
+这四条的共同特征：**没有任何报错**，一切看起来正常，但功能没起作用。
+
+| 陷阱 | 表现 | 根因 | 判定动作 |
+| :--- | :--- | :--- | :--- |
+| 路由属性名写错 | 插件已激活但接口一律 404 | `webServer.register` 的属性是 `handler` 不是 `handle` | 查 `@deepseek-ai/dsh-host-webserver` 类型声明 |
+| exports 白名单没收紧 | 加了 `exports` 后卡片标题/描述/图标全空 | `readPluginMeta` 靠 exports 解析 `/package.json` 与 `/locale/en.json`，子路径未放行即抛 `ERR_PACKAGE_PATH_NOT_EXPORTED` 且被吞 | 补 `"./package.json"` 与 `"./locale/*.json"` |
+| 产物有两个来源 | 改源码没生效，或改了没反应 | `tsc` 编一份同名产物，构建脚本又覆写一份 | 全仓 grep 该产物名，只应有一处生成 |
+| CSS 变量名拼错 | 元素有样式但颜色/圆角是浏览器默认 | `var(--不存在的名字, #fff)` 静默用兜底值 | DevTools Computed Style 查真实变量名 |
+
+**总原则：静默失败必须靠"回读真值"发现，不能靠看界面。** 每次写操作后回读接口或磁盘，值没变就是没生效。
+
+### 4. 装到旧版本时的两条立即验证
 - `pnpm add <pkg> --config.minimum-release-age=0`（关闭 24 小时发布冷却期）或 `pnpm add <pkg>@<exact-version>`（精确版本绕过冷却期）能立刻拿到正确版本，即坐实根因是解析策略而非网络；
 - **清缓存对上述根因无效**，用 `npm install <pkg> --dry-run` 与 pnpm 结果横向对比可快速隔离。完整推导、参数实验与决策表见 [install-resolution-traps.md](./references/install-resolution-traps.md)。
 
 ---
 
-## 九、工作区辅助脚本
+## 九、交付前自检清单 (Pre-Delivery Checklist)
 
-**`<技能根目录>` 是本 Skill 的安装目录**（DSH 下位于 `~/.agents/skills/dsh-plugin-dev`）。下面的相对路径命令必须先切换到该目录，或把占位符替换为实际路径；直接在用户项目目录下执行会因找不到文件而失败。
+本技能只提供纯文本规范，不含任何脚本或示例工程。交付前逐项确认：
 
-- **多工程合规性批量校验**：
-  ```bash
-  node <技能根目录>/scripts/scaffold_plugin.mjs /tmp/test-plugin && node <技能根目录>/scripts/validate_plugin.mjs /tmp/test-plugin
-  ```
-- **新建标准插件工程骨架**：
-  ```bash
-  node <技能根目录>/scripts/scaffold_plugin.mjs my-new-plugin [--dual-face]
-  ```
+1. `package.json`：`name`/`version`/`type: module` 齐备；`dsh.bundle.id` 非空；双面插件声明 `dsh.client.platform` + `dsh.client.module` + `exports["./client"]`；
+2. `cordis.patch.yml`：含真实 `- insert:` 声明（非注释）；条目的 `id` 与 `dsh.bundle.id` 一致、`name` 与 `package.json` 的 `name` 一致；
+3. 入口文件存在且导出 `apply`：`node --check index.js`（双面再加 `node --check lib/client.js`）无报错；
+4. 双面插件的 Client 半侧经 `ctx.slots.inject/register` 挂载，组件只接收 props；
+5. 真实启动验收：端口监听 + 首页 200；`--dump-config` 通过只代表 YAML 可解析。
+
+带条件导出对象的 `exports`（`{ types, default }`）是合法写法，校验时取 `default` 或 `import` 字段。

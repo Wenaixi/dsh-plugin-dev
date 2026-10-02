@@ -33,9 +33,9 @@
 
 ### 五、前端双面 UI 插件与全量插槽体系 (Client UI & Slots)
 - **[settings-and-plugin-ui.md](./settings-and-plugin-ui.md)**：
-  全局设置窗口 (Settings) 与插件管理中心 UI 深度指南——`settings.section` 插槽机制、源码级解密三大明星插件（终端输入、侧边卡片、壁纸引擎）的真实注入代码、导航图标 (Nav Glyph) 替换技法、React 设置面板的本地 vs 补丁持久化、以及左侧“插件”管理中心官方/已安装卡片呈现与配置开关联动。
+  全局设置窗口 (Settings) 与插件管理中心 UI 深度指南——`settings.section` 与 `plugins.bundle.config` 插槽机制、源码级解密三大明星插件（终端输入、侧边卡片、壁纸引擎）的真实注入代码、导航图标 (Nav Glyph) 替换技法、React 设置面板的本地 vs 补丁持久化、左侧“插件”管理中心卡片呈现、**`readPluginMeta` 的 exports 白名单契约（卡片空白根因与修法）**与开发决策树。
 - **[web-ui-slots-and-styling.md](./web-ui-slots-and-styling.md)**：
-  Web GUI 全量插槽树实战——右侧边栏（`sidebar.right.pane.tab`）、会话顶部工具栏（`conversation.session.header.utilities`）、输入框挂件（`conversation.input.right`）、消息流拦截（`conversation.chat.node`）、全局外壳（`shell.*`）；官方主题 CSS 变量（`--dsw-alias-*`）与多语言国际化（i18n: `ctx.locale`）。
+  Web GUI 全量插槽树实战——右侧边栏（`sidebar.right.pane.tab`）、会话顶部工具栏（`conversation.session.header.utilities`）、输入框挂件（`conversation.input.right`）、消息流拦截（`conversation.chat.node`）、全局外壳（`shell.*`）；官方主题 CSS 变量（415 个 `--dsw-*`，含四组常见误写对照）；样式安全注入与 HMR 回收铁律；**官方 primitives 组件族优先策略**（SegmentedControl / Switch / StateDot / Tag / Button）与「客户端产物单一来源」纪律；多语言国际化（i18n: `ctx.locale`）。
 
 ### 六、跨端通信与三角色物理隔离 (IPC & Remote)
 - **[remote-rpc-guide.md](./remote-rpc-guide.md)**：
@@ -59,7 +59,7 @@
 - **[debugging-and-troubleshooting.md](./debugging-and-troubleshooting.md)**：
   本地开发调试三大极速回路（`--patch` 覆盖、本地路径添加、临时沙盒）、双面插件前端排查技巧（`__DSH_BOOT__`、`__ModuleLoader__`、Combo 404）、Top 9 高频故障排查速查表（PENDING 挂起、配置冲掉、组件传 ctx 报错、安装解析到旧版本等）、安装失败排障六步路径、插件管理器目录结构与黑匣子日志分析。
 - **[install-resolution-traps.md](./install-resolution-traps.md)**：
-  插件安装版本解析三大陷阱的权威排查手册——pnpm 发布冷却期 `minimumReleaseAge: 1440`（24 小时，只装发布满 24h 的版本，新版本被排除后解析回退到最老合格版本）、semver 预发布排序（`-tag.N` 后缀被范围解析默认排除，`maxSatisfying(vers,'*')` 返回旧正式版）、DSH 兼容性闸门两段式预检与后检语义与精确版本豁免机制、profile 目录结构与 `minimumReleaseAge: 0` 配置落点、desktop profile 的 Electron 独占守卫。附可复现的参数实验、时间指纹判定法与排障决策表。
+  插件安装版本解析三大陷阱的权威排查手册——pnpm 发布冷却期 `minimumReleaseAge: 1440`（24 小时，只装发布满 24h 的版本，新版本被排除后解析回退到最老合格版本）、semver 预发布排序（`-tag.N` 后缀被范围解析默认排除，`maxSatisfying(vers,'*')` 返回旧正式版）、DSH 兼容性闸门两段式预检与后检语义与精确版本豁免机制、profile 目录结构与 `minimumReleaseAge: 0` 配置落点、desktop profile 的 Electron 独占守卫。附可复现的参数实验、时间指纹判定法与排障决策表；并覆盖**全新 profile 首次安装的三大坑**：`dsh plugin add` 不写 `dsh.profile.bundles` 需手动补、原生依赖的 `ERR_PNPM_IGNORED_BUILDS` 需在 `pnpm-workspace.yaml` 里加 `allowBuilds` 放行、以及从零到可跑的五步落地顺序。
 
 ### 十、多模态附件、人机交互与最终交付物呈递 (Multimodal & Deliverables)
 - **[multimodal-and-deliverables.md](./multimodal-and-deliverables.md)**：

@@ -72,6 +72,89 @@ console.log(window.__ModuleLoader__.entries)
 - **排查点**：查看你的插件客户端 bundle 是否已注册；
 - **排查 Combo 请求**：切换到 Network（网络）标签页，查看形如 `/plugins/??<id>/client.js&rev=...` 的批量加载请求是否返回了 200。若返回 404，检查 `package.json` 的 `exports["./client"]` 路径是否指向了真实存在的物理打包文件。
 
+### 3. 客户端半侧的三种致命形态错误
+
+Browser 半侧被包在 `window.__ModuleLoader__.load({ id, factory })` 里，**外层是 CJS factory 闭包**。这个约束决定了下面三条，任何一条写错都表现为 `Failed to load plugins` 且控制台只给一句含糊的 import 错误：
+
+| 写错的形态 | 报错 | 为什么错 |
+| :--- | :--- | :--- |
+| factory 内写 ESM `import React from 'react'` | `Cannot use import statement outside a module` | 整段代码被当 CJS 脚本求值，没有 ESM 上下文。依赖一律 `require('react')` |
+| factory 外写 `return module.exports` | `Illegal return statement` | 外层不是函数。factory 内部才能 `return`，且必须以 `return module.exports` 收尾 |
+| 用 JSX 写组件 | 语法错误 | factory 内没有 JSX 编译。用 `React.createElement`（可简写为 `const e = React.createElement`） |
+
+正确骨架（这是唯一被官方加载器接受的形态）：
+
+```js
+window.__ModuleLoader__.load({
+  id: "@scope/my-plugin",
+  factory: (require) => {
+    var module = { exports: {} };
+    var exports = module.exports;
+    Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
+
+    const React = require("react");
+    const e = React.createElement;
+
+    function Widget() {
+      return e("div", null, "内容");
+    }
+
+    function apply(ctx) {
+      ctx.slots.inject("plugins.bundle.config", () =>
+        ctx.slots.register({ name: "plugins.bundle.config", key: "@scope/my-plugin" }, Widget)
+      );
+    }
+
+    exports.apply = apply;
+    exports.inject = ["slots"];
+    return module.exports;
+  }
+});
+```
+
+可对照的官方实现：`@deepseek-ai/dsh-better-sidebar`、`dsh-plugin-wallpaper-engine`、`@linxin666/dsh-client-ui-git-graph`。
+
+### 4. 同一个界面渲染出两份
+
+同一个组件注册到多个插槽、或同一个插槽被两个插件各注册一次时，用户会看到**完全相同的两块面板**。
+
+判定动作（不要靠猜，直接数 DOM）：
+
+```js
+// DevTools 控制台：数目标面板元素个数，应恰好为 1
+document.querySelectorAll("text-content 片段")  // 换成你的面板文案
+// 更可靠：在组件根节点上加 data 属性后统计
+document.querySelectorAll("[data-my-plugin-panel]").length
+```
+
+逐个 `ctx.slots.register` 检查：删除冗余注册，只保留一个入口。特别注意 `plugins.bundle.config`（插件卡片详情内嵌）与 `plugins.detail.section`（详情页扩展区）语义高度重叠，**同一面板不要同时注册这两处**。
+
+### 5. Host 路由注册的两处静默失败
+
+`ctx.webServer.register` 的契约（来自 `@deepseek-ai/dsh-host-webserver` 类型声明）：
+
+```ts
+interface WebRoute {
+  kind: 'exact' | 'prefix'
+  path: string
+  handler: (req, res) => void | Promise<void>   // 属性名是 handler，不是 handle
+}
+```
+
+| 症状 | 根因 | 修法 |
+| :--- | :--- | :--- |
+| 插件已激活但接口一律 404 | 把 `handler` 写成了 `handle`，注册被静默接受但从未挂上回调 | 改为 `handler` |
+| 启动即抛 `cannot get property "webServer" without inject` | 未在 `export const inject` 中声明 `webServer` | `export const inject = ['webServer', ...] as const` |
+
+注册必须包在 `ctx.effect` 里返回清理函数，否则插件卸载后路由残留：
+
+```ts
+ctx.effect(() => {
+  ctx.logger.info('[my-plugin] 路由就绪: /api/plugins/my-plugin/config')
+  return ctx.webServer.register({ kind: 'exact', path: '/api/plugins/my-plugin/config', handler })
+}, 'my-plugin: web route')
+```
+
 ---
 
 ## 三、Top 9 高频故障排查速查表 (Troubleshooting Matrix)

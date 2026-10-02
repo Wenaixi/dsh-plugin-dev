@@ -55,13 +55,9 @@ UI 插件必须遵循**双面插件 (Dual-Face)** 规范：Node 端 `lib/index.j
 
 ---
 
-## 四、开发辅助工具链 (Scaffolder & Validator)
+## 四、交付前自检
 
-技能内置纯原生 Node.js 开发工具链：
-- `scripts/scaffold_plugin.mjs`：一键生成标准单面（Host 端）或双面（Host + Client React UI）插件工程骨架。
-- `scripts/validate_plugin.mjs`：对插件包元数据、补丁结构、入口导出及双面客户端文件进行静态合规性校验。
-
----
+本技能是**纯文本规范集**，不含任何脚本、脚手架或示例工程。按 [SKILL.md](./SKILL.md) 第九节的清单逐项自检：`package.json` 的 `dsh.bundle.id` 与 `dsh.client.module`、`cordis.patch.yml` 的 `- insert:` 与 id/name 一致性、入口 `apply` 导出、双面插件的 `ctx.slots` 挂载方式。
 
 ## 五、快速开始
 

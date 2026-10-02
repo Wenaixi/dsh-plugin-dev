@@ -185,18 +185,58 @@ async function saveHostConfig(patchConfig) {
    - 数据源：Host 侧服务 `ctx.remote.pluginInventory.list()` 实时扫描当前 profile 目录下的 `package.json`（读取 `dependencies` 与 `dsh.profile.bundles`）。
 
 ### 2. 插件卡片元数据读取规范
-已安装插件在卡片上展示的各项信息完全来源于插件自身的 `package.json`：
-- **卡片标题**：取自 `package.json` 的 `name`（若包内包含 `locale/zh.json`，且声明了 `title`，则展示本土化名称）；
-- **卡片描述**：直接读取 `package.json` 中的 **`description`** 字段！
-  - *实战技巧*：编写插件时，在 `package.json` 中写一段清晰易懂的中文 `description`，它就会原汁原味地呈现在已安装插件卡片的正文区域；
-- **版本号**：取自 `package.json` 的 `version`；
-- **启用/禁用 Switch 开关**：
-  - 点击开关时，系统会自动在当前 profile 的 `cordis.patch.yml` 中添加或修改：
-    ```yaml
-    - id: my-plugin-id
-      disabled: true  # 禁用
-    ```
-  - 修改后由 HMR 热重载或下一次重启生效。
+
+卡片信息由宿主 `readPluginMeta`（`@deepseek-ai/dsh-app-boot/lib/index.js`）读取，它把两个子路径交给 Node 的 exports 解析：
+
+```
+${specifier}/package.json
+${specifier}/locale/en.json
+```
+
+**任一子路径不在包的 `exports` 白名单里，Node 抛 `ERR_PACKAGE_PATH_NOT_EXPORTED`，该异常被宿主吞掉后返回 `undefined`——卡片上就只剩一个包名，标题、描述、图标全空，而且没有任何报错。**
+
+这是最容易踩的一个坑：包明明装好了、插件也在跑，卡片却像没写 manifest。
+
+最小修法（`exports` 一旦声明就变成严格白名单，必须显式放行子路径）：
+
+```json
+{
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": ["lib", "locale", "assets/icon.png"],
+  "dsh": { "bundle": { "id": "my-plugin" }, "client": { "platform": "web" } }
+}
+```
+
+同时在包内提供 `locale/en.json` 与 `locale/zh.json`：
+
+```json
+{ "meta": { "title": "...", "description": "..." } }
+```
+
+字段与取值：
+
+| 卡片元素 | 来源 | 备注 |
+| :--- | :--- | :--- |
+| 标题 | `locale/{en,zh}.json` 的 `meta.title`，缺失回退 `name` | 有 locale 就能中英双语 |
+| 描述 | `locale/{en,zh}.json` 的 `meta.description`，缺失回退 manifest `description` | 官方包的 manifest `description` 一律写英文长句，中文请放 locale |
+| 图标 | manifest 的 `icon` 字段 | **必须是包内相对路径的 svg/png/jpg/webp，且 <= 256 KiB**，超限报 `icon exceeds 256 KiB` |
+| 版本号 | `package.json` 的 `version` | |
+| 启用/禁用开关 | 由宿主改写 profile 的 `cordis.patch.yml` | |
+
+```yaml
+# 宿主自动写入的内容
+- id: my-plugin-id
+  disabled: true  # 禁用
+```
+
+修改后由 HMR 热重载或下一次重启生效。
+
+对照反证：没有声明 `exports` 的包走 Node 的 legacy 目录查找，反而能正常读到 manifest——所以**"加 exports 之后描述反而没了"是这类包最典型的回归**。
 
 ---
 
@@ -208,3 +248,20 @@ async function saveHostConfig(patchConfig) {
 | 想要在现有“内置插件”页面里追加一个子选项卡 | 插件设置二级 Tab | `ctx.slots.inject("settings.plugins.tab", ...)` |
 | 想要在通用设置页面里插入一行开关项 | 通用设置插入行 | `ctx.slots.inject("settings.general.item", ...)` |
 | 想要让插件在左侧主导航“插件”管理列表中优雅展示 | 组合包元数据声明 | 配置好 `package.json` 的 `name`、`description`、`dsh.bundle` |
+| 想要让配置面板直接出现在**已安装插件的卡片详情里**（最贴近用户预期的落点） | 插件卡片配置插槽 | `ctx.slots.inject("plugins.bundle.config", ...)`，`key` 用包名 |
+| 想要在设置面板里放分段选择器 / 开关 / 状态点 / 标签 | 官方 primitives | `require("@deepseek-ai/dsh-client-ui-primitives")`，见 [web-ui-slots-and-styling.md](./web-ui-slots-and-styling.md) 第 4 节 |
+
+`plugins.bundle.config` 的注册形态（`key` 必须是**包名**，容器按包名匹配）：
+
+```js
+function apply(ctx) {
+  ctx.slots.inject("plugins.bundle.config", () =>
+    ctx.slots.register(
+      { name: "plugins.bundle.config", key: "@scope/my-plugin" },
+      MyConfigPanel
+    )
+  )
+}
+```
+
+**同一块面板不要同时注册 `plugins.bundle.config` 与 `plugins.detail.section`**——两者都在插件详情页渲染，会出现两块一模一样的面板。判定方法见 [debugging-and-troubleshooting.md](./debugging-and-troubleshooting.md) 第 4 节。

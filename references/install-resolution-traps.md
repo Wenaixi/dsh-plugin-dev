@@ -204,6 +204,79 @@ error: profile "desktop" is managed exclusively by the Electron application
 
 ---
 
+## 七之二、`pnpm add` 报 `ERR_PNPM_IGNORED_BUILDS` 与 profile 脚手架的两处必踩坑
+
+全新 profile 首次安装原生依赖（`dsh-web-app` 等带原生模块的包）会连续踩两个坑，两者都发生在安装阶段而非插件代码阶段。
+
+### 7.2.1 `ERR_PNPM_IGNORED_BUILDS`
+
+现象：包已下载完（`Packages: +245`），却以 `Ignored build scripts: koffi@x.y.z` 收尾并退出码 1，报 `plugin command failed`。这不是安装失败，是 pnpm 10+ 的供应链策略主动拦截了原生构建脚本。
+
+**正解是在 profile 的 `pnpm-workspace.yaml` 里显式放行**，而不是找 CLI 子命令（`dsh plugin ... allow-build` 不存在，会报 `Command "allow-build" not found`）：
+
+```yaml
+packages:
+  - .
+
+nodeLinker: hoisted
+autoInstallPeers: false
+
+allowBuilds:
+  koffi: true
+```
+
+放行后重跑同一条 `dsh plugin --profile <name> add <pkg>@<version>` 即可，被拦的安装会继续完成。
+
+### 7.2.2 `dsh plugin add` 不会写 `dsh.profile.bundles`
+
+首次 `dsh plugin --profile <new> add <pkg>` 会自动脚手架出 profile 目录（`package.json` / `cordis.patch.yml` / `pnpm-workspace.yaml` / `.plugin-manager`），并把包写进 `dependencies`——但 **`dsh.profile.bundles` 数组不会自动加入新包**，仍是初始的 `["@deepseek-ai/dsh-base", ...]`。
+
+后果：`package.json` 里明明有依赖，`dsh <profile>` 启动时却看不到它（Loader 只装载 bundles 里列出的包）。
+
+判定动作：
+
+```bash
+cat ~/.dsh/profiles/<name>/package.json   # 对比 dependencies 与 dsh.profile.bundles 两处
+```
+
+修法：手动把包名补进 `dsh.profile.bundles`。例如要跑 Web GUI：
+
+```json
+{
+  "dependencies": { "@deepseek-ai/dsh-web-app": "0.2.0-rc.2" },
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "@deepseek-ai/dsh-base",
+        "@deepseek-ai/dsh-web-app",
+        "@scope/my-plugin"
+      ]
+    }
+  }
+}
+```
+
+### 7.2.3 建议的全新 profile 落地顺序
+
+```bash
+# 1. 脚手架 + 装本地插件（link: 直连工作区，源码改动即时生效）
+dsh plugin --profile <name> add <本地插件绝对路径>
+
+# 2. 放行原生构建脚本（在 pnpm-workspace.yaml 里加 allowBuilds）
+
+# 3. 装 Web 前端 bundle，务必锁与宿主同版本的精确版本
+dsh plugin --profile <name> add @deepseek-ai/dsh-web-app@<dsh 同版本号>
+
+# 4. 手动补 dsh.profile.bundles（插件 + web-app）
+
+# 5. 启动
+dsh <name> --port <port> --no-open
+```
+
+第 3 步必须锁版本：不带版本号会解析到 `0.0.1-rc.1` 这类被 semver 预发布排序排除的老版本，随后撞上第四节描述的兼容性闸门。
+
+---
+
 ## 八、官方依据
 
 - pnpm `minimumReleaseAge` 设置项与默认值：<https://pnpm.io/settings/dependency-resolution>

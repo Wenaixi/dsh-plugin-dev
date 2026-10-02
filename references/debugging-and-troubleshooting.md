@@ -72,7 +72,7 @@ console.log(window.__ModuleLoader__.entries)
 | **6. 启动报错 "1 required plugin did not activate"** | 盲目相信了 `--dump-config`，实际存在缺包或版本 peer 拦截 | `--dump-config` 不加载插件代码！检查 `~/.dsh/profiles/<profile>/cfg.err`，使用 `allow-version` 豁免兼容性或安装缺失插件。 |
 | **7. 执行系统命令报注入或权限错误** | 试图拼接 shell 字符串并传给 `ctx.subprocess.spawn` | DSH 的子进程生成参数 **严格零 Shell 解释**！必须传入扁平的 `argv` 数组（如 `['git', 'status', '-s']`），绝不要传 `'sh -c "..."'`。 |
 | **8. Typert Remote 方法调用报 AST 语法错误** | 远程暴露的方法签名中使用了对象解构或默认参数值 | 远程方法签名必须严格遵守规则：单一名命参数对象，禁止解构，禁止默认值，协作中断 `signal` 必须为末位参数。 |
-| **9. 装插件时解析到过时的旧版本，随后报 incompatible** | **不是** peer 范围写错，而是**包管理器解析到了旧版本**：pnpm v11+ 默认 `minimumReleaseAge: 1440`（24 小时发布冷却期）把刚发布的新版本排除，叠加 `-tag.N` 预发布后缀被 semver 默认排除，解析一路回退到最老的合格版本，其 peer 锁在旧 DSH 契约上 | 先看 `~/.dsh/profiles/<profile>/.plugin-manager/logs/` 最新 `pnpm.log` 确认解析版本 → registry `dist-tags` 拿真实 latest → 比对宿主实装版本与该版本 peer 区间。修复：profile 的 `pnpm-workspace.yaml` 加 `minimumReleaseAge: 0`，或改用精确版本 `pkg@<version>`（精确 spec 绕过冷却期）。**清缓存无效，别浪费��间**。完整推导与复现实验见 [install-resolution-traps.md](./install-resolution-traps.md)。 |
+| **9. 装插件时解析到过时的旧版本，随后报 incompatible** | **不是** peer 范围写错，而是**包管理器解析到了旧版本**：pnpm v11+ 默认 `minimumReleaseAge: 1440`（24 小时发布冷却期）把刚发布的新版本排除，叠加 `-tag.N` 预发布后缀被 semver 默认排除，解析一路回退到最老的合格版本，其 peer 锁在旧 DSH 契约上 | 先看 `~/.dsh/profiles/<profile>/.plugin-manager/logs/` 最新 `pnpm.log` 确认解析版本 → registry `dist-tags` 拿真实 latest → 比对宿主实装版本与该版本 peer 区间。修复：profile 的 `pnpm-workspace.yaml` 加 `minimumReleaseAge: 0`，或改用精确版本 `pkg@<version>`（精确 spec 绕过冷却期）。**清缓存无效，别浪费时间**。完整推导与复现实验见 [install-resolution-traps.md](./install-resolution-traps.md)。 |
 
 ---
 

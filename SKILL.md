@@ -5,6 +5,10 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 
 # dsh-plugin-dev
 
+> **【核心定位】** 本文件是辅助开发者和 AI 助手开发、审查、调试 DSH (DeepSeek Harness) 插件的权威参考技能（Skill），**不是 DSH 插件自身**。
+
+---
+
 开发 DeepSeek Harness (DSH 0.2.0-rc.2) 插件的标准与权威参考 Skill。
 
 ---
@@ -45,17 +49,19 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 ## 二、场景决策与开发导引矩阵
 
 ```text
-┌─ 需求快速分流路由 ────────────────────────────────────────────────────────┐
-│ 需要浏览器/Web UI 界面？ ───────► 场景 E: 双面插件 (Dual-Face & Slots)   │
-│ 接入第三方大模型厂商 API？ ─────► 场景 D: LLM 适配器 (LlmAdapter Seam)    │
-│ 多 Agent 团队协作与共享看板？ ──► 场景 H: Agent Teams (ctx.agentTeams)     │
-│ 挂钟定时提醒与周期计划任务？ ───► 场景 G: 定时调度系统 (ctx.schedule)     │
-│ 面向模型暴露能力或安全拦截？ ───► 场景 B: 模型工具插件 (defineTool & Guard)│
-│ 提供跨插件共享的有状态能力？ ───► 场景 C: 服务提供方 (Service 继承)       │
-│ 轻量生命周期、事件监听、日志？ ─► 场景 A: 基础函数插件 (ctx.effect)      │
-│ 在设置窗口加专属 Tab/插件页加卡片？► 场景 I: 设置与插件 UI (Settings Section) │
-│ 打包发布、Profile 组合配置？ ───► 场景 F: 组合包工程 (Bundle & Patch)    │
-└───────────────────────────────────────────────────────────────────────────┘
+┌─ 插件开发需求快速分流路由 ────────────────────────────────────────────────────────┐
+│ 需要在全局设置窗口左侧加专属 Tab / 插件页展示卡片？► 场景 I: 设置与插件 UI (Settings) │
+│ 需要在右侧栏/输入框/会话顶部加挂件或支持深浅色主题？► 场景 J: Web 全量插槽与主题 (Slots) │
+│ 浏览器前端需要调用 Node 宿主做高危或系统操作？ ────► 场景 K: 跨端通信 (Remote RPC)    │
+│ 插件装载失败/卡在 PENDING/排查报错疑难杂症？ ───────► 场景 L: 极速联调与排错 (Debug)  │
+│ 接入第三方大模型厂商 API？ ────────────────────────► 场景 D: LLM 适配器 (LlmAdapter) │
+│ 多 Agent 团队协作与共享看板？ ──────────────────────► 场景 H: Agent Teams 架构       │
+│ 挂钟定时提醒与周期计划任务？ ───────────────────────► 场景 G: 定时调度系统 (Schedule)  │
+│ 面向模型暴露能力或安全拦截？ ───────────────────────► 场景 B: 模型工具插件 (Tool & Guard)│
+│ 提供跨插件共享的有状态能力？ ───────────────────────► 场景 C: 服务提供方 (Service 继承) │
+│ 轻量生命周期、事件监听、日志？ ─────────────────────► 场景 A: 基础函数插件 (ctx.effect) │
+│ 打包发布、Profile 组合配置？ ───────────────────────► 场景 F: 组合包工程 (Bundle/Patch) │
+└───────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 
@@ -70,6 +76,9 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 | **G** | 定时提醒、挂钟计划任务调度 | 定时调度系统：消费 `ctx.schedule`，注册 schedule 系列工具 | [services.md](./references/services.md) |
 | **H** | 多智能体协同、分布式团队、共享任务看板 | Agent Teams 架构：消费 `ctx.agentTeams`，使用 agent_team 系列工具 | [services.md](./references/services.md) |
 | **I** | 在全局设置左侧加专属 Tab、自定义设置面板 | 双面 UI 设置扩展：注入 `settings.section`，编写纯 React 设置面板 | [settings-and-plugin-ui.md](./references/settings-and-plugin-ui.md) |
+| **J** | 右侧边栏、输入框挂件、会话工具栏、主题与 i18n | Web 核心插槽扩展：注入 `sidebar.right.*`、`conversation.input.*`、适配 CSS 变量 | [web-ui-slots-and-styling.md](./references/web-ui-slots-and-styling.md) |
+| **K** | 浏览器前端调用 Node 宿主文件/系统能力 | 跨端通信网关：编写 `@Remote` 服务，Client 调 `ctx.remote.xxx` | [remote-rpc-guide.md](./references/remote-rpc-guide.md) |
+| **L** | 本地极速调试、插件卡死排查、错误诊断 | 本地调试与排错：`--patch` 极速联调、检查 `__DSH_BOOT__`、Top 8 避坑 | [debugging-and-troubleshooting.md](./references/debugging-and-troubleshooting.md) |
 
 ---
 

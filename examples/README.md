@@ -15,7 +15,7 @@
 | 提供全局可共享的有状态服务能力 | **服务提供方插件** | 继承 `Service`, `super(ctx, name)` | [service-provider](./service-provider) | `references/services.md` |
 | 工具权限控制、安全过滤、执行审计 | **事件流水线拦截插件** | `tools/pre-execute` (waterfall), `next()` | [event-interceptor](./event-interceptor) | `references/events.md` |
 | 携带强类型配置参数、多环境部署 | **规范配置插件** | `Schemastery`, `!!js` 动态求值 | [configurable-plugin](./configurable-plugin) | `references/config.md` |
-| 跨项目能力分发、多角色解耦 | **三角色架构包** | Definition / Provider / Consumer | `cfbridge` 生产规范 | `references/three-roles.md` |
+| 跨项目能力分发、多角色解耦 | **三角色架构包** | 双面插件规范、Slots 注入、Remote 契约 | 参见 `references/three-roles.md` 的标准写法 | `references/three-roles.md` |
 
 ---
 

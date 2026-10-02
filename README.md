@@ -82,11 +82,11 @@ UI 插件必须遵循**双面插件 (Dual-Face)** 规范：Node 端 `lib/index.j
 ## 四、实战示例库 (Examples)
 
 技能内置 5 个即装即用的标准示例工程：
-- [examples/greet-tool/](./examples/greet-tool/)：基于 `defineTool` 的最小模型工具插件。
-- [examples/hello-plugin/](./examples/hello-plugin/)：基于 `ctx.effect` 的最小生命周期扩展插件。
-- [examples/service-provider/](./examples/service-provider/)：自定义 Service 基类与跨插件服务注入示例。
-- [examples/event-interceptor/](./examples/event-interceptor/)：基于 `ctx.tools.guard` 的单调安全守卫与审计插件。
-- [examples/configurable-plugin/](./examples/configurable-plugin/)：基于 Schemastery 的强类型配置与校验插件。
+- [examples/greet-tool/](scripts/scaffold_plugin.mjs)：基于 `defineTool` 的最小模型工具插件。
+- [examples/hello-plugin/](scripts/scaffold_plugin.mjs)：基于 `ctx.effect` 的最小生命周期扩展插件。
+- [examples/service-provider/](scripts/scaffold_plugin.mjs)：自定义 Service 基类与跨插件服务注入示例。
+- [examples/event-interceptor/](scripts/scaffold_plugin.mjs)：基于 `ctx.tools.guard` 的单调安全守卫与审计插件。
+- [examples/configurable-plugin/](scripts/scaffold_plugin.mjs)：基于 Schemastery 的强类型配置与校验插件。
 
 ---
 

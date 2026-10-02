@@ -1,0 +1,6 @@
+# dsh-remote-storage-plugin 补丁配置
+- insert:
+    - id: remote-storage-plugin
+      name: dsh-remote-storage-plugin
+      config: {}
+      disabled: false

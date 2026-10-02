@@ -421,3 +421,31 @@ DSH 为插件提供统一的用户配置表单体系。插件导出的 Schemaste
 3. **文件锁保护**：写入过程受文件锁保护，避免并发写入导致 YAML 语法损坏。
 4. **HMR 自动触发**：写入完成后，文件监听器自动检测到补丁变动，执行增量重载而无需重启应用。
 5. **即时字段 (Volatile)**：配置可用 `Volatile<T>` + `Schema.xxx().volatile()` 声明即时字段，运行时用 `.get()` 读取、跨字段校验用 `.check()`（Host 持久化前执行，不进表单 schema）；变更经 `loader/volatile-update` 事件推送（只派发给所属 fiber）。`role('secret')` 阻止值进入表单响应；凭据域值用凭据引用。
+
+---
+
+## 8. Cordis 4.0.4 微内核 Context Proxy 隔离底层深度剖析
+
+在 DSH 中，`Context` 对象本质是一个受保护的 JavaScript Proxy，属性访问通过服务解析器（Service Resolver）动态分发。
+
+### 1. `ctx.isolate(key)` 服务作用域物理隔离槽
+当插件希望在子上下文（Child Context）中覆盖某个全局服务，但又不希望污染全局父级上下文时：
+```js
+// 在子上下文为 customCache 服务创建隔离槽
+const childCtx = ctx.isolate('customCache');
+
+// 子上下文注册的实现仅对自己及后代可见，父上下文完全感知不到
+childCtx.plugin(MyIsolatedCachePlugin);
+```
+- 隔离键被记录在 `Context[symbols.isolate]` 映射表中；
+- 实现了多 Agent 或多任务间的服务多租户隔离。
+
+### 2. `ctx.intercept(key, config)` 动态拦截代理
+允许针对特定服务的方法调用或属性读取挂载动态拦截器（Intercept Map），在不重写服务类的情况下实现切面监控或参数注入。
+
+### 3. `Context.is(value)` 全局跨 Realm 品牌检验
+Cordis 废弃了脆弱的 `value instanceof Context` 判定，改用全局 Symbol 品牌：
+```js
+Context.is[Symbol.toPrimitive] = () => Symbol.for("cordis.is");
+```
+- 使得即便在多包 Monorepo、不同 npm 副本或不同 iframe/Worker Realm 下，跨环境的 Context 对象依然能 100% 准确识别！

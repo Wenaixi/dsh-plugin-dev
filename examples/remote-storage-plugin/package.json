@@ -1,0 +1,28 @@
+{
+  "name": "dsh-remote-storage-plugin",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./lib/client.js"
+  },
+  "dsh": {
+    "bundle": {
+      "id": "remote-storage-plugin",
+      "description": "演示前端 React 通过 Typert Remote RPC 调用 Node 宿主服务并将数据安全写入 ctx.storage.domain 领域持久化存储"
+    },
+    "client": {
+      "platform": "web",
+      "module": "./lib/client.js"
+    }
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.2.0-rc.1",
+    "@deepseek-ai/cordis": "~4.0.4",
+    "react": ">=18"
+  }
+}

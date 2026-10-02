@@ -153,3 +153,44 @@ export function apply(ctx) {
   )
 }
 ```
+
+---
+
+## 六、官方 ToolRuntime 底层安全与隔离四大契约 (源码级深度揭秘)
+
+基于 `@deepseek-ai/dsh-tools` 源码（第 3410~3480 行），流水线在调度和收尾阶段贯彻了四项绝对安全铁律：
+
+### 1. `Object.freeze(exec)` 调用元数据绝对冻结
+在执行流水线第 14 阶段派发 `tools/result` 事件前，调度器会对当前调用的执行对象执行硬性冻结：
+```js
+Object.freeze(exec);
+```
+- 杜绝任何后置观察者、事件监听器或第三方插件篡改已完成调用的名称、参数、Agent 句柄或调用 ID。
+
+### 2. 观察者故障绝对隔离 (Observer Fault Isolation)
+流水线在向外部广播 `tools/result` 同步通知时，采用双重异常隔离机制：
+```js
+const callbacks = this.ctx.events.dispatch("emit", [scopeTarget(this, exec.agent), "tools/result", exec, result]);
+for (const callback of callbacks) {
+  try {
+    const returned = callback(exec, result);
+    Promise.resolve(returned).catch(reportFailure);
+  } catch (error) {
+    reportFailure(error);
+  }
+}
+```
+- **安全保障**：无论是同步抛出的异常还是异步 Reject，调度器仅记录 `ctx.logger.warn` 警告日志，**绝不中断工具结果交付**，单个恶意或崩溃的监听器绝对无法拖垮 Agent 轮次。
+
+### 3. `finalizeContent` 权限受限的内容收尾
+工具定义中可选提供的 `finalizeContent(exec, result)` 回调拥有严格的权限边界：
+- 调度器仅提取其返回值并更新 `content` 数组；
+- 工具开发者**无法接触也无法篡改**系统的 `isError`、`error` 等判定字段，保证错误分类的绝对纯洁性。
+
+### 4. `serviceAsk` 审批服务机会性消费与安全降级
+当策略中间件在第 3 阶段返回 `{ kind: "ask" }` 时，系统调用 `serviceAsk` 解析审批结果：
+- **机会性消费 (Opportunistic Consumption)**：通过 `ctx.get("approval")` 动态获取审批服务；
+- **自动降级为 Deny**：
+  1. 若当前环境未加载审批服务插件（如无头环境），系统**自动降级为 `deny`**（报错 `requires approval (not yet supported)`）；
+  2. 若当前调用未绑定 Agent 句柄（Agent-less），无法审计且无前端 UI，系统同样**自动降级为 `deny`**；
+  3. 唯有具备完整 Agent 且已挂载审批服务的调用，才会弹出真实的人类确认弹窗。

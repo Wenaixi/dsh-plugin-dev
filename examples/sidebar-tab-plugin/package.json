@@ -1,0 +1,25 @@
+{
+  "name": "dsh-sidebar-tab-plugin",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./lib/client.js"
+  },
+  "dsh": {
+    "bundle": {
+      "id": "sidebar-tab-plugin",
+      "description": "演示如何在 DSH Web 主界面右侧边栏挂载独立 Tab 面板并在会话顶部挂载快捷工具按钮"
+    },
+    "client": {
+      "platform": "web",
+      "module": "./lib/client.js"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.2.0-rc.1",
+    "@deepseek-ai/cordis": "~4.0.4",
+    "react": ">=18"
+  }
+}

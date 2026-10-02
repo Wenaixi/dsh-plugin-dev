@@ -1,0 +1,6 @@
+# dsh-sidebar-tab-plugin 补丁配置
+- insert:
+    - id: sidebar-tab-plugin
+      name: dsh-sidebar-tab-plugin
+      config: {}
+      disabled: false

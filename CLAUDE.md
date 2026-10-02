@@ -7,17 +7,19 @@
 
 ## 2. DSH 0.2.0-rc.2 官方核心架构真相与权威规范
 
-### A. 核心服务名称矩阵 (The Core Spine)
-| 服务名称 | 挂载属性 | 所属核心包 | 职责与说明 |
-| --- | --- | --- | --- |
-| SessionLog | `ctx.sessions` (复数!) | `@deepseek-ai/dsh-session` | 仅追加的 SessionEvent 日志与状态唯一真源，严禁误写为 session |
-| SystemPrompt | `ctx.systemPrompt` | `@deepseek-ai/dsh-system-prompt` | 提示词片段组装与工具 Schema 生成 |
-| ToolRuntime | `ctx.tools` | `@deepseek-ai/dsh-tools` | 作用域化工具注册表、保护执行管线与展示投影 |
-| AgentRegistry | `ctx.agents` (复数!) | `@deepseek-ai/dsh-agent` | Agent 句柄注册表、发起者作用域与 `agent/*` 事件 |
-| AgentLoop | `ctx.agentLoop` | `@deepseek-ai/dsh-agent-loop` | 实现 AgentFactory 的具体默认执行循环驱动器 |
-| LlmRuntime | `ctx.llm` | `@deepseek-ai/dsh-llm` | 消息协议、流式分发、重试策略与适配器注册 |
-| ScopeLib | 无 (纯函数库) | `@deepseek-ai/dsh-scope` | `createScope` / `scopeOf` / `scopeTarget` 零依赖作用域库 |
-| ConfigEditor / Settings | `ctx.settings` | `@deepseek-ai/dsh-settings` | 配置表单与补丁持久化服务 |
+### A. 核心服务名称矩阵 (The Core Spine，官方 core/seam/bundle 角色)
+| 服务名称 | 挂载属性 | 角色 | 所属核心包 | 职责与说明 |
+| --- | --- | --- | --- | --- |
+| SessionStore | `ctx.sessions` (复数!) | core | `@deepseek-ai/dsh-session` | 仅追加的 SessionEvent 日志与状态唯一真源，严禁误写为 session |
+| SystemPrompt | `ctx.systemPrompt` | core | `@deepseek-ai/dsh-system-prompt` | 提示词片段组装与工具 Schema 生成 |
+| ToolRuntime | `ctx.tools` | core | `@deepseek-ai/dsh-tools` | 注册能力、PTC 传输、策略前处理→单调守卫→环绕分派→策略后处理→结果观测 |
+| AgentRegistry | `ctx.agents` (复数!) | core | `@deepseek-ai/dsh-agent` | Agent 句柄注册表、发起者作用域与 `agent/*` 事件 |
+| ConfigEditor | `ctx.configEditor` | core | `@deepseek-ai/dsh-config-editor` | 在应用文件锁与 HMR 队列下持久化 profile 配置补丁、协调 Loader 条目 |
+| Settings | `ctx.settings` | core | `@deepseek-ai/dsh-settings` | 从活动 profile 条目投影 volatile Config 成表单，委托 configEditor 落盘 |
+| AgentLoop | `ctx.agentLoop` | **bundle** | `@deepseek-ai/dsh-agent-loop` | 唯一的具体循环插件；扩展包依赖 dsh-agent 事件与服务，**绝不依赖此包** |
+| LlmRuntime | `ctx.llm` | **seam** | `@deepseek-ai/dsh-llm` | 提供方无关流式协议与适配器注册（实现 llm-deepseek / llm-pi-ai / llm-replay） |
+| 其余 seam | subprocess/shell/web/jobs/fs/credentials/sessionPersistence/sessionQuery/storage/skills/ptcRuntime/sandbox/approval/compaction | seam | 各自 Definition 包 | 契约与实现分离，实现以不同名称注册提供方 |
+| ScopeLib | 无 (纯函数库) | — | `@deepseek-ai/dsh-scope` | `createScope` / `scopeOf` / `scopeTarget` 零依赖作用域库，**不挂载服务** |
 
 ### B. Cordis 五大事件派发模式 (Dispatch Modes，官方权威)
 1. **emit**：同步广播，按注册顺序通知，无返回值，不等待异步。
@@ -62,7 +64,7 @@
 
 ### F. 三角色架构模型与真实 IPC 通信机制 (Three Roles & IPC Architecture)
 1. **角色分工**：
-   - **Browser (客户端)**：React 18 + 浏览器端 Cordis 运行时，驱动 SlotRegistry 界面呈现与本地状态。
+   - **Browser (客户端)**：React + 浏览器端 Cordis 运行时，驱动 Slots 插槽系统呈现与本地状态。
    - **Host (Node.js 宿主)**：DSH 核心服务总线 (The Core Spine: sessions, tools, agents, llm, settings, clientModules) 与 Web 服务器。
    - **Worker (工作进程 / 沙箱)**：独立子进程，运行 Native Runner（PowerShell、Bash、Python），隔离高风险与重计算任务。
 2. **IPC 通信通道（官方 Typert Remote 架构）**：

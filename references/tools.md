@@ -59,30 +59,72 @@ interface ToolDefinition extends ToolSchema {
 - **注册借用只读定义**：注册后不得修改 schema、不得替换回调。
 - **`exec`（ToolRunContext）携带不可变身份**：`callId` / `name` / `arguments`（物化为无损 JSON 并冻结）/ `agent` / `token` / `signal` / `parent` 全程不可变；`exec.signal` 是操作字段（触发时取消工作），仅 around-dispatch 包装器可替换并恢复它（不能移除）。
 
-## 执行流水线（顺序固定）
+## 执行流水线（官方精确顺序）
 
 ```
-tools/pre-execute (waterfall)   →  allow/deny/cancel/ask 决策
+tool/call session event 先记录（先于任何工具逻辑/Hook）
        ↓
-单调 guard（ctx.tools.guard）   →  返回 string 即拒绝；无 allow 结果
+presentCall(args) 卡点
        ↓
-tools/execute (waterfall)      →  环绕包装（截止时间/重试/指标）；只能替换 signal
+tools/pre-execute (waterfall)      →  allow / ask / deny 决策
        ↓
-projectContent                  →  在执行后策略之前安装已准备内容
+单调 guard（ctx.tools.guard）      →  deny（返回 string）或 abstain（返回 undefined），无 allow 结果
        ↓
-tools/post-execute (waterfall)  →  accept：替换展示 content 或 value 二选一；block：转含纠正反馈的 isError
+ctx.approval 一次性 prompt        →  allowed-once；拒绝/取消/不可用 → denied
        ↓
-finalizeContent                 →  定义拥有的回调，恰好一次
+tools/execute (waterfall)         →  环绕包装（timeout/retry/metrics）；只能替换 signal
        ↓
-tools/result (emit)             →  观察冻结的权威结果；观察者失败隔离
+工具 execute()
+       ↓
+FS Gate（仅 tool-fs 可写）        →  fs/write-intent、fs/edit-intent
+       ↓
+工具自有事件                     →  todo/write、fs/observed、hook/invoked、hook/result、tool/ptc-dispatch
+       ↓
+ToolDefinition.projectContent     →  在执行后策略之前安装已准备内容
+       ↓
+tools/post-execute (waterfall)    →  accept / block / replace / add context
+       ↓
+外层规范化                        →  任一步 throw 变 isError 快照
+       ↓
+finalizeContent                   →  定义拥有的回调，恰好一次
+       ↓
+tools/result（同步通知）           →  观察冻结的权威结果；观察者失败隔离
+       ↓
+tool/result 事件 → presentResult → 批次 additionalContexts 按 FIFO 注入
 ```
 
 要点：
 
+- **`tool/call` 会话事件先于一切工具逻辑/Hook 记录**。
 - 三个 waterfall（pre-execute / execute / post-execute）可以改写**一次调用**，但不能替换工具定义本身。
+- **guard 有两语义**：拒绝（返回 string）与**弃权**（返回 undefined）；没有 allow 结果，后注册监听器不可能把拒绝变回允许。
+- **审批是 allowed-once（一次性）**，不是持久授权；拒绝/取消/不可用统一转 denied。
+- **denied 时工具主体跳过执行，但仍进入 projectContent 阶段**。
 - 未知工具名或执行抛异常 → `UNKNOWN_TOOL` 结构化错误，**不终止轮次**。
-- `tools/result` 是 emit 观察，结果不可变、不可变换；规范 value 仅执行期存在，持久化只存 `content` / `error` / `meta`。
-- `ctx.approval` 询问在单调守卫之前处理。
+- **`tools/result` 是同步 emit 通知**（结果冻结不可变换）；**`tool/result` 是持久化 SessionEvent**（规范 value 仅执行期存在，持久化只存 `content` / `error` / `meta`）。
+- `ctx.approval` 询问在单调守卫之后（guard 之后、execute 之前）。
+
+## 官方工具归属表（tool-catalog，生成器以 `ctx.tools.schemas()` 运行时结果为准）
+
+| 工具名 | 所属工具包 |
+| --- | --- |
+| `run_code` | `tool-run-code`（dsh-tools，PTC 单入口） |
+| `bash` / `pwsh` | `tool-bash` / `tool-pwsh` |
+| `edit` / `read` / `read_image` / `write` | `tool-fs` |
+| `glob` / `grep` | `tool-fs-search`（`@vscode/ripgrep`） |
+| `skill` | `tool-skill` |
+| `subagent` / `list_subagent_models` | `tool-subagent` |
+| `interrupt_agent` / `list_agents` / `send_message` | `tool-subagent-control` |
+| `job_*` | `tool-jobs` |
+| `create_goal` / `get_goal` / `update_goal` | `tool-goal` |
+| `exit_plan_mode` | `plan-mode` |
+| `ask_user_question` | `tool-ask-user` |
+| `plugin_manager` | `plugin-manager` |
+| `session_*`（5 个） | `tool-session-query` |
+| `terminal_*`（6 个）、持久化 bash/pwsh | `tool-terminal` / `tool-terminal-persistent` |
+| `lsp`、`ralph`、`schedule_*`、`str_replace_editor`、MCP 资源三件套 | 各自工具包 |
+
+目录无法静态推断（运行时展开枚举/拼接描述/配置决定名称/MCP 原始 JSON Schema），官方生成器真实启动每个工具插件读 `ctx.tools.schemas()`——**以运行时的 `schemas()` 结果为准**。
 
 ## 执行调度
 

@@ -145,11 +145,18 @@ root
 
 ### 1. Browser ↔ Host IPC
 
-由生成式 Remote（Typert）提供：
+由生成式 Remote（Typert）提供，契约在 api-gateway：
 
-- 直接调用是 `ctx.remote.<namespace>`；作用域调用是 `agentCtx.remote.<namespace>`。
-- `@Remote` / `@RemoteScope` 才把方法开放给 Client；HTTP 一元 RPC 落在 `POST /api/<namespace>/<method>`。
+- 直接调用是 `ctx.remote.<namespace>` / `agentCtx.remote.<namespace>`（普通对象具体函数，非 Proxy）；`assembly` 经 `ctx.remote.$mount()` 挂载。
+- **`@Remote('create')` 等注解才把方法开放给 Client**（未标记不能经 ctx.remote 调用）；`@RemoteScope('agent','current')` 先经 `ctx.typert.contexts` 解析作用域 Context。继承 `TypertRemoteService`（super(ctx,'goals') 绑 key+namespace）或 `bindTypertRemote(this, serviceKey)`。
+- 方法签名硬约束：公开/非静态/有具体实现、不能泛型、参数具名必填简单标识符、**禁解构/默认值/rest/可选**。
+- **协作取消**：Host 签名最后一个参数必须是 `signal: AbortSignal`（记于描述符而非 args）。
+- 一元 RPC：`connection.rpc.call('/api','<ns>/<method>',{args},signal)` → HTTP `POST /api/<ns>/<method>`。
+- **`@Remote({mode:'stream'})`**：返回 `Iterable/AsyncIterable/RemoteStream<Out,In>`，经 `/api/remote.mux` WebSocket 投递；Client 得 `RemoteStreamHandle`（send/end/dispose），上行经 `ctx.invocation.uplink<In>()` 读取。**这就是 remote.mux 的唯一合法用途（流式 Remote），不是通用多路复用总线**。
 - `ctx.remote.$on()` 把 allowlist 事件交 root Context、scoped waterfall 事件交 Session Context（可返回结果 / next() / 拒绝）。
+- 依赖声明归实际调用方：业务包 `inject` 须含 `['remote','remote.<ns>']`。
+- 错误码：`gateway/lookup-unavailable`、`session/not-found`、`session/agent-busy`、未归类 → `gateway/internal`。
+- 构建：`tsc -b tsconfig.host.json` → `tsdown --env.DSH_BUILD_FACE host`（Typert 生成器只在 Host 阶段跑一次）→ Client 阶段只消费生成声明；产物写包 `lib/`（typert.host.*、typert.remote-client.*），经 `./typert` 与 `./remote` 入口暴露；SRC 回退不读 TS 类型、不生成 Zod schema，Client 拒绝挂载无严格 codec 的 SRC 描述符。
 - 浏览器侧 `ctx.sessions`（ClientSessions→SessionManager→Session）是 session-controller 的 Client 面镜像，不是 SessionLog 本体；`ctx.workspaces` 来自 workspace-controller。
 - 重连：物理/逻辑独立；普通通知不重放；可靠恢复需 baseline/cursor/显式 query；`page()` 仅用于更早历史与 gap repair。架构中不存在 Client Runtime / HostFrame / `events.mux` / `events.host` / 通用 `resync()`。
 

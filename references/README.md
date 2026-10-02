@@ -67,3 +67,11 @@
 ### 十二、领域数据存储、持续伪终端与检查点 (Storage, Terminal & Checkpoints)
 - **[storage-terminals-and-checkpoints.md](./storage-terminals-and-checkpoints.md)**：
   服务端状态存储与交互式终端权威指南——领域数据存储 (`ctx.storage.domain` Zod 强校验命名空间表、拒绝乱写文件的三层存储分层)、持续交互式伪终端 (`ctx.terminal` 长任务 PTY 会话、输入流发送与 POSIX 信号打断)、以及会话语义检查点与断电自愈策略 (`session-checkpoint-policy`)。
+
+### 十三、人类斜杠命令、输入触发器与交互扩展 (Commands & Input Triggers)
+- **[slash-commands-and-input-triggers.md](./slash-commands-and-input-triggers.md)**：
+  人类斜杠命令与输入交互指南——`ctx.commands` 核心注册表、自定义 `/command` 编写实战、输入触发器 (`dsh-client-ui-input-trigger`) 下拉补全浮层、纯前端 UI 双面设计模式、以及全局快捷键 (`dsh-client-shortcuts`) 绑定。
+
+### 十四、沙箱底层物理隔离、图像转储与出站网络代理 (Sandbox, Image Offload & Proxy)
+- **[sandbox-internals-and-proxy.md](./sandbox-internals-and-proxy.md)**：
+  沙箱内核机制与网络代理指南——Windows WRITE_RESTRICTED 令牌与 DACL 交集检查原理、Linux Landlock LSM 路径封锁、沙箱结果三状态严格判别法 (Policy Denial vs Runner Failure vs Exit Code)、多模态长对话 `image-offload` 图像外置转储与重试自愈、以及 Undici 全局调度器出站网络代理 (`dsh-http-proxy`) 透明支持。

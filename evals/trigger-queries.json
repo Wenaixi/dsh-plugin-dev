@@ -169,6 +169,22 @@
     {
       "query": "插件需要拉起一个长期运行的开发服务器进程怎么使用持续交互式伪终端",
       "should_trigger": true
+    },
+    {
+      "query": "如何在 DSH 插件中注册一个用户在输入框键入 / 时弹出的自定义斜杠命令",
+      "should_trigger": true
+    },
+    {
+      "query": "DSH 在 Windows 平台下是怎么通过 ACL 令牌实现只读沙箱权限控制的",
+      "should_trigger": true
+    },
+    {
+      "query": "多模态长对话图片过多导致上下文溢出时 DSH 是怎么自动转储自愈的",
+      "should_trigger": true
+    },
+    {
+      "query": "在企业内网环境下如何配置 DSH 的全局 HTTP 代理让所有插件请求生效",
+      "should_trigger": true
     }
   ]
 }

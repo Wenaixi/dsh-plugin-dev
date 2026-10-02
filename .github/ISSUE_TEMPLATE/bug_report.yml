@@ -11,7 +11,7 @@ body:
     id: problem
     attributes:
       label: 问题描述
-      description: 哪篇文档或哪个示例工程存在问题？具体现象是什么？
+      description: 哪篇文档存在问题？具体现象是什么？
       placeholder: 例如：references/services.md 中关于 ctx.xxx 挂载名与官方源码不符...
     validations:
       required: true

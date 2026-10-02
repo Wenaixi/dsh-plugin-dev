@@ -307,8 +307,8 @@ ctx.effect(() => {
 - `ctx.on(name, listener, options?)`：注册事件监听器（disposable）；`ctx.once(name, listener)` 单次监听。
 - 派发方法（每个事件必须明确其派发模式，并只能由对应方法派发）：
   - `ctx.emit(name, ...args)`：同步广播，无返回值。
-  - `ctx.waterfall(name, ...args)`：同步链式加工，返回最终值。监听器接收 `(...args, next)`，调用 `next()` 执行下游；不调 `next()` 直接返回即短路。协作式监听器可修改共享请求对象后委托，也可整体替换结果。
-  - `ctx.parallel(name, ...args)`：异步并发（`Promise.all`）等待全部 settle，无返回值。
+  - `ctx.waterfall(name, ...args)`：同步环绕中间件，返回最终值。监听器接收 `(...args, next)`，调用 `next()` 执行下游；不调 `next()` 直接返回即短路。协作式监听器可修改共享请求对象后委托，也可整体替换结果。
+  - `ctx.parallel(name, ...args)`：异步并发（`Promise.allSettled`）等待全部 settle，返回 `Promise<void>`（若有失败项汇总抛出 `AggregateError`，绝非结果数组）。
   - `ctx.serial(name, ...args)`：按注册顺序依次 `await`，直到第一个 bail 值（非 null/false/undefined）即返回该值（`Promisify<ReturnType>`，不是结果数组）。
   - `ctx.bail(name, ...args)`：**同步**按序调用，直到某个监听器返回 bail 值（非 null/false/undefined）即返回该值。
 - `EventOptions`：`prepend?`（插到队列最前）、`global?`（忽视作用域过滤器强制全局接收）。

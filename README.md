@@ -41,9 +41,9 @@ DSH 是基于 Cordis 微内核构建的高可扩展 Agent Harness。在 DSH 架�
 3. **五大事件派发模式**：
    - `emit`：同步通知，无返回值；
    - `waterfall`：**同步环绕中间件**（监听器收 `(...args, next)`，调 `next()` 执行下游、不调即短路），返回最终加工值——不是简单传值链；
-   - `parallel`：`Promise.all` 并发等待全部 settle，无返回值；
-   - `serial`：按序 `await`，返回结果数组；
-   - `bail`：按序直到某监听器返回 bail 值，返回该值。
+   - `parallel`：`Promise.allSettled` 并发等待**全部 settle**，返回 `Promise<void>`（若有失败项全部 settle 后汇总抛出 `AggregateError`，绝非结果数组）；
+   - `serial`：依次 `await` 直到首个 bail 值（非 null/false/undefined）即短路返回（返回首个 bail 值，**绝非结果数组**）；
+   - `bail`：同步调用直到首个 bail 值，返回该 bail值。
 4. **配置落点与全量替换规约**：
    - **废弃警告**：`$DSH_HOME/settings.yaml` 已完全废弃，修改无效。
    - **三层落点（+ overlay）**：组合包 patch → `$DSH_HOME/profiles/<profile>/cordis.patch.yml` → `$DSH_HOME/cordis.patch.yml` → `--patch` overlay（按 argv 顺序）。后层按行胜出。
@@ -79,14 +79,11 @@ UI 插件必须遵循**双面插件 (Dual-Face)** 规范：Node 端 `lib/index.j
 
 ---
 
-## 四、实战示例库 (Examples)
+## 四、开发辅助工具链 (Scaffolder & Validator)
 
-技能内置 5 个即装即用的标准示例工程：
-- [examples/greet-tool/](scripts/scaffold_plugin.mjs)：基于 `defineTool` 的最小模型工具插件。
-- [examples/hello-plugin/](scripts/scaffold_plugin.mjs)：基于 `ctx.effect` 的最小生命周期扩展插件。
-- [examples/service-provider/](scripts/scaffold_plugin.mjs)：自定义 Service 基类与跨插件服务注入示例。
-- [examples/event-interceptor/](scripts/scaffold_plugin.mjs)：基于 `ctx.tools.guard` 的单调安全守卫与审计插件。
-- [examples/configurable-plugin/](scripts/scaffold_plugin.mjs)：基于 Schemastery 的强类型配置与校验插件。
+技能内置纯原生 Node.js 开发工具链：
+- `scripts/scaffold_plugin.mjs`：一键生成标准单面（Host 端）或双面（Host + Client React UI）插件工程骨架。
+- `scripts/validate_plugin.mjs`：对插件包元数据、补丁结构、入口导出及双面客户端文件进行静态合规性校验。
 
 ---
 

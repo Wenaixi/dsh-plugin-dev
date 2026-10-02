@@ -31,14 +31,14 @@ cd dsh-plugin-dev
 本项目无需繁重的构建打包步骤，所有示例与脚本基于原生 Node.js (>=18) ESM 运行。
 
 ### 2. 自动化合规性校验
-在提交任何修改前，必须运行随包提供的校验工具验证全部示例工程：
+在提交任何修改前，必须运行随包提供的校验工具验证生成的工程骨架合规性：
 ```bash
 node scripts/scaffold_plugin.mjs /tmp/test-plugin && node scripts/validate_plugin.mjs /tmp/test-plugin
 ```
 确保所有工程输出 `校验通过`，退出码为 0。
 
 ### 3. 生成新插件脚手架
-如需贡献新的示例插件，推荐使用内置脚手架生成标准骨架：
+开发或测试新插件时，推荐使用内置脚手架生成标准骨架：
 ```bash
 # 生成基础单面插件
 node scripts/scaffold_plugin.mjs /tmp/my-new-plugin

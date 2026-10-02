@@ -13,7 +13,7 @@ DSH 构建于 Cordis 事件总线之上。Cordis 提供五种严格区分同步/
 | `emit` | 同步顺序通知，返回 `void`，不等待 Promise | 纯状态广播与无返回值通知（如 `ready`, `dispose`, `skills/change`） |
 | `waterfall` | **同步环绕中间件 (Around-Middleware)**<br>监听器接收 `(...args, next)`，外层先调，内部调 `next()` 驱动下游，返回最终值 | 拦截器、请求管道、动态上下文过滤与参数/结果整体替换。**绝非简单顺序传值链**！不调 `next()` 即短路。 |
 | `parallel` | `Promise.allSettled` 并发等待**全部 settle**<br>返回 `Promise<void>`（**绝非结果数组**） | 异步资源关闭与并发收敛通知（如 `workspace/session-stop`）。若有失败项，全部 settle 后汇总抛出 `AggregateError`。 |
-| `serial` | 串行依次 `await`，直到遇到首个 bail 值即短路返回<br>返回 `Promisify<ReturnType>`（**绝非结果数组**） | 异步短路链、优先处理者决策链（首个非 falsy/非 null/非 undefined 者胜出）。 |
+| `serial` | 串行依次 `await`，直到遇到首个 bail 值即短路返回<br>返回 `Promisify<ReturnType>`（**绝非结果数组**） | 异步短路链、优先处理者决策链（首个非 null/非 false/非 undefined 的 bail 值胜出）。 |
 | `bail` | 同步按序调用，遇到首个 bail 值即同步短路返回<br>返回 `ReturnType` | 同步优先级匹配、首个命中即停的决策链。 |
 
 ### 1. Bail 值的严格判定准则 (`isBailed`)

@@ -23,12 +23,9 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
-      - name: Test plugin scaffolder (Single-face & Dual-face)
+      - name: Test plugin scaffolder & validator (Positive & Negative contract suite)
         run: |
-          node scripts/scaffold_plugin.mjs /tmp/test-single-face
-          node scripts/validate_plugin.mjs /tmp/test-single-face
-          node scripts/scaffold_plugin.mjs /tmp/test-dual-face --dual-face
-          node scripts/validate_plugin.mjs /tmp/test-dual-face
+          node scripts/test_validator.mjs
 
       - name: Check for dead markdown links
         run: |

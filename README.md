@@ -1,5 +1,20 @@
 # DeepSeek Harness (DSH) 插件开发权威指南
 
+<p align="center">
+  <a href="https://github.com/Wenaixi/dsh-plugin-dev/actions/workflows/ci.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/Wenaixi/dsh-plugin-dev/ci.yml?branch=main&style=flat-square&label=CI%20Build" alt="CI Status" />
+  </a>
+  <img src="https://img.shields.io/badge/DSH%20Baseline-0.2.0--rc.2-blue?style=flat-square" alt="DSH Version" />
+  <img src="https://img.shields.io/badge/Cordis-4.0.4-orange?style=flat-square" alt="Cordis Version" />
+  <img src="https://img.shields.io/badge/Node.js-%3E%3D18-brightgreen?style=flat-square" alt="Node Version" />
+  <a href="./LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License" />
+  </a>
+  <a href="https://github.com/Wenaixi/dsh-plugin-dev/pulls">
+    <img src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square" alt="PRs Welcome" />
+  </a>
+</p>
+
 本项目是开发、审查、调试 **DeepSeek Harness (DSH 0.2.0-rc.2)** 插件与生态扩展的标准与权威参考知识库（Agent Skill）。内容依据 DSH 官方文档站 44 页逐页核对，凡与旧版记忆冲突处一律以官方原文为准。
 
 DSH 是基于 Cordis 微内核构建的高可扩展 Agent Harness。在 DSH 架构中，**一切皆为插件 (Everything is a Plugin)**：会话日志、工具注册表、系统提示词装配、模型适配器、UI 界面以及执行循环驱动器均作为平等、可插拔的插件运行。

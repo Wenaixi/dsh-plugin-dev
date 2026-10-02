@@ -1,0 +1,19 @@
+name: 💡 需求或改进建议 (Feature / Enhancement)
+description: 提议新增架构参考专题、改进示例工程或扩充评测用例
+title: "[FEAT]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议内容
+      description: 请详细描述你的建议
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: 适用场景与背景
+      description: 为什么这个改动对 DSH 插件开发者有价值？
+    validations:
+      required: true

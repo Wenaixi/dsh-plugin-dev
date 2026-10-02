@@ -164,14 +164,8 @@ ctx.effect(() => {
 ### 3.4 事件派发与监听
 
 - `ctx.on(name, listener, options?)`：注册事件监听器（disposable）；`ctx.once(name, listener)` 单次监听。
-- 派发方法（每个事件必须明确其派发模式，并只能由对应方法派发）：
-  - `ctx.emit(name, ...args)`：同步广播，无返回值。
-  - `ctx.waterfall(name, ...args)`：同步环绕中间件，返回最终值。监听器接收 `(...args, next)`，调用 `next()` 执行下游；不调 `next()` 直接返回即短路。协作式监听器可修改共享请求对象后委托，也可整体替换结果。
-  - `ctx.parallel(name, ...args)`：异步并发（`Promise.allSettled`）等待全部 settle，返回 `Promise<void>`（若有失败项汇总抛出 `AggregateError`，绝非结果数组）。
-  - `ctx.serial(name, ...args)`：按注册顺序依次 `await`，直到第一个 bail 值（非 null/false/undefined）即返回该值（`Promisify<ReturnType>`，不是结果数组）。
-  - `ctx.bail(name, ...args)`：**同步**按序调用，直到某个监听器返回 bail 值（非 null/false/undefined）即返回该值。
-- `EventOptions`：`prepend?`（插到队列最前）、`global?`（忽视作用域过滤器强制全局接收）。
-- 事件是"通知加规约"：先通过 TS 声明合并注册事件名并标注 `@mode` 分发模式，再按对应方法派发，不能混用。
+- 派发有五个互不通用的方法：`ctx.emit` / `ctx.waterfall` / `ctx.parallel` / `ctx.serial` / `ctx.bail`。事件一旦在类型声明里标注了 `@mode`，就只能用对应方法派发，混用无效。
+- 事件的完整语义（`waterfall` 的环绕中间件形态、`parallel`/`serial`/`bail` 的 bail 值短路、`EventOptions`、`isBailed` 源码、disposer 返回值）见 [events.md](./events.md) 第一节。
 
 ### 3.5 上下文过滤与隔离：ctx.isolate()
 
@@ -197,34 +191,11 @@ DSH 的设计精髓是**切面（Seam）化设计**：不存在特权或硬编�
 2. **实现提供方 (Service Provider)**：具体提供该能力的插件（如 DeepSeek 适配器、SQLite 存储）。
 3. **消费者 (Consumer)**：使用该服务的业务插件或面向模型的工具。
 
-### 4.1 DSH 核心能力目录（官方 capability-seams 口径）
+### 4.1 核心能力目录
 
-| ctx 键 | 角色 | 所属包 | 实现提供方举例 | 核心职责 |
-| --- | --- | --- | --- | --- |
-| `ctx.sessions` | core | `@deepseek-ai/dsh-session` | session-memory + persistence-fs | 仅追加的 `SessionEvent` 唯一真源日志与状态快照（注意为复数） |
-| `ctx.systemPrompt` | core | `@deepseek-ai/dsh-system-prompt` | system-prompt 基础装配器 | 动态收集提示词片段与模型可见工具 Schema 生成 |
-| `ctx.tools` | core | `@deepseek-ai/dsh-tools` | dsh-tools 标准执行管线 | 注册能力、PTC 传输、调用依次经过策略前处理、单调守卫、环绕分派、策略后处理与最终结果观测 |
-| `ctx.agents` | core | `@deepseek-ai/dsh-agent` | agent-loop | 活跃 Agent 注册表与发起者作用域（注意为复数） |
-| `ctx.agentLoop` | **bundle** | `@deepseek-ai/dsh-agent-loop` | — | **唯一的具体循环插件；扩展包依赖 dsh-agent 的事件与服务，绝不依赖此包** |
-| `ctx.llm` | **seam** | `@deepseek-ai/dsh-llm` | llm-deepseek, llm-pi-ai, llm-replay | 提供方无关消息流式协议与适配器注册 |
-| `ctx.settings` | core | `@deepseek-ai/dsh-settings` | config-editor | 从活动 profile 条目投影 volatile Config 字段成表单，委托 config-editor 持久化 |
-| `ctx.configEditor` | core | `@deepseek-ai/dsh-config-editor` | — | 在应用文件锁与 HMR 队列下持久化 profile 配置补丁，并协调 Loader 条目 |
-| `ctx.credentials` | seam | `@deepseek-ai/dsh-credentials` | credentials-local | 用户 API Key 与敏感环境变量受控注入与脱敏 |
-| `ctx.subprocess` | seam | `@deepseek-ai/dsh-subprocess` | subprocess-local | 子进程 spawn 与终端原语（bash 执行器、PTY、LSP Host、ACP 后端均经它） |
-| `ctx.shell` | seam | `@deepseek-ai/dsh-shell` | bash-local / bash-sandbox / pwsh-local | 终端执行沙箱 |
-| `ctx.web` | seam | `@deepseek-ai/dsh-web` | web-search-exa / web-fetch-http | 网页搜索与抓取能力（提供方注册能力而非工具） |
-| `ctx.jobs` | seam | `@deepseek-ai/dsh-jobs` | jobs-local | 后台任务生命周期管理 |
-| `ctx.fs` | seam | `@deepseek-ai/dsh-fs` | fs-local / fs-sandbox / fs-ssh | 文件系统能力（配套 fs-observation-policy） |
-| `ctx.sessionPersistence` | seam | `@deepseek-ai/dsh-session-persistence` | session-persistence-jsonl | 会话持久化存储 |
-| `ctx.sessionQuery` | seam | `@deepseek-ai/dsh-session-query` | session-query-sqlite | 会话查询 |
-| `ctx.storage` | seam | `@deepseek-ai/dsh-storage` | storage-json / storage-sqlite | 通用键值存储 |
-| `ctx.skills` | seam | `@deepseek-ai/dsh-skill` | skill-filesystem / skill-badge / skill-office | 技能（Skill）注册表与调用策略 |
-| `ctx.ptcRuntime` | seam | `@deepseek-ai/dsh-ptc-runtime` | ptc-runtime-local | PTC 模式程序执行运行时 |
-| `ctx.sandbox` | seam | `@deepseek-ai/dsh-sandbox` | sandbox-local (bwrap/Landlock, Seatbelt, Windows ACL) | 文件效果策略沙箱（`SandboxMode` 只管文件效果，不管网络/进程可见性） |
-| `ctx.approval` | seam | `@deepseek-ai/dsh-approval` | approval-local | 审批请求（approval/request waterfall） |
-| `ctx.compaction` | seam | `@deepseek-ai/dsh-compaction` | compaction-basic | 上下文压缩 |
+DSH 把每种能力切分为抽象契约（seam），实现以不同包名注册提供方。这张全量能力表（core / seam / bundle 角色、所属包、实现提供方与职责）维护在 [services.md](./services.md) 第一节与第三节，改动只在那里发生。
 
-注意：`@deepseek-ai/dsh-scope` 是纯函数库（提供 `createScope`、`scopeOf`、`scopeTarget`），**不挂载任何服务**。
+本文件只保留依赖倒置的用法规则；服务清单本身不在此重复。
 
 ### 4.2 DSH 专用作用域库 (@deepseek-ai/dsh-scope)
 

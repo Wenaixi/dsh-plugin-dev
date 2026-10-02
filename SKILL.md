@@ -21,31 +21,22 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 ## 一、核心原则与架构真相 (Architectural Invariants)
 
 1. **微内核设计 (Zero-Privilege Microkernel)**：DSH 没有特权核心，所有能力均以 Cordis 插件形式装配于共享 `Context`。
-2. **核心大动脉服务单复数绝对铁律 (The Core Spine)**：
-   - `ctx.sessions`（**复数!** `@deepseek-ai/dsh-session`）：仅追加 SessionEvent 日志与会话状态唯一真源；
-   - `ctx.agents`（**复数!** `@deepseek-ai/dsh-agent`）：活动 Agent 实例句柄注册表；
-   - `ctx.agentTeams`（**复数!** `@deepseek-ai/dsh-experimental-agent-team`）：多 Agent 团队编排大动脉；
-   - `ctx.tools`（**复数!** `@deepseek-ai/dsh-tools`）：工具注册、单调守卫与执行运行时；
-   - `ctx.settings`（**复数!** `@deepseek-ai/dsh-settings`）：动态表单视图投影；
-   - `ctx.clientModules`（**复数!** `@deepseek-ai/dsh-client-modules`）：双面插件模块图与 HMR（Browser 侧为 `ctx.modules`）；
-   - `ctx.systemPrompt`（**单数!** `@deepseek-ai/dsh-system-prompt`）：系统提示词组装与工具 Schema 生成；
-   - `ctx.configEditor`（**单数!** `@deepseek-ai/dsh-config-editor`）：文件锁与 HMR 下的补丁持久化；
-   - `ctx.schedule`（**单数!** `@deepseek-ai/dsh-schedule`）：宿主持久化挂钟提醒与调度；
-   - `ctx.planMode`（**单数!** `@deepseek-ai/dsh-plan-mode`）：计划模式软性控制器；
-   - `ctx.workspaceRegistry`（**单数!** `@deepseek-ai/dsh-workspace`）：工作区实体注册表；
-   - `ctx.llm`（**单数 Seam!** `@deepseek-ai/dsh-llm`）：提供方无关流式协议；
-   - `ctx.agentLoop`（**Bundle!** `@deepseek-ai/dsh-agent-loop`）：唯一具体循环包（外部插件绝不直接依赖此包）；
-   - `@deepseek-ai/dsh-scope`：**纯函数库**（`createScope`/`scopeOf`），**不挂载任何服务**。
+2. **核心大动脉服务单复数铁律 (The Core Spine)**——写错单复数是最常见的低级错误：
+   - **复数**（注册表 / 多成员服务）：`ctx.sessions`、`ctx.agents`、`ctx.agentTeams`、`ctx.tools`、`ctx.settings`、`ctx.clientModules`；
+   - **单数**（引擎 / 运行时 / 控制器）：`ctx.systemPrompt`、`ctx.configEditor`、`ctx.schedule`、`ctx.planMode`、`ctx.workspaceRegistry`、`ctx.llm`；
+   - `ctx.agentLoop` 是唯一的具体循环包（bundle），扩展插件依赖 `@deepseek-ai/dsh-agent` 的事件与服务即可；
+   - `@deepseek-ai/dsh-scope` 是纯函数库，不在 Context 上挂载服务。
+   完整角色矩阵（core / seam / bundle）、所属包与提供方见 [services.md](./references/services.md)。
 3. **Cordis 五大事件派发模式**：
-   - `emit`：同步顺序广播，返回 `void`；
-   - `waterfall`：**同步环绕中间件**（监听器接收 `(...args, next)`，调 `next()` 驱动下游，不调即短路，可整体替换最终返回值）；
-   - `parallel`：`Promise.allSettled` 并发等待**全部 settle**，返回 `Promise<void>`，失败项汇总抛出 `AggregateError`；
-   - `serial`：依次 `await` 直到首个 bail 值（非 null/false/undefined），返回该 bail 值；
-   - `bail`：同步调用直到首个 bail 值，返回该 bail 值。
+   - `emit`：同步广播，返回 `void`；
+   - `waterfall`：**同步环绕中间件**，监听器收 `(...args, next)`，调 `next()` 驱动下游，不调即短路并可整体替换返回值；
+   - `parallel` / `serial` / `bail`：都在遇到首个 bail 值（非 null / false / undefined）时短路；`serial` 逐个 await，`parallel` 等待全部 settle 后返回 `Promise<void>`。
+   源码级调度算法、`isBailed` 边界与 `EventOptions` 见 [events.md](./references/events.md)。
 4. **配置补丁四层生效与全量替换语义**：
-   - 生效顺序：bundles 自带 patch -> profile patch -> 用户全局 patch -> CLI `--patch` overlays（后层胜出）；
-   - 补丁中的 `config` 采用**全量替换，绝不进行深合并 (Wholesale replacement, not deep-merged)**；
+   - 生效顺序：bundles 自带 patch -> profile patch -> 用户全局 patch -> CLI `--patch` overlays（后层按行胜出）；
+   - 补丁中的 `config` **整体替换，不做深合并**；
    - **绝对严禁教导用户修改 `settings.yaml`**（已彻底废弃，启动时自动重命名为 `settings.yaml.imported`）。
+   落点路径、`- insert:` 语法、`- id:` 覆盖、`!!js` 动态求值与两种写入语义见 [config.md](./references/config.md)。
 5. **官方工具执行 16 阶段流水线**（此处列出跨阶段关键环节，完整 16 阶段逐条与源码行号见 [tools.md](./references/tools.md)）：
    `tool/call` 记录 -> `presentCall` -> `pre-execute` -> **`approval` (serviceAsk 审批裁决)** -> **单调 guard (终极一票否决权)** -> `execute`(环绕分派) -> 工具 `execute`(主体) -> FS Gate -> 工具自有事件 -> **`projectContent` (denied 依然触发)** -> `post-execute` -> 规范化 -> `finalizeContent` -> `tools/result` (同步) -> `tool/result` (持久化) -> `presentResult`。
    **审批先于守卫**：用户点了「允许」之后，单调 guard 仍可否决，详见 tools.md 第 4、5 阶段。

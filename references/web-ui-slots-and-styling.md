@@ -5,9 +5,13 @@
 
 ---
 
-## 一、DSH 官方核心 Slot 层级树全景图
+## 一、Slot 层级树见 three-roles.md
 
 DSH 的 Web GUI 采用组件化微前端插槽体系，**所有 UI 扩展一律通过 `ctx.slots.inject` 注入**，挂载与样式回收由宿主负责。
+
+Slot 标识清单、cardinality（single/list/keyed/chain）与 scope（root/session-maybe/session）的完整对照表见 [three-roles.md](./three-roles.md) 的「常用 Slot 标识清单」；本文件只讲各插槽的注册实战与样式/i18n 配套。
+
+下图是**布局示意**（非完整标识表）：
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐

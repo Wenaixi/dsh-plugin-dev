@@ -43,6 +43,13 @@ function hasApplyExport(src) {
   return lines.some((line) => exportRegex.test(line))
 }
 
+// exports 允许两种写法：字符串，或条件导出对象（{ types, default } / { import }）
+function exportPath(value) {
+  if (typeof value === 'string') return value
+  if (value && typeof value === 'object') return value.default ?? value.import ?? null
+  return null
+}
+
 function validateOne(targetDir) {
   const dir = resolve(targetDir)
   const errors = []
@@ -84,6 +91,13 @@ function validateOne(targetDir) {
           typeof pkg.dsh.bundle.id === 'string' && pkg.dsh.bundle.id.length > 0,
           '缺少 dsh.bundle.id'
         )
+        // 声明了 patch 路径就必须真实存在，否则 Loader 找不到组合包补丁
+        if (typeof pkg.dsh.bundle.patch === 'string') {
+          check(
+            existsSync(join(dir, pkg.dsh.bundle.patch)),
+            'dsh.bundle.patch 指定的补丁文件不存在: ' + pkg.dsh.bundle.patch
+          )
+        }
       }
 
       // 双面插件声明校验
@@ -114,17 +128,24 @@ function validateOne(targetDir) {
           '声明了 dsh.client 时，package.json.exports 必须包含 "./client" 导出'
         )
         if (pkg.exports && pkg.exports['./client']) {
-          const clientExportPath = join(dir, pkg.exports['./client'])
+          const clientExportRel = exportPath(pkg.exports['./client'])
+          check(clientExportRel !== null, 'exports["./client"] 必须是字符串或条件导出对象')
+          const clientExportPath = clientExportRel ? join(dir, clientExportRel) : null
           check(
-            existsSync(clientExportPath),
-            'package.json.exports["./client"] 指定的文件不存在: ' + pkg.exports['./client']
+            clientExportPath !== null && existsSync(clientExportPath),
+            'package.json.exports["./client"] 指定的文件不存在: ' + JSON.stringify(pkg.exports['./client'])
           )
-          if (existsSync(clientExportPath)) {
+          if (clientExportPath !== null && existsSync(clientExportPath)) {
             const syntaxErr = checkJsSyntax(clientExportPath)
             check(!syntaxErr, '客户端入口文件 JS 语法错误: ' + syntaxErr)
             try {
               const clientSrc = readFileSync(clientExportPath, 'utf8')
               check(hasApplyExport(clientSrc), '客户端入口文件必须导出 apply(ctx) 声明')
+              // 双面插件的 Client 半侧只经插槽挂载组件
+              check(
+                /slots\.(inject|register)/.test(clientSrc),
+                '客户端入口必须经 ctx.slots.inject/register 挂载组件'
+              )
             } catch (e) {
               errors.push('读取客户端入口文件失败: ' + e.message)
             }
@@ -144,10 +165,12 @@ function validateOne(targetDir) {
         'package.json.exports 应包含 "." 根导出'
       )
       if (pkg.exports['.']) {
-        const rootExportPath = join(dir, pkg.exports['.'])
+        const rootExportRel = exportPath(pkg.exports['.'])
+        check(rootExportRel !== null, 'exports["."] 必须是字符串或条件导出对象')
+        const rootExportPath = rootExportRel ? join(dir, rootExportRel) : null
         check(
-          existsSync(rootExportPath),
-          'package.json.exports["."] 指定的文件不存在: ' + pkg.exports['.']
+          rootExportPath !== null && existsSync(rootExportPath),
+          'package.json.exports["."] 指定的文件不存在: ' + JSON.stringify(pkg.exports['.'])
         )
       }
     } else {

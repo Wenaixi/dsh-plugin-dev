@@ -59,7 +59,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
    - **输出**：确定的插件形态、所需服务清单、包名（如 `dsh-my-plugin`）。
 2. **步骤 2：生成工程骨架与依赖声明**
    - **输入**：目标目录路径；
-   - **执行**：使用随包工具一键生成合规骨架（单面 `node scripts/scaffold_plugin.mjs <dir>`，双面追加 `--dual-face`）；
+   - **执行**：使用随包工具一键生成合规骨架（单面 `node <技能根目录>/scripts/scaffold_plugin.mjs <dir>`，双面追加 `--dual-face`）；
    - **输出**：包含规范 `package.json`、`cordis.patch.yml`、入口 `index.js` 的工程骨架。
 3. **步骤 3：编写核心业务逻辑与生命周期**
    - **输入**：业务逻辑与 API 接口；
@@ -71,7 +71,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
    - **输出**：在 Web GUI 或终端中正常激活并生效的插件功能。
 5. **步骤 5：自动化验收与合规校验**
    - **输入**：完成测试的插件目录；
-   - **执行**：运行 `node scripts/validate_plugin.mjs <dir>` 验证包规范；若有 Markdown 文档执行死链检测；
+   - **执行**：运行 `node <技能根目录>/scripts/validate_plugin.mjs <dir>` 验证包规范；若有 Markdown 文档执行死链检测；
    - **输出**：全部绿色通过的交付物。
 
 ---
@@ -293,11 +293,13 @@ export function apply(ctx) {
 
 ## 九、工作区辅助脚本
 
+**`<技能根目录>` 是本 Skill 的安装目录**（DSH 下位于 `~/.agents/skills/dsh-plugin-dev`）。下面的相对路径命令必须先切换到该目录，或把占位符替换为实际路径；直接在用户项目目录下执行会因找不到文件而失败。
+
 - **多工程合规性批量校验**：
   ```bash
-  node scripts/scaffold_plugin.mjs /tmp/test-plugin && node scripts/validate_plugin.mjs /tmp/test-plugin
+  node <技能根目录>/scripts/scaffold_plugin.mjs /tmp/test-plugin && node <技能根目录>/scripts/validate_plugin.mjs /tmp/test-plugin
   ```
 - **新建标准插件工程骨架**：
   ```bash
-  node scripts/scaffold_plugin.mjs my-new-plugin [--dual-face]
+  node <技能根目录>/scripts/scaffold_plugin.mjs my-new-plugin [--dual-face]
   ```

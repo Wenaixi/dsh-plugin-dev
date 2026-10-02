@@ -40,7 +40,8 @@ const pkgJson = {
   dsh: {
     bundle: {
       id: bundleId,
-      description: 'DSH 插件：' + pkgName
+      description: 'DSH 插件：' + pkgName,
+      patch: './cordis.patch.yml'
     }
   },
   peerDependencies: {
@@ -57,8 +58,8 @@ if (isDualFace) {
   pkgJson.exports['./client'] = './lib/client.js'
   mkdirSync(join(dir, 'lib'), { recursive: true })
 }
+writeFileSync(join(dir, 'package.json'), JSON.stringify(pkgJson, null, 2) + String.fromCharCode(10))
 
-writeFileSync(join(dir, 'package.json'), JSON.stringify(pkgJson, null, 2) + '\n')
 
 // 2. index.js（纯 JS ESM，使用 JSDoc 类型注解）
 const indexJs = `// ${pkgName} 插件入口
@@ -83,19 +84,31 @@ writeFileSync(join(dir, 'index.js'), indexJs)
 
 // 3. client.js（仅在 --dual-face 时生成）
 if (isDualFace) {
+if (isDualFace) {
   const clientJs = `// ${pkgName} 浏览器端组件入口（Dual-Face Client UI）
+// 组件只接收宿主插槽注入的 props，不接收 ctx。
 export const name = '${pkgName}/client'
+
+/**
+ * 客户端面板组件：props 由宿主插槽提供
+ * @param {{ sessionId?: string }} props
+ */
+function Panel(props) {
+  return { type: 'div', props: { className: 'p-4' }, children: ['${pkgName}', props.sessionId ?? 'no-session'] }
+}
 
 /**
  * 客户端装载入口
  * @param {import('@deepseek-ai/cordis').Context} ctx
  */
 export function apply(ctx) {
-  // 统一通过 ctx.slots.inject / ctx.slots.register 注入插槽
-  // 严禁组件直接持有 ctx 实例
-}
-`
+  // 通过插槽挂载；Slot 标识与 Cardinality/Scope 见 references/three-roles.md
+  ctx.slots.inject('sidebar.right.pane.tab', () =>
+    ctx.slots.register({ id: '${bundleId}-panel', title: '${pkgName}' }, Panel)
+  )
+}`
   writeFileSync(join(dir, 'lib/client.js'), clientJs)
+}
 }
 
 // 4. cordis.patch.yml

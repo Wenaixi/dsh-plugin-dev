@@ -33,7 +33,7 @@ cd dsh-plugin-dev
 ### 2. 自动化合规性校验
 在提交任何修改前，必须运行随包提供的校验工具验证生成的工程骨架合规性：
 ```bash
-node scripts/scaffold_plugin.mjs /tmp/test-plugin && node scripts/validate_plugin.mjs /tmp/test-plugin
+node <技能根目录>/scripts/scaffold_plugin.mjs /tmp/test-plugin && node <技能根目录>/scripts/validate_plugin.mjs /tmp/test-plugin
 ```
 确保所有工程输出 `校验通过`，退出码为 0。
 
@@ -41,10 +41,10 @@ node scripts/scaffold_plugin.mjs /tmp/test-plugin && node scripts/validate_plugi
 开发或测试新插件时，推荐使用内置脚手架生成标准骨架：
 ```bash
 # 生成基础单面插件
-node scripts/scaffold_plugin.mjs /tmp/my-new-plugin
+node <技能根目录>/scripts/scaffold_plugin.mjs /tmp/my-new-plugin
 
 # 生成双面 UI 插件（含 React 客户端与 Slots 插槽骨架）
-node scripts/scaffold_plugin.mjs /tmp/my-ui-plugin --dual-face
+node <技能根目录>/scripts/scaffold_plugin.mjs /tmp/my-ui-plugin --dual-face
 ```
 
 ---

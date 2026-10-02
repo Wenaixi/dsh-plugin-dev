@@ -1,6 +1,6 @@
 ---
 name: dsh-plugin-dev
-description: 开发 DeepSeek Harness (DSH 0.2.0-rc.2) 插件的标准与权威参考：编写、修改、审查、调试 DSH / Cordis 插件、核心大动脉服务总线、Cordis 五大事件系统、全量替换配置补丁、ToolRuntime 16 阶段流水线与单调守卫、LLM 适配器 Seam、Dual-Face 浏览器双面 UI 插件与 Slots 插槽、Agent Teams 多智能体团队编排、Schedule 挂钟定时任务、三角色沙箱架构、组合包打包与安装时使用；提到 DSH 插件、Cordis、plugin、服务、事件、工具、适配器、双面插件即触发。 The authoritative standard for developing DeepSeek Harness (DSH) plugins — create, modify, review or debug DSH/Cordis plugins, services, events, config patches, tool execution pipelines, LLM adapters, dual-face client-ui plugins, Agent Teams, Schedule, three-role architecture, and bundle packaging.
+description: "Use when creating, modifying, reviewing, or debugging DeepSeek Harness (DSH 0.2.0-rc.2) / Cordis plugins. Trigger on: DSH 插件、Cordis、plugin、服务注入、事件监听、模型工具 (defineTool)、单调守卫 (guard)、LLM 适配器、双面插件 (Dual-Face)、Slots 插槽、Agent Teams 团队协作、Schedule 挂钟定时、cordis.patch.yml 补丁配置、三角色架构、或组合包打包安装。"
 ---
 
 # dsh-plugin-dev
@@ -43,6 +43,20 @@ description: 开发 DeepSeek Harness (DSH 0.2.0-rc.2) 插件的标准与权威�
 ---
 
 ## 二、场景决策与开发导引矩阵
+
+```text
+┌─ 需求快速分流路由 ────────────────────────────────────────────────────────┐
+│ 需要浏览器/Web UI 界面？ ───────► 场景 E: 双面插件 (Dual-Face & Slots)   │
+│ 接入第三方大模型厂商 API？ ─────► 场景 D: LLM 适配器 (LlmAdapter Seam)    │
+│ 多 Agent 团队协作与共享看板？ ──► 场景 H: Agent Teams (ctx.agentTeams)     │
+│ 挂钟定时提醒与周期计划任务？ ───► 场景 G: 定时调度系统 (ctx.schedule)     │
+│ 面向模型暴露能力或安全拦截？ ───► 场景 B: 模型工具插件 (defineTool & Guard)│
+│ 提供跨插件共享的有状态能力？ ───► 场景 C: 服务提供方 (Service 继承)       │
+│ 轻量生命周期、事件监听、日志？ ─► 场景 A: 基础函数插件 (ctx.effect)      │
+│ 打包发布、Profile 组合配置？ ───► 场景 F: 组合包工程 (Bundle & Patch)    │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
 
 | 场景 | 目标需求 | 推荐形态与核心服务 | 关键参考文档 |
 | --- | --- | --- | --- |

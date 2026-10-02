@@ -163,3 +163,26 @@ dsh --profile test-env --dump-config
 ### 4. 插件热重载（HMR）后出现重复执行或定时器翻倍
 - **原因**：未将事件监听或定时器绑定到 Cordis 上下文，写成了模块顶层全局变量。
 - **排查**：将全部生命周期操作放入 `apply`，原生资源使用 `ctx.effect` 包裹。
+
+---
+
+## 六、工程辅助脚本 (Tooling Scripts)
+
+在工作区 `scripts/` 目录下提供了两个零外部依赖、基于原生 Node.js 实现的生产力工具：
+
+### 1. 组合包规范校验器 (validate_plugin.mjs)
+对插件工程的 `package.json`、`cordis.patch.yml`、`apply` 入口导出契约、`exports['.']` 与依赖声明进行全量静态校验。支持多路径批量校验：
+```bash
+# 批量检验本目录下全部 5 个示例工程
+node scripts/validate_plugin.mjs examples/hello-plugin examples/service-provider examples/configurable-plugin examples/greet-tool examples/event-interceptor
+```
+
+### 2. 标准插件脚手架生成器 (scaffold_plugin.mjs)
+一键生成完全符合 DSH 0.2.0-rc.2 规范与 JSDoc 标注的插件骨架：
+```bash
+# 1. 生成基础单面插件骨架（纯 Node 宿主逻辑）
+node scripts/scaffold_plugin.mjs my-custom-plugin
+
+# 2. 生成双面 UI 插件骨架（包含浏览器端 React 组件与 Slots 注入）
+node scripts/scaffold_plugin.mjs my-ui-plugin --dual-face
+```

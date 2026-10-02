@@ -1,4 +1,23 @@
 # DSH 插件本地开发调试回路与高频故障排查宝典 (DSH 0.2.0-rc.2)
+
+---
+
+## 零、伪 API 与伪归因黑名单
+
+DSH 里有一批「看起来非常合理、但根本不存在」的 API 和「听起来顺理成章、但方向完全错了」的归因。写错时不会报编译错误，也不会在启动时失败，而是静默失效或被误诊为别的问题。下表左两列是凭印象最容易脱口而出的写法与判断，右两列给出 DSH 的真相与一条**可执行的判定动作**。
+
+| 凭印象的写法 / 归因 | DSH 中的真相 | 正确写法 | 可执行的判定动作 |
+| --- | --- | --- | --- |
+| `ctx.settings.registerTab(...)`、`ctx.ui.addSettingsTab(...)` | 两者都不存在。`ctx.settings` 只把 volatile config 投影成表单描述符并委托 `ctx.configEditor` 落盘，不承担任何界面注册职责 | Client 半侧经 `ctx.slots.inject('settings.section', ...)` 挂载设置区块 | 在插件源码 grep `slots.inject`，命中 0 即说明走错了路径 |
+| `ctx.tools.registerTool(...)`、`ctx.toolRegistry` | 都不存在；容器就是 `ctx.tools`，方法名是 `register` | `ctx.tools.register(defineTool({...}))` | 运行时执行 `ctx.tools.schemas()`，按返回的名字查 |
+| 直接改 `$DSH_HOME/settings.yaml` 打开某个插件 | 该文件已彻底废弃，启动时会被自动重命名为 `settings.yaml.imported` 且不再生效（**静默失效，零错误信号**） | 一切增删改走 `cordis.patch.yml` | `ls $DSH_HOME/settings.yaml.imported`，存在即证明你改的那份早已失效 |
+| 「required plugin did not activate」= 依赖没装上 | 这是 Loader **激活图**的语言：某个 required 同伴插件没有 mount。与 `peerDependencies` 是两套独立机制 | 先定位是哪一个 id 没激活，再看它自己为什么没 mount | 读 `~/.dsh/profiles/<profile>/cfg.err`，它会点名未激活的插件 id |
+| 「peer 报错」= 该版本的 peer 区间写错了 | 常常是包管理器解析到了陈旧版本（pnpm 24 小时发布冷却期 + semver 预发布排序），装到的根本不是你要的那个版本 | 先确认实际解析版本，再决定改 peer 还是改解析 | 同一安装命令隔一段时间重跑两次：版本号会随时间前移 = 冷却期指纹；恒定不变才是缓存问题 |
+| 「装上了」= 该服务已就绪 | seam 契约包与实现包分离：只装 `dsh-llm` 之类的契约包，服务存在但没有任何提供方 | 契约包 + 实现包成对安装（如 `dsh-llm` + `llm-deepseek`） | `ctx.get('<服务名>')` 返回 `undefined` 即该能力未装配 |
+| 「`mcp__<server>__<tool>` 是 DSH 的标准工具命名」 | 该前缀来自 Claude Code，不是 DSH 惯例 | DSH 工具名见 [tools.md](./tools.md) 的归属表；MCP 工具经 `dsh-mcp-client` 桥接后由宿主分配名字 | `ctx.tools.schemas()` 是唯一权威清单，静态表仅供对照 |
+
+**用法**：写插件或排障时，凡是手上出现「听起来应该有这个 API」的直觉，先在本表查一遍；凡是症状为「静默失效」或「归因指向包管理器」，先按最后一列的判定动作取证，再动手改。
+
 ---
 
 ## 一、本地极速调试三大工作流回路 (Fast Inner Loops)
@@ -136,4 +155,3 @@ export function apply(ctx) {
 ```
 
 完整目录语义、`minimumReleaseAge: 0` 配置片段、BOM/CRLF 写入陷阱与排障决策表见 [install-resolution-traps.md](./install-resolution-traps.md)。
-

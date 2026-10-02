@@ -40,6 +40,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 5. **官方工具执行 16 阶段流水线**（此处列出跨阶段关键环节，完整 16 阶段逐条与源码行号见 [tools.md](./references/tools.md)）：
    `tool/call` 记录 -> `presentCall` -> `pre-execute` -> **`approval` (serviceAsk 审批裁决)** -> **单调 guard (终极一票否决权)** -> `execute`(环绕分派) -> 工具 `execute`(主体) -> FS Gate -> 工具自有事件 -> **`projectContent` (denied 依然触发)** -> `post-execute` -> 规范化 -> `finalizeContent` -> `tools/result` (同步) -> `tool/result` (持久化) -> `presentResult`。
    **审批先于守卫**：用户点了「允许」之后，单调 guard 仍可否决，详见 tools.md 第 4、5 阶段。
+6. **反例与误诊**：以上铁律都有一批「看起来合理但不存在」的 API 和「听起来顺理成章但方向错」的归因（改 `settings.yaml`、`registerTool`、`registerTab`、`did not activate` 等），逐条附可执行判定动作，见 [debugging-and-troubleshooting.md](./references/debugging-and-troubleshooting.md) 的「伪 API 与伪归因黑名单」。
 
 ---
 

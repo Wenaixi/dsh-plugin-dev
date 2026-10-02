@@ -4,22 +4,49 @@
 
 ## 核心服务脊梁 (The Core Spine)
 
-在 DeepSeek Harness (DSH 0.2.0-rc.2) 中，运行时能力由核心包挂载到 `ctx` 上的服务提供。服务名称具有严格的单复数与大小写约定：
+在 DSH 中，运行时能力由核心包挂载到 `ctx` 上。官方 capability-seams 口径用四种**角色**描述每个服务键：
 
-| 服务名称 | 挂载属性 | 所属核心包 | 核心职责 |
-| --- | --- | --- | --- |
-| SessionLog | `ctx.sessions` | `@deepseek-ai/dsh-session` | 仅追加的 `SessionEvent` 事件源日志与状态唯一真源（注意为复数） |
-| SystemPrompt | `ctx.systemPrompt` | `@deepseek-ai/dsh-system-prompt` | 系统提示词组装、片段收集与工具 Schema 呈现 |
-| ToolRuntime | `ctx.tools` | `@deepseek-ai/dsh-tools` | 作用域化工具注册表、保护执行管线与展示投影 |
-| AgentRegistry | `ctx.agents` | `@deepseek-ai/dsh-agent` | 活跃 Agent 句柄注册表、发起者作用域与 `agent/*` 事件（注意为复数） |
-| AgentLoop | `ctx.agentLoop` | `@deepseek-ai/dsh-agent-loop` | 实现 `AgentFactory` 的默认执行循环驱动器 |
-| LlmRuntime | `ctx.llm` | `@deepseek-ai/dsh-llm` | 提供方无关消息协议、流式分发、重试策略与适配器注册 |
-| ConfigEditor / Settings | `ctx.settings` | `@deepseek-ai/dsh-settings` | 配置表单、补丁持久化与设置描述符管理 |
-| Credentials | `ctx.credentials` | `@deepseek-ai/dsh-credentials` | 用户凭证、环境变量与安全认证存储管理 |
-| AgentDefaultModel | `ctx.agentDefaultModel` | `@deepseek-ai/dsh-agent-default-model` | 全局与 Profile 默认模型路由配置解析 |
-| AgentPresets | `ctx.agentPresets` | `@deepseek-ai/dsh-agent-presets` | 预设 Agent 模板与执行策略注册表 |
+| 角色 | 语义 |
+| --- | --- |
+| **core** | 每个组合必启动的主干服务 |
+| **seam** | 可替换能力缝：契约与实现分离，实现以不同名称注册提供方 |
+| **bundle** | 具体组合包（如 `dsh-base`、`dsh-sdk-minimal`），不是服务 |
+| **service** | 独立服务 |
 
-注意：`@deepseek-ai/dsh-scope` 是纯函数库（提供 `createScope`、`scopeOf`、`scopeTarget`），不挂载服务。
+**关键误区纠正**：
+
+- `ctx.llm` 的官方角色是 **seam**（契约 `@deepseek-ai/dsh-llm`，实现 `llm-deepseek` / `llm-pi-ai` / `llm-replay`），不是 core。
+- `ctx.agentLoop` 是 **bundle**：官方原文"唯一的具体循环插件；扩展包依赖 dsh-agent 的事件和服务，而不依赖此包"。扩展插件**绝不直接依赖** `@deepseek-ai/dsh-agent-loop`。
+- 服务键的单复数有严格约定：`ctx.sessions`（复数）、`ctx.agents`（复数）是 registry；单数键（如 `ctx.llm`）用于引擎/运行时/策略等。
+
+### 官方核心服务矩阵（capability-seams）
+
+| ctx 键 | 角色 | 契约包 | 实现/提供方 | 核心职责 |
+| --- | --- | --- | --- | --- |
+| `ctx.sessions` | core | `@deepseek-ai/dsh-session` | session-memory + persistence-fs | 仅追加的 SessionEvent 唯一真源日志与状态快照（注意为复数） |
+| `ctx.systemPrompt` | core | `@deepseek-ai/dsh-system-prompt` | — | 系统提示词组装、片段收集、工具 Schema 呈现 |
+| `ctx.tools` | core | `@deepseek-ai/dsh-tools` | — | 注册能力、PTC 传输、调用经 策略前处理→单调守卫→环绕分派→策略后处理→最终结果观测 |
+| `ctx.agents` | core | `@deepseek-ai/dsh-agent` | agent-loop（经 setFactory） | 活跃 Agent 注册表、发起者作用域与 agent/* 事件（注意为复数） |
+| `ctx.settings` | core | `@deepseek-ai/dsh-settings` | config-editor | 从活动 profile 条目投影 volatile Config 字段成表单，委托 config-editor 持久化 |
+| `ctx.configEditor` | core | `@deepseek-ai/dsh-config-editor` | — | 在应用文件锁与 HMR 队列下持久化 profile 配置补丁，协调 Loader 条目 |
+| `ctx.agentPresets` | core | `@deepseek-ai/dsh-agent-presets` | — | 立即挂载 YAML 声明的 preset 版本，保留已替换版本直到最后使用者释放 |
+| `ctx.llm` | **seam** | `@deepseek-ai/dsh-llm` | llm-deepseek / llm-pi-ai / llm-replay | 提供方无关消息流式协议与适配器注册（消费方：agent-loop、compaction-basic） |
+| `ctx.credentials` | seam | `@deepseek-ai/dsh-credentials` | credentials-local | 用户凭证、环境变量与安全认证存储 |
+| `ctx.subprocess` | seam | `@deepseek-ai/dsh-subprocess` | subprocess-local | 子进程 spawn、终端原语（bash 执行器、PTY、LSP Host、ACP 后端均经它） |
+| `ctx.shell` | seam | `@deepseek-ai/dsh-shell` | bash-local / bash-sandbox / pwsh-local | 终端执行沙箱 |
+| `ctx.web` | seam | `@deepseek-ai/dsh-web` | web-search-exa/perplexity/deepseek、web-fetch-http | 网页搜索与抓取（提供方注册能力而非工具） |
+| `ctx.jobs` | seam | `@deepseek-ai/dsh-jobs` | jobs-local | 后台任务生命周期 |
+| `ctx.fs` | seam | `@deepseek-ai/dsh-fs` | fs-local / fs-sandbox / fs-ssh | 文件系统能力（配套 fs-observation-policy） |
+| `ctx.sessionPersistence` | seam | `@deepseek-ai/dsh-session-persistence` | session-persistence-jsonl | 会话持久化存储 |
+| `ctx.sessionQuery` | seam | `@deepseek-ai/dsh-session-query` | session-query-sqlite | 会话查询 |
+| `ctx.storage` | seam | `@deepseek-ai/dsh-storage` | storage-json / storage-sqlite | 通用键值存储 |
+| `ctx.skills` | seam | `@deepseek-ai/dsh-skill` | skill-filesystem / skill-badge / skill-office | 技能注册表与调用策略 |
+| `ctx.ptcRuntime` | seam | `@deepseek-ai/dsh-ptc-runtime` | ptc-runtime-local | PTC 模式程序执行运行时 |
+| `ctx.sandbox` | seam | `@deepseek-ai/dsh-sandbox` | sandbox-local（bwrap/Landlock、Seatbelt、Windows ACL） | 文件效果策略沙箱（SandboxMode 不管网络/进程可见性） |
+| `ctx.approval` | seam | `@deepseek-ai/dsh-approval` | approval-local | 审批请求（approval/request waterfall） |
+| `ctx.compaction` | seam | `@deepseek-ai/dsh-compaction` | compaction-basic | 上下文压缩 |
+
+注意：`@deepseek-ai/dsh-scope` 是**纯函数库**（提供 `createScope`、`scopeOf`、`scopeTarget`、`ScopedLayers`），**不挂载任何 ctx 服务**。
 
 ## 消费服务
 
@@ -35,9 +62,7 @@ export const inject = ['tools', 'sessions']
 
 export function apply(ctx: Context) {
   // apply 执行时，ctx.tools 与 ctx.sessions 保证已就绪
-  ctx.tools.register({
-    /* ... */
-  })
+  ctx.tools.register({ /* ... */ })
 }
 ```
 
@@ -53,11 +78,7 @@ export const inject = {
 }
 
 export function apply(ctx: Context) {
-  // ctx.tools 必定可用
-  ctx.tools.register({
-    /* ... */
-  })
-
+  ctx.tools.register({ /* ... */ })
   // 可选服务需在使用前进行存在性判定
   if (ctx.llm) {
     // 接入 LLM 额外能力
@@ -81,11 +102,10 @@ declare module '@deepseek-ai/cordis' {
 }
 
 export class DatabaseService extends Service {
-  // 声明自身依赖的其他服务
   static inject = ['settings']
 
   constructor(ctx: Context) {
-    // 第一个参数是绑定的 Context，第二个参数是挂载到 ctx 上的服务键名
+    // 第二个参数是挂载到 ctx 上的服务键名
     super(ctx, 'database', true)
   }
 
@@ -98,7 +118,7 @@ export class DatabaseService extends Service {
   }
 
   public query(sql: string) {
-    return [/* 查询结果 */]
+    return []
   }
 }
 
@@ -109,18 +129,17 @@ export function apply(ctx: Context) {
 }
 ```
 
-`super(ctx, 'database', true)` 的第三个参数表示服务是否为单例/立即生效服务（immediate）。设置为 `true` 时，该服务实例将直接挂载到当前上下文树根节点，供全局可见。
-
 ### 2. 服务生命周期与就绪契约
 
-- **构造阶段**：当服务类被实例化时，`ctx.database` 立即被赋值。
-- **start() 钩子**：所有依赖就绪后调用。若返回 Promise，下游依赖该服务的插件会保持等待，直到 Promise 兑现。
-- **stop() 钩子**：服务所属插件被卸载或环境退出时触发，执行优雅停机与资源释放。
+- **构造阶段**：`super(ctx, name)` 调用后服务**立即注册**到 `ctx.<name>`，并随所属 fiber **自动移除**（无需手动注销）。
+- **start() 钩子**：所有依赖就绪后调用。若返回 Promise，下游依赖该服务的插件会保持等待。
+- **stop() 钩子**：服务所属插件被卸载或环境退出时触发。
 - **可逆效果**：服务内部通过 `this.ctx.on()` 监听的事件、通过 `this.ctx.effect()` 注册的资源，均与当前上下文生命周期绑定，卸载时自动注销。
+- **命名规则**：单数 ctx 键用于 engine/runtime/policy/controller/resolver/store/当前配置；复数键用于 registry 或拥有多个具名成员的服务；host 与 client **不得复用同一个 Cordis Context 键**（TS 声明合并会同时看到两种类型）。
 
 ## 声明合并与类型安全
 
-在 TypeScript 开发中，必须通过 `declare module '@deepseek-ai/cordis'` 扩展 `Context` 接口，以确保在整个项目中访问 `ctx.<serviceKey>` 时获得完整的代码提示与静态类型检查：
+必须通过 `declare module '@deepseek-ai/cordis'` 扩展 `Context` 接口，以获得完整的代码提示与静态类型检查：
 
 ```ts
 import type { DatabaseService } from './database'
@@ -134,6 +153,6 @@ declare module '@deepseek-ai/cordis' {
 
 ## 循环依赖与加载顺序规则
 
-- **启动并发**：配置清单（`cordis.patch.yml`）中的各个插件条目是并发激活的，列表的前后物理顺序不代表插件的加载执行顺序。
+- **启动并发**：配置清单（`cordis.patch.yml`）中的各个插件条目是并发激活的，列表的前后物理顺序不代表插件加载顺序。
 - **依赖决序**：插件加载顺序完全由 `inject` 拓扑关系决定。
-- **死锁防护**：严禁在两个插件之间出现相互必需的循环依赖（A 必需 B，B 必需 A），否则两个插件将均处于永久 PENDING 状态。如需双向交互，其中一方必须将依赖声明为 `optional`，或通过事件解耦。
+- **死锁防护**：严禁两个插件之间出现相互必需的循环依赖（A 必需 B，B 必需 A），否则两个插件均处于永久 PENDING。如需双向交互，一方必须将依赖声明为 `optional`，或通过事件解耦。

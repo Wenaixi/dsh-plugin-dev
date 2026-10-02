@@ -19,4 +19,4 @@ Event interception and pipeline middleware example (bundle format, plain JavaScr
 ## References
 
 - `references/events.md` (Five dispatch modes: emit, parallel, bail, serial, waterfall)
-- `references/plugin-forms.md` (Hook plugins and permission gates)
+- `references/plugin-anatomy.md` (Hook plugins and permission gates)

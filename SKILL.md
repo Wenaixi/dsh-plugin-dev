@@ -1,3 +1,8 @@
+---
+name: dsh-plugin-dev
+description: 开发 DeepSeek Harness (DSH 0.2.0-rc.2) 插件的标准与权威参考：编写、修改、审查、调试 DSH / Cordis 插件、核心大动脉服务总线、Cordis 五大事件系统、全量替换配置补丁、ToolRuntime 16 阶段流水线与单调守卫、LLM 适配器 Seam、Dual-Face 浏览器双面 UI 插件与 Slots 插槽、Agent Teams 多智能体团队编排、Schedule 挂钟定时任务、三角色沙箱架构、组合包打包与安装时使用；提到 DSH 插件、Cordis、plugin、服务、事件、工具、适配器、双面插件即触发。 The authoritative standard for developing DeepSeek Harness (DSH) plugins — create, modify, review or debug DSH/Cordis plugins, services, events, config patches, tool execution pipelines, LLM adapters, dual-face client-ui plugins, Agent Teams, Schedule, three-role architecture, and bundle packaging.
+---
+
 # dsh-plugin-dev
 
 开发 DeepSeek Harness (DSH 0.2.0-rc.2) 插件的标准与权威参考 Skill。

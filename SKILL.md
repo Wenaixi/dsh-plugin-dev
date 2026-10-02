@@ -53,6 +53,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 │ 面向模型暴露能力或安全拦截？ ───► 场景 B: 模型工具插件 (defineTool & Guard)│
 │ 提供跨插件共享的有状态能力？ ───► 场景 C: 服务提供方 (Service 继承)       │
 │ 轻量生命周期、事件监听、日志？ ─► 场景 A: 基础函数插件 (ctx.effect)      │
+│ 在设置窗口加专属 Tab/插件页加卡片？► 场景 I: 设置与插件 UI (Settings Section) │
 │ 打包发布、Profile 组合配置？ ───► 场景 F: 组合包工程 (Bundle & Patch)    │
 └───────────────────────────────────────────────────────────────────────────┘
 ```
@@ -68,6 +69,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 | **F** | 打包发布、Profile 组合、依赖规整 | 组合包 (Bundle)：配置 `dsh.bundle`，携带 `cordis.patch.yml` | [packaging.md](./references/packaging.md) |
 | **G** | 定时提醒、挂钟计划任务调度 | 定时调度系统：消费 `ctx.schedule`，注册 schedule 系列工具 | [services.md](./references/services.md) |
 | **H** | 多智能体协同、分布式团队、共享任务看板 | Agent Teams 架构：消费 `ctx.agentTeams`，使用 agent_team 系列工具 | [services.md](./references/services.md) |
+| **I** | 在全局设置左侧加专属 Tab、自定义设置面板 | 双面 UI 设置扩展：注入 `settings.section`，编写纯 React 设置面板 | [settings-and-plugin-ui.md](./references/settings-and-plugin-ui.md) |
 
 ---
 

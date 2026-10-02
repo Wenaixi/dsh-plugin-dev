@@ -113,6 +113,14 @@
     {
       "query": "用 Vite 搭建一个独立的 React 待办事项单页应用",
       "should_trigger": false
+    },
+    {
+      "query": "怎么在 DSH 全局设置窗口左侧加一个专属 Tab 选项卡和配置面板",
+      "should_trigger": true
+    },
+    {
+      "query": "如何在 DSH 插件管理页面里显示我的插件卡片和配置项",
+      "should_trigger": true
     }
   ]
 }

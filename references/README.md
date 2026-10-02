@@ -22,7 +22,11 @@
 - **[tools.md](./tools.md)**：
   ToolRuntime 核心设计、官方严格 16 阶段工具执行流水线（`tool/call` -> `presentCall` -> `pre-execute` -> `approval` -> `monotonic guard` -> `execute` -> `FS Gate` -> 工具自有事件 -> `projectContent` -> `post-execute` -> 规范化 -> `finalizeContent` -> `tools/result` -> `tool/result` -> `presentResult`）、单调安全守卫法则、全量官方工具归属包对照表与 `defineTool` 编写规范。
 
-### 四、三角色架构、跨端通信与双面 UI (Three Roles, IPC & UI)
+### 四、设置窗口与插件管理中心 UI (Settings & Plugin Manager UI)
+- **[settings-and-plugin-ui.md](./settings-and-plugin-ui.md)**：
+  全局设置窗口 (Settings) 与插件管理中心 UI 深度开发指南——`settings.section` 插槽机制、源码级解密三大明星插件（终端输入、侧边卡片、壁纸引擎）的真实注入代码、导航图标 (Nav Glyph) 替换技法、React 设置面板的本地 vs 补丁持久化、以及左侧“插件”管理中心官方/已安装卡片呈现与配置开关联动。
+
+### 五、三角色架构、跨端通信与双面 UI (Three Roles, IPC & UI)
 - **[three-roles.md](./three-roles.md)**：
   三角色物理隔离（Browser 前端、Host 宿主、Worker 沙箱进程）、Typert Remote RPC API 网关契约（`@Remote` 与 `@RemoteScope` 约束、禁止解构/默认值、尾参协作式 signal、流式通道）、不存在 Client Runtime/HostFrame 红线警告、子进程生成原语（`ctx.subprocess.spawn` 与 `spawnTerminal`）、`SandboxMode`（仅限文件效果）与沙箱故障隔离。
 - **[plugin-anatomy.md: 双面插件与 Slots](./plugin-anatomy.md#5-双面插件规范-dual-face-architecture)**：

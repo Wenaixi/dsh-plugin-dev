@@ -48,6 +48,20 @@
 
 注意：`@deepseek-ai/dsh-scope` 是**纯函数库**（提供 `createScope`、`scopeOf`、`scopeTarget`、`ScopedLayers`），**不挂载任何 ctx 服务**。
 
+**skills 注册表（`ctx.skills`）细节**：
+
+- `SkillProvider{name; list(options)→SkillCandidate[]|SkillProviderObservation; get(candidate,options)}`；`SkillInvocationPolicy{modelInvocable; userInvocable}`（frontmatter 键 `disable-model-invocation`、`user-invocable`，双 false 仅受信 `ctx.skills.get()` 可取）。
+- 本地发现优先级 Rank（同层内低 rank 赢重名→提供方顺序→本地顺序）：100 project-dsh（`<projectRoot>/.dsh/skills`）、200 project-agents（`<projectRoot>/.agents/skills`）、300 custom（`Config.customSkillDirs`）、400 user-dsh（`<dshHome>/skills`）、500 user-agents（`<agentsHome>/skills`）、600 bundled（`Config.bundledSkillDir`/DSH_BUNDLED_SKILL_DIR）。项目根=含 .git 的最近祖先（找不到用 cwd）。
+- skill 名 `^[a-z0-9]+(?:-[a-z0-9]+)*$`；接受 `<name>/SKILL.md` 目录包或 `<name>.md` 扁平文件；**递归 `/**/SKILL.md` 发现不支持**。
+- 模型会话目录只用 name + description（XML 转义），**绝不使用正文/绝对路径/来源/提供方**；`catalogDescriptionMaxLength` 默认 500、最小 3；目录消息属于会话历史而非 World State；仅改正文只影响后续工具调用。
+- 注册表不缓存完整定义（`get()` 每次重读正文）；提供方代次变化→发现重试一次、再变→标不完整不缓存；事件 `skills/change`（emit，无 diff 失效通知）。
+
+**宿主侧可选能力（不进 seam 矩阵，按需加载）**：
+
+- `ctx.planMode`（`@deepseek-ai/dsh-plan-mode`）：`PlanModeController`——记入日志的逐 agent 协作状态，激活期间每个模型请求带 `plan:policy` 提示词段落（order 50 渲染）；`PlanModeConfig{ section }` 非法（缺失/空白/非字符串/未知键）→ 插件加载时失败；`set(agent, active)` 返回 `'committed'|'queued'|'cancelled'|'noop'`（重复选择幂等）。计划模式是**软性指引**：沙箱模式与审批策略分别强制限制且都不读写计划状态；该包可选、agent loop 不依赖它。
+- `ctx.workspaceRegistry`（`@deepseek-ai/dsh-workspace`）：用户工作目录的持久记录（`Workspace{id, path, title, sessionIds,...}`）。成员资格双条件：账本有 id 且 header 规范 `cwd === workspace path`；所有权真源是有序 `sessionIds`，绝不从 cwd 派生。宿主侧可选能力、**不对模型可见**（无工具/无提示词/无会话事件）。
+- `dsh-agent-instructions` **不是** workspace 消费方：它在 agent 自己 cwd 下发现 AGENTS.md 风格指令文件，从不触碰 `ctx.workspaceRegistry`。
+
 ## 消费服务
 
 插件必须通过静态属性 `inject` 显式声明依赖。框架保证：只有当 `inject` 中声明的所有必需服务均已就绪（READY）时，插件的 `apply()` 或构造函数才会执行。

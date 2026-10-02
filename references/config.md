@@ -142,6 +142,16 @@ export function apply(ctx: Context, config: Config) {
 | `ui-developer-tools` | `ui-settings` | 开发者工具设置 |
 | `shell` | `pwsh-sandbox` (Windows) / `bash-sandbox` (其他平台) | 终端执行沙箱环境配置 |
 
+## 配置目录生成规则（勿手改官方生成文件）
+
+官方文档站以下目录页由生成器产出、`pnpm run verify-*` 校验（doc-sync），**禁止手工编辑**（中英两版同源）：
+
+- `config-catalog`：`scripts/gen-config-catalog.ts` 按部署为轴列出每个可加载包的 config 类型。生成器把运行时 schemastery schema 与粘贴声明交叉核对，每个 schema 验证键必须出现在声明类型中——**粘贴内容无法隐藏加载器接受的字段**。
+- `persistence-catalog`：所有持久会话事件信封与类型指纹（SHA-256，注释/位置/别名/readonly 不影响，元组顺序/属性名/值类型/可选性影响），机器可读 schema 在 `docs/persistence-schema.json`。
+- `tool-catalog`：`ctx.tools.schemas()` 运行时结果（生成器真实启动每个工具插件），执行 `pnpm run verify-tool-catalog` 验证。
+
+**误解纠正**：运行时 schema 有意排除的字段是仅供运行时使用的 seam（`inject` 注入的服务键等），**不能通过 cordis.yml 设置**——不是所有 Config 字段都可配。
+
 ## 调试与验证配置树
 
 在修改 `cordis.patch.yml` 后，应通过 CLI 命令导出合并后的完整配置树，以排查语法错误或验证配置覆盖结果：

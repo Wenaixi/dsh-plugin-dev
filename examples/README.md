@@ -1,12 +1,5 @@
 # DSH 插件开发实战示例库
 
-<p align="center">
-  <samp>
-    <strong>中文</strong> ·
-    <a href="./README.en.md">English</a>
-  </samp>
-</p>
-
 本目录收录了 DeepSeek Harness (DSH) 官方规范下的完整实战插件示例。所有示例均采用 DSH Bundle 组合包规范、纯 JavaScript/ESM 编写、零构建步骤、即装即用。每个示例均针对 DSH 架构设计中的一种特定能力与核心规则，配有独立的配置声明与生命周期管理。
 
 ---

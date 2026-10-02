@@ -1,12 +1,5 @@
 # hello-plugin
 
-<p align="center">
-  <samp>
-    <strong>中文</strong> ·
-    <a href="./README.en.md">English</a>
-  </samp>
-</p>
-
 最小 DSH 插件示例（bundle 格式，纯 JavaScript，无需构建）。加载后打印日志，并演示"注册即副作用"：用 `ctx.effect` 注册的心跳定时器会在插件卸载时自动清理。
 
 ## 安装

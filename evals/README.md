@@ -1,12 +1,5 @@
 # 触发评测
 
-<p align="center">
-  <samp>
-    <strong>中文</strong> ·
-    <a href="./README.en.md">English</a>
-  </samp>
-</p>
-
 `description` 的回归评测集，方法论来自 Agent Skills 官方指南[《Optimizing skill descriptions》](https://agentskills.io/skill-creation/optimizing-descriptions)。
 
 ## 评测集

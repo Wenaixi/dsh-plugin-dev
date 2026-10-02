@@ -1,12 +1,5 @@
 # greet-tool
 
-<p align="center">
-  <samp>
-    <strong>中文</strong> ·
-    <a href="./README.en.md">English</a>
-  </samp>
-</p>
-
 最小模型工具示例：用 `defineTool` 注册一个 `greet` 工具。`@deepseek-ai/dsh-tools` 由 dsh 安装目录自带，无需额外安装。
 
 ## 安装

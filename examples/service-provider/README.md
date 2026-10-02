@@ -1,12 +1,5 @@
 # service-provider
 
-<p align="center">
-  <samp>
-    <strong>中文</strong> ·
-    <a href="./README.en.md">English</a>
-  </samp>
-</p>
-
 自定义 Cordis 服务与依赖注入示例（bundle 格式，纯 JavaScript，无需构建）。演示如何继承 `Service` 基类向全局上下文暴露命名能力，并通过 `inject` 声明依赖进行安全消费。
 
 ## 演示内容

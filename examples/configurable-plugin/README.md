@@ -1,12 +1,5 @@
 # configurable-plugin
 
-<p align="center">
-  <samp>
-    <strong>中文</strong> ·
-    <a href="./README.en.md">English</a>
-  </samp>
-</p>
-
 规范配置与 Schemastery 校验示例（bundle 格式，纯 JavaScript，无需构建）。演示如何按照 DSH 官方硬规则导出 Schema、在 YAML 中传入覆盖值，以及使用 `!!js` 标签安全求值环境变量。
 
 ## 演示内容

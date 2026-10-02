@@ -59,3 +59,7 @@
 ### 十、Webhook 外部集成、无头模式与长工作流 (Webhook, Headless & Workflows)
 - **[webhook-headless-and-workflows.md](./webhook-headless-and-workflows.md)**：
   企业级自动化与无头运行权威指南——Webhook 外部触发与会话拉起 (`ctx.webhookRuntime`、`WebhookRule`、GitHub 集成)、Headless 纯无头命令行与 CI/CD 自动化批处理 (`dsh-headless`、`--json` ndjson 事件流)、以及 PTC 长任务工作流沙箱编排 (`dsh-workflow-ptc`、`WorkerLimits`)。
+
+### 十一、官方内置增强插件与实用中间件 (Built-in Enhancements & Middleware)
+- **[builtin-enhancements-and-middleware.md](./builtin-enhancements-and-middleware.md)**：
+  高阶中间件与死循环防护全景指南——工具调用死循环检测与劝告性上下文注入 (`repeat-tool-reminder`)、动态时钟与物理挂钟环境事实注入 (`time-context`)、定稿消息用户点赞点踩反馈回流 (`message-feedback`)、以及包级架构不变量断言守护网 (`dsh-invariants`)。

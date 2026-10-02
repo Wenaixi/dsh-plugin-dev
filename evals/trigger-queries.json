@@ -145,6 +145,22 @@
     {
       "query": "怎么在没有前端界面的 CI/CD 流水线中以 Headless 无头模式运行 DSH 任务",
       "should_trigger": true
+    },
+    {
+      "query": "大模型在调用工具时陷入反复重试相同报错命令的死循环怎么办如何写中间件拦截",
+      "should_trigger": true
+    },
+    {
+      "query": "如何在 DSH 插件中为每个会话轮次自动注入当前宿主物理挂钟时间和时区事实",
+      "should_trigger": true
+    },
+    {
+      "query": "怎么收集用户对模型回答的点赞点踩和批注反馈数据",
+      "should_trigger": true
+    },
+    {
+      "query": "在多包插件工程里怎么使用 invariant 伴生入口进行架构契约自检",
+      "should_trigger": true
     }
   ]
 }

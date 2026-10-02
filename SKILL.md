@@ -270,6 +270,10 @@ dsh --profile web --dump-config
 
 3. **生效层顺序**：组合包 patch（按 bundles 列表序）→ profile 自身 `cordis.patch.yml` → `$DSH_HOME/cordis.patch.yml` → `--patch` overlay。后层按行胜出、config 整块替换。git 安装拉取源码：需自包含 prepare 脚本 + profile 的 pnpm-workspace.yaml `allowBuilds` 授权。详细规范参见 [references/packaging.md](./references/packaging.md)。
 
+4. **开发辅助脚本（零依赖）**：
+   - `node scripts/scaffold_plugin.mjs <dir> [--client]`：生成合规 bundle 骨架（package.json + cordis.patch.yml + index.js，`--client` 追加双面入口）。
+   - `node scripts/validate_plugin.mjs <dir>`：离线校验 package.json 必填字段、`dsh.bundle` 声明、patch 存在性与入口文件。
+
 ---
 
 ## 技术参考文档索引

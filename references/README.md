@@ -63,3 +63,7 @@
 ### 十一、官方内置增强插件与实用中间件 (Built-in Enhancements & Middleware)
 - **[builtin-enhancements-and-middleware.md](./builtin-enhancements-and-middleware.md)**：
   高阶中间件与死循环防护全景指南——工具调用死循环检测与劝告性上下文注入 (`repeat-tool-reminder`)、动态时钟与物理挂钟环境事实注入 (`time-context`)、定稿消息用户点赞点踩反馈回流 (`message-feedback`)、以及包级架构不变量断言守护网 (`dsh-invariants`)。
+
+### 十二、领域数据存储、持续伪终端与检查点 (Storage, Terminal & Checkpoints)
+- **[storage-terminals-and-checkpoints.md](./storage-terminals-and-checkpoints.md)**：
+  服务端状态存储与交互式终端权威指南——领域数据存储 (`ctx.storage.domain` Zod 强校验命名空间表、拒绝乱写文件的三层存储分层)、持续交互式伪终端 (`ctx.terminal` 长任务 PTY 会话、输入流发送与 POSIX 信号打断)、以及会话语义检查点与断电自愈策略 (`session-checkpoint-policy`)。

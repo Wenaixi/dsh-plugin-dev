@@ -161,6 +161,14 @@
     {
       "query": "在多包插件工程里怎么使用 invariant 伴生入口进行架构契约自检",
       "should_trigger": true
+    },
+    {
+      "query": "如何在 DSH 插件中安全地存储跨会话的持久化业务数据而不是随便写文件",
+      "should_trigger": true
+    },
+    {
+      "query": "插件需要拉起一个长期运行的开发服务器进程怎么使用持续交互式伪终端",
+      "should_trigger": true
     }
   ]
 }

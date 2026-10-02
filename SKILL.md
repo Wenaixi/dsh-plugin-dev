@@ -113,6 +113,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 │ 需要在全局设置窗口左侧加专属 Tab / 插件页展示卡片？► 场景 I: 设置与插件 UI (Settings) │
 │ 需要在右侧栏/输入框/会话顶部加挂件或支持深浅色主题？► 场景 J: Web 全量插槽与主题 (Slots) │
 │ 想要向用户呈递最终交付物卡片(打开/预览)或弹窗提问？► 场景 O: 多模态与交付物 (Deliverables)│
+│ 外部系统 Webhook 自动触发唤醒或纯命令行无头批处理？ ─► 场景 P: Webhook 与无头 (Headless) │
 │ 想要桥接连接外部 MCP Server (HTTP 或 StdIO 工具)？ ─► 场景 M: MCP 客户端桥接 (MCP Client)│
 │ 动态向模型注入提示词段落或计算会话事件流投影？ ────► 场景 N: 提示词与事件投影 (Prompt)  │
 │ 浏览器前端需要调用 Node 宿主做高危或系统操作？ ────► 场景 K: 跨端通信 (Remote RPC)    │
@@ -145,6 +146,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 | **M** | 接入外部 MCP 工具服务 (HTTP 或 StdIO) | MCP 客户端桥接：配置 `dsh-mcp-client` 插件实例，生成 `mcp__*__*` 工具 | [mcp-and-tools-bridge.md](./references/mcp-and-tools-bridge.md) |
 | **N** | 动态改写系统提示词、监听会话事件与状态投影 | 提示词与投影体系：注入 `systemPrompt` 有序段落、注册 `sessionProjections` 折叠器 | [system-prompt-and-projections.md](./references/system-prompt-and-projections.md) |
 | **O** | 呈递最终文件交付物卡片、向用户交互式提问 | 多模态与人机交互：调用 `present` 生成文件卡片、调用 `ask_user_question` 挂起提问 | [multimodal-and-deliverables.md](./references/multimodal-and-deliverables.md) |
+| **P** | 外部 Webhook 触发、CI/CD 纯命令行无头批处理 | 外部集成与无头驱动：注册 `webhookRuntime` 规则、以 `dsh-headless` 运行自动化测试 | [webhook-headless-and-workflows.md](./references/webhook-headless-and-workflows.md) |
 
 ---
 

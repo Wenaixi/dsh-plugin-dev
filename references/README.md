@@ -55,3 +55,7 @@
 ### 九、多模态附件、人机交互与最终交付物呈递 (Multimodal & Deliverables)
 - **[multimodal-and-deliverables.md](./multimodal-and-deliverables.md)**：
   多模态与人机交互权威指南——最终交付物卡片 (`present` 工具与前端 Deliverables 原生打开/预览)、人机协同结构化提问 (`ask_user_question` 与 `ctx.userQuestions` 挂起/恢复)、多模态图像附件规范化存储 (`dsh-attachment-local`)、以及长上下文工具结果智能剪枝 (`compaction-tool-result-pruner`)。
+
+### 十、Webhook 外部集成、无头模式与长工作流 (Webhook, Headless & Workflows)
+- **[webhook-headless-and-workflows.md](./webhook-headless-and-workflows.md)**：
+  企业级自动化与无头运行权威指南——Webhook 外部触发与会话拉起 (`ctx.webhookRuntime`、`WebhookRule`、GitHub 集成)、Headless 纯无头命令行与 CI/CD 自动化批处理 (`dsh-headless`、`--json` ndjson 事件流)、以及 PTC 长任务工作流沙箱编排 (`dsh-workflow-ptc`、`WorkerLimits`)。

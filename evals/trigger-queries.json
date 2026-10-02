@@ -137,6 +137,14 @@
     {
       "query": "在工具调用过程中怎么向用户发起一个单选或多选确认卡片",
       "should_trigger": true
+    },
+    {
+      "query": "如何在 DSH 中监听 GitHub Webhook 请求并在收到 Issue 时自动启动 Agent 处理",
+      "should_trigger": true
+    },
+    {
+      "query": "怎么在没有前端界面的 CI/CD 流水线中以 Headless 无头模式运行 DSH 任务",
+      "should_trigger": true
     }
   ]
 }

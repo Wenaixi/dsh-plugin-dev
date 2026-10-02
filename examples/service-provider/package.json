@@ -1,15 +1,19 @@
 {
-  "name": "dsh-service-provider",
+  "name": "dsh-memory-cache",
   "version": "0.1.0",
   "type": "module",
   "main": "index.js",
-  "files": [
-    "index.js",
-    "cordis.patch.yml"
-  ],
+  "exports": {
+    ".": "./index.js"
+  },
   "dsh": {
     "bundle": {
-      "patch": "./cordis.patch.yml"
+      "id": "memory-cache",
+      "description": "内存缓存服务提供方示例"
     }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.2.0-rc.1",
+    "@deepseek-ai/cordis": "~4.0.4"
   }
 }

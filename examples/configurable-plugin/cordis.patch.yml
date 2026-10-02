@@ -1,11 +1,10 @@
-# dsh-configurable-plugin — 带配置校验与动态环境变量的演示层
+# dsh-weather-plugin 补丁配置
 - insert:
-    - id: configurable-plugin
-      name: dsh-configurable-plugin
+    - id: weather-plugin
+      name: dsh-weather-plugin
       config:
-        apiEndpoint: !!js 'process.env.CUSTOM_API_ENDPOINT || "https://custom-api.example.com/v1"'
-        timeoutMs: 10000
-        enableRetry: true
-        advanced:
-          maxConcurrentRequests: 8
-          debugHeaders: true
+        apiKey: "demo-key-12345"
+        units: "celsius"
+        refreshInterval: 600
+        apiEndpoint: !!js 'process.env.CUSTOM_API_ENDPOINT || "https://api.weather.example.com"'
+      disabled: false

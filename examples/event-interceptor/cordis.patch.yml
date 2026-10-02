@@ -1,4 +1,6 @@
-# dsh-event-interceptor — 工具拦截与审计中间件演示层
+# dsh-tool-interceptor 补丁配置
 - insert:
-    - id: event-interceptor
-      name: dsh-event-interceptor
+    - id: tool-interceptor
+      name: dsh-tool-interceptor
+      config: {}
+      disabled: false

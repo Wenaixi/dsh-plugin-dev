@@ -4,6 +4,21 @@ DeepSeek Harness (DSH) 采用提供方无关（Provider-neutral）的模型调�
 
 ## 职责划分
 
+```ts
+// @deepseek-ai/dsh-llm 核心抽象契约
+export abstract class LlmAdapter {
+  /** 唯一必需实现的流式调用抽象方法 */
+  abstract stream(options: GenerateOptions): AsyncIterable<StreamChunk>
+
+  /** 可选覆写：返回该适配器支持的动态模型列表 */
+  listModels?(signal?: AbortSignal): Promise<LlmDiscoveredModel[]>
+
+  /** 可选覆写：解析特定模型的上下文长度与特性 */
+  resolveModel?(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo>
+}
+```
+
+
 - **`LlmRuntime`（`ctx.llm`）**：提供方路由解析、流分发、`llm/*` 事件、共享的 `BlockAssembler` 折叠、模型元数据归一化。**不做库级重试**：一次适配器调用等于一次提供方尝试。
 - **`LlmAdapter`**：把标准 `GenerateOptions` 转成厂商载荷，再把厂商流式响应映射为统一的 `StreamChunk` 序列。唯一必需实现的方法是 `stream()`。
 
@@ -116,6 +131,47 @@ interface AdapterRegistrationHandle {
 | `block-end` | `index: number, block: ContentBlock` | 块结束，携带完整块 |
 | `usage` | `usage: TokenUsage` | 计费与计量凭证 |
 | `finish` | `reason: FinishReason, replayState?: ReplayEnvelope` | 终结分片 |
+
+```ts
+// @deepseek-ai/dsh-llm 中的 StreamChunk 完整封闭类型定义
+export type StreamChunk =
+  | {
+      type: 'block-start'
+      index: number
+      blockType: ContentBlockType // 'text' | 'tool-call'
+    }
+  | {
+      type: 'text-delta'
+      index: number
+      text: string
+    }
+  | {
+      type: 'reasoning-delta'
+      index: number
+      text: string
+    }
+  | {
+      type: 'tool-call-delta'
+      index: number
+      id: ToolCallId
+      name?: string
+      argumentsDelta: string
+    }
+  | {
+      type: 'block-end'
+      index: number
+      block: ContentBlock
+    }
+  | {
+      type: 'usage'
+      usage: TokenUsage
+    }
+  | {
+      type: 'finish'
+      reason: FinishReason
+      replayState?: ReplayEnvelope
+    }
+```
 
 ```ts
 type FinishReason =

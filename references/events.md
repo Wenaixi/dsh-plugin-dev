@@ -1,198 +1,119 @@
-# 事件系统与派发模式
+# DSH 与 Cordis 事件系统权威技术指南 (DSH 0.2.0-rc.2)
 
-事件是 Cordis 插件间解耦通信的核心机制。DSH 大量使用事件实现可拔插扩展点、流程拦截与状态感知。通过 `ctx.on()` 注册的所有监听器均受所属 Fiber 作用域管理，插件卸载时自动注销（可逆效果）。
+本文件是 DeepSeek Harness (DSH 0.2.0-rc.2) 与 Cordis 4.0.4 事件派发机制、宿主运行事件与持久会话事件（Persistence Catalog）的官方权威规范。
 
-## 五大事件派发模式（官方权威表格）
+---
 
-Cordis 规定：每个事件必须有明确的派发模式，且只能由其对应方法派发。新事件通过 `@mode` 标签记录模式，使生成目录能将声明与分发调用点交叉校验。
+## 一、Cordis 五大事件派发模式 (Dispatch Modes)
 
-| 模式 | 派发方法 | 是否 await | 分发顺序 | 返回值 |
-| --- | --- | --- | --- | --- |
-| emit | `ctx.emit(name, ...args)` | 否（同步） | 按注册顺序观察 | 否 |
-| waterfall | `ctx.waterfall(name, ...args)` | 否（同步） | 按注册顺序观察（环绕中间件） | 是（最终加工值） |
-| parallel | `ctx.parallel(name, ...args)` | 是（并发） | 所有监听器并行观察，全部 settle 后兑现 | 否（`Promise<void>`，不是结果数组） |
-| serial | `ctx.serial(name, ...args)` | 是（按序） | 依次 `await` 直到第一个 bail 值 | 是（首个 bail 值，`Promisify<ReturnType>`，不是结果数组） |
-| bail | `ctx.bail(name, ...args)` | 否（同步） | 同步按序调用直到第一个同步 bail 值 | 是（首个 bail 值） |
+DSH 构建于 Cordis 事件总线之上。Cordis 提供五种严格区分同步/异步、短路与环绕语义的派发模式：
 
-**bail 值判定**：非 `null`、非 `false` 且非 `undefined` 的第一个值。`on` 返回 disposer（`() => boolean`）；布尔 options 是 `prepend` 简写；`EventOptions = { prepend?, global? }`（`global: true` 忽略上下文过滤器）；全部事件方法均有 `thisArg` 首参重载。
+| 模式名称 | 源码调度算法与返回值 | 适用场景与核心语义 |
+| --- | --- | --- |
+| `emit` | 同步顺序通知，返回 `void`，不等待 Promise | 纯状态广播与无返回值通知（如 `ready`, `dispose`, `skills/change`） |
+| `waterfall` | **同步环绕中间件 (Around-Middleware)**<br>监听器接收 `(...args, next)`，外层先调，内部调 `next()` 驱动下游，返回最终值 | 拦截器、请求管道、动态上下文过滤与参数/结果整体替换。**绝非简单顺序传值链**！不调 `next()` 即短路。 |
+| `parallel` | `Promise.allSettled` 并发等待**全部 settle**<br>返回 `Promise<void>`（**绝非结果数组**） | 异步资源关闭与并发收敛通知（如 `workspace/session-stop`）。若有失败项，全部 settle 后汇总抛出 `AggregateError`。 |
+| `serial` | 串行依次 `await`，直到遇到首个 bail 值即短路返回<br>返回 `Promisify<ReturnType>`（**绝非结果数组**） | 异步短路链、优先处理者决策链（首个非 falsy/非 null/非 undefined 者胜出）。 |
+| `bail` | 同步按序调用，遇到首个 bail 值即同步短路返回<br>返回 `ReturnType` | 同步优先级匹配、首个命中即停的决策链。 |
 
-## Waterfall 语义（重要：不是传值链）
-
-`ctx.waterfall` 是**环绕中间件（around-middleware）**，**不是**"后一个监听器接收前一个返回值"的简单传值链：
-
-- 监听器接收 `(...args, next)`；调用 `next()` 执行下游，下游返回值经 `next()` 回到当前包装层，可再包装后外传。
-- **不调用 `next()` 直接返回即短路**。
-- 协作式监听器可修改共享请求/决策对象后委托，也可**整体替换结果**（下游只看到替换后的值）。
-- 单决策事件中短路是设计意图：策略监听器不调 `next()` 直接返回；观察/标注类必须委托。
-- 仅当必须早于普通注册运行时才使用 `prepend: true`。
-
+### 1. Bail 值的严格判定准则 (`isBailed`)
+在 `serial` 与 `bail` 模式中，返回值是否触发短路的判定逻辑为：
 ```ts
-ctx.waterfall('my-pipeline', initial, (ctx, value, next) => {
-  // 可以修改 value 后委托
-  return next({ ...value, injected: true })
-  // 或者短路直接返回
-  // return { blocked: true }
-})
-```
-
-## 监听器注册与选项
-
-### 基础监听与销毁器
-
-```ts
-import type { Context } from '@deepseek-ai/cordis'
-
-export function apply(ctx: Context) {
-  const dispose = ctx.on('custom-event', (data) => {
-    console.log('Received:', data)
-  })
-
-  ctx.once('one-time-event', () => {
-    console.log('Fired once and auto-disposed')
-  })
-
-  // 插件卸载时 ctx 范围内的监听器自动注销，无需手动 dispose()
+export function isBailed(value: any) {
+  return value !== null && value !== false && value !== undefined
 }
 ```
+- **重要边界**：数字 `0`、空字符串 `""`、空对象 `{}` 均被视作合法 bail 值并触发短路！
+- 显式返回 `false` 会被视作非 bail 值，流水线将继续向下执行下一个监听器。
 
-### EventOptions 控制
-
-```ts
-interface EventOptions {
-  prepend?: boolean // 插到同事件既有监听器队列最前面（高优先级）
-  global?: boolean  // 忽视上下文作用域过滤器，强制全局接收
-}
-
-ctx.on('tools/pre-execute', async (call) => {
-  // 率先执行拦截逻辑
-}, { prepend: true })
-```
-
-### parallel 的 thisArg 重载
-
-`ctx.parallel` 支持先传 `thisArg` 作为监听器的 `this` 绑定（`NoInfer<ThisType<Events[K]>>`）。
-
-## DSH 官方核心事件（按子系统与模式）
-
-事件按子系统组织，模式是公开约定的一部分。以下为官方文档确认的事件及模式：
-
-### 1. Agent 生命周期与协调（ctx.agents / dsh-agent）
-
-| 事件 | 模式 | 说明 |
-| --- | --- | --- |
-| `agent/created` | serial | 可 throw 否决创建；AgentLoop 在监听器全部完成前保持排队输入 |
-| `agent/status` | emit | 状态变化（idle/running）通知 |
-| `agent/pre-step` | waterfall | 返回 `PreStepDecision`：`{kind:'reject'}` 或 `{kind:'enter'; messages; startsRequestSeries?}` |
-| `agent/request` | waterfall | 替换冻结的 LlmCallConfig（提供方/模型必须存在） |
-| `agent/request-error` | **waterfall** | 处理者返回 `{kind:'retry'}` 且不调 `next()` 则重试，否则失败终态 |
-| `agent/turn-stopping` | serial | 可 steer 后再读 inbox |
-| `agent/inbox/inserted` | `claimed` | `discarded` | emit | 收件箱有序持久列表变更 |
-| `agent/assistant-stream` | emit | 实时流分片（瞬态，回放读持久 settlement） |
-| `agent/error` | emit | 错误通知 |
-| `agent/disposed` | emit | Agent 被 dispose（不是第三个 status） |
-
-注意：**轮次/步骤边界是持久会话事件，不是 agent emit**。
-
-### 2. 工具执行管线（ctx.tools / dsh-tools）
-
-| 事件 | 模式 | 说明 |
-| --- | --- | --- |
-| `tools/pre-execute` | waterfall | allow/deny/cancel/ask 决策；**参数在此阶段禁止改写**（历史/审计/UI/执行一致） |
-| `tools/execute` | waterfall | 环绕包装（截止时间/重试/指标）；只能替换 signal |
-| `tools/post-execute` | waterfall | accept（替换展示 content 或 value 二选一）或 block（转含纠正反馈的 isError） |
-| `tools/result` | emit | 观察冻结的权威结果；观察者失败隔离 |
-| `tools/change` | emit | 故意不 scope 过滤（全局变化影响所有 agent 下次组装） |
-| `tools/ptc-dispatch-log` | waterfall | 只能修改持久日志副本（程序已拿到完整 value，模型两者都看不到） |
-
-### 3. 会话与持久化（ctx.sessions / dsh-session）
-
-| 事件 | 模式 | 说明 |
-| --- | --- | --- |
-| `session/event` | emit | post-commit fire-and-forget 广播 |
-| `session/created` | emit | 同步 throw 可否决并回滚 |
-| `session/disposed` | emit | 会话销毁 |
-| `session/flush` | parallel | 无 waterfall veto；flush(session) 是唯一刷盘入口（禁止裸 ctx.parallel('session/flush',…)） |
-| `api-session/added` | `removed` | `status` | `error` | `activity` | emit | API 层会话状态 |
-
-### 4. 持久会话事件族（persistence-catalog，约 60 个事件）
-
-所有事件以 `type` 为判别键的真判别联合（switch 直接收窄 `data`，无 cast）；信封 `{type, seq, time, data}` + 可选 `ignorable` + 条件 `surfaceOp`/`sourceEventSeqs`。
-
-| 事件族 | 说明 |
-| --- | --- |
-| `add-on/msg`、`hook/invoked`、`hook/result` | 钩子与附加消息（仅日志扩展，不投影模型历史） |
-| `llm/retry`、`llm/retry-ready` | LLM 重试相关 |
-| `goal/change`、`plan/mode` | 目标与计划模式状态（plan/mode 仅记日志、整值替换、持久可回放、**绝不进入模型 transcript**；客户端只收 {active,pending}） |
-| `sandbox/mode` | 沙箱模式会话状态 |
-| `feedback/*`、`approval/*` | 反馈与审批（allowed-once 记录） |
-| `session/title`、`session/title-scheduled` | 会话标题 |
-| `tool/workflow/*` | 工具工作流（多工具编排） |
-| `workspace/changes` | 工作区变更（仅日志扩展） |
-| `compaction/*` | 压缩相关 |
-| `turn/start`、`turn/end`、`step/start`、`step/end` | 轮次与步骤边界（持久事实） |
-| `tool/call`、`tool/result`、`tool/ptc-dispatch`、`tool/ptc-dispatch-end` | 工具调用持久化 |
-| `user/message`、`assistant/attempt`、`assistant/message`、`developer/message`、`system/message`、`request/header`、`request/context`、`session/end-seed` | 消息与请求 |
-
-**SurfaceEventType 只有 5 类**：`system/message` | `developer/message` | `user/message` | `assistant/message` | `tool/result`——只有它们可携带 `surfaceOp`（`'append'` 或 `{op:'replace', startSeq, endSeq}`，replace 用于压缩、须含全部被遮蔽表面节点），因此产生模型历史；log-only 事件不产生。`ignorable` 缺席=必需，读者遇未识别**必需**事件必须拒绝重建会话而非静默丢弃。机器可读 schema 在 `docs/persistence-schema.json`；类型指纹 SHA-256（注释/位置/别名/readonly 不影响，元组顺序/属性名/值类型/可选性影响）。
-
-### 5. LLM 流（ctx.llm / dsh-llm）
-
-| 事件 | 模式 | 说明 |
-| --- | --- | --- |
-| `llm/stream` | waterfall | 可短路整个流分发 |
-| `llm/adapters-updated` | emit | 负载为空；每次 commit 点触发，消费方重读 listProviders/listModels |
-
-### 6. 系统提示词（ctx.systemPrompt）
-
-| 事件 | 模式 | 说明 |
-| --- | --- | --- |
-| `system-prompt/change` | emit | 注册/注销提示词段落；故意不 scope 过滤 |
-| `system-prompt/assemble` | waterfall | Scoped 过滤；返回值为权威；complete 段在 waterfall 后恢复为唯一段落 |
-
-### 7. 宿主事件（workspace / plan / skills）
-
-| 事件 | 模式 | 说明 |
-| --- | --- | --- |
-| `workspace/session-activity` | waterfall | 归档前询问"还有什么在跑"，非空拒绝不写入；无提供方组合可自由归档 |
-| `workspace/session-stop` | parallel | `stopActivity` 时先写归档再派发停止；活动族键 turn/job/subagent/schedule |
-| `plan/mode` | emit | 计划模式 `{active:boolean}`：仅记日志、整值替换、持久可回放、**绝不进入模型 transcript** |
-| `skills/change` | emit | 技能注册表失效通知（无 diff，重查 `ctx.skills.list()`） |
-
-### 8. 环境与内部钩子事件（Inherited Cordis API）
-
-| 事件 | 模式 | 说明 |
-| --- | --- | --- |
-| `internal/plugin` | — | fiber 创建 |
-| `internal/status` | — | fiber 生命周期状态变化 |
-| `internal/service` | — | 服务绑定拦截钩子（无核心生产者） |
-| `internal/update` | waterfall | fiber 配置更新正在应用 |
-| `internal/config` | waterfall | 配置校验前解析 |
-| `internal/get` | `internal/set` | waterfall | 从存储读/写服务 |
-| `internal/listener` | — | 监听器注册 |
-| `internal/dispatch` | — | 派发至监听器 |
-| `exit` | — | 信号退出 |
-| `loader/config-update` | `loader/entry-init` | `loader/partial-dispose` | `loader/patch-context` | — | loader 重载生命周期 |
-| `loader/volatile-update` | — | 波动配置不重挂载直接提交进运行 fiber，**只派发给所属 fiber** |
-
-内部钩子事件多为 Waterfall/拦截类，不是广播通知。**拦截和策略优先用事件，直接能力调用优先用服务方法**。
-
-## 类型化事件扩展 (Declaration Merging)
-
-```ts
-export interface GitCommitPayload {
-  hash: string
-  message: string
-  author: string
-}
-
-declare module '@deepseek-ai/cordis' {
-  interface Events {
-    // 声明为同步事件 (emit)
-    'git/commit'(payload: GitCommitPayload): void
-    // 声明为阻断事件 (bail)
-    'git/pre-commit'(payload: { stagedFiles: string[] }): boolean | Promise<boolean>
+### 2. EventOptions、Disposer 与 thisArg 重载
+- **监听器配置项**：
+  ```ts
+  export interface EventOptions {
+    prepend?: boolean // 插入到该事件现有监听器队列的最前面
+    global?: boolean  // 忽略上下文作用域过滤器 (Context.filter)，强制全局接收
   }
+  ```
+  在 `ctx.on(name, listener, true)` 中，第三个参数传布尔值即为 `{ prepend: true }` 的简写。
+- **Disposer 注销函数**：
+  `ctx.on()` 与 `ctx.once()` 返回一个 `() => boolean` 注销函数。若执行时成功移除监听器返回 `true`，未找到返回 `undefined`。监听器由所属 Fiber 的 `effect` 生命周期自动托管，Fiber 卸载时全自动注销。
+- **`thisArg` 首参重载**：
+  所有五大派发方法均原生提供首参为 `thisArg` 的重载，支持显式指定监听器内部 `this` 绑定。
+
+---
+
+## 二、宿主核心运行事件 (Host Runtime Events)
+
+| 事件名 | 派发模式 | 核心传参与生命周期语义 |
+| --- | --- | --- |
+| `workspace/session-activity` | **waterfall** | `({ sessionId }, next)`：Workspace 归档会话前询问活跃状态。四大活动族（`turn`、`subagent`、`job`、`schedule`）通过 `next()` 合并入数组。若数组非空，Workspace 立即拒绝归档。 |
+| `workspace/session-stop` | **parallel** | 会话归档或强制停止时并发派发。各子系统以用户自身的停止方式取消当前活跃活动（如丢弃排队收件箱，记录 inbox splice）。全部 settle 后抛出 `AggregateError`。 |
+| `plan/mode` | **双重机制** | 持久化层为仅记日志的 SessionEvent `plan/mode`（整值替换，**绝不进入模型 transcript**）；运行时通过 `SessionProjectionMap` 的 `plan` 单元推导 `{ active, pending }` 视图。 |
+| `skills/change` | **emit** | 技能注册表发生变动（增删改）时的全局失效广播，不带 diff。消费方收到后应重新调用 `ctx.skills.list()`。 |
+| `ready` | **parallel** | 插件体系与所有服务完全就绪后的生命周期广播。 |
+| `dispose` | **parallel** | 插件或宿主上下文停用时的清理广播。 |
+
+---
+
+## 三、持久会话事件体系 (Persistence Catalog)
+
+在 DSH 会话存储层中，所有日志以仅追加（Append-Only）的 `SessionEvent` 形式持久化（JSONL 或 SQLite）。由 `gen-persistence-catalog.ts` 维护的已知事件全貌严格包含 **60 个核心类型**。
+
+### 1. 表面事件 (SurfaceEventType，严格 5 大类)
+在 60 个事件中，**唯有以下 5 类事件代表模型可见表面节点**（产生 LLM 上下文历史）：
+1. `system/message`：系统消息；
+2. `developer/message`：开发者指令；
+3. `user/message`：用户输入；
+4. `assistant/message`：模型响应；
+5. `tool/result`：工具执行结果。
+
+### 2. `surfaceOp` 操作语义
+只有上述 5 类表面事件允许携带 `surfaceOp`，其余 55 个事件在类型定义中强制 `surfaceOp?: never`：
+- `'append'`：向当前模型上下文表面末尾追加节点；
+- `{ op: 'replace', startSeq: SessionSeq, endSeq: SessionSeq }`：用于会话压缩（Compaction）与历史修剪，声明被替换的表面事件序号范围，被遮蔽节点不再进入模型上下文。
+
+### 3. `ignorable` 向前兼容性契约
+- **缺席 = 必需 (Required)**！
+- 当反序列化器读取会话日志时，如果遇到不在已知 60 个类型集合中的事件：
+  - 若该事件**未携带** `ignorable: true`，反序列化器**必须抛出异常并拒绝重建会话 (fail-fast)**，防止因静默丢失关键事件造成状态推导错误；
+  - 若该事件标记了 `ignorable: true`，则视为安全的向前兼容扩展，仅作为日志存储保留，跳过表面重建。
+
+### 4. SHA-256 结构指纹
+Persistence Catalog 为每个事件类型自动计算 SHA-256 结构指纹：
+- 严格针对属性名、属性类型、可选性以及元组内元素顺序计算哈希；
+- 注释、声明位置、字段别名和 `readonly` 修饰符不改变指纹；用于 CI 自动化拦截未经版本迁移的破坏性事件结构变更。
+
+---
+
+## 四、事件监听代码实战
+
+```js
+export const inject = ['tools']
+
+export function apply(ctx) {
+  // 1. 同步广播监听
+  const unbindReady = ctx.on('ready', () => {
+    ctx.logger('my-plugin').info('服务完全就绪')
+  })
+
+  // 2. waterfall 环绕中间件（拦截工具前置决策）
+  ctx.waterfall('tools/pre-execute', async (exec, next) => {
+    // 检查是否受保护
+    if (exec.toolName === 'dangerous_tool') {
+      // 短路拦截，不再调用下游
+      return { kind: 'deny', reason: '此工具已被策略拦截' }
+    }
+    // 正常放行至下游监听器
+    return next()
+  })
+
+  // 3. 监听会话活动检测
+  ctx.waterfall('workspace/session-activity', (target, next) => {
+    const list = next() || []
+    if (hasPendingJob(target.sessionId)) {
+      list.push({ kind: 'job', id: 'my-job-1' })
+    }
+    return list
+  })
 }
 ```
-
-事件名先声明（声明合并）+ `@mode` 标分发模式，再按对应方法派发，**不能混用**。

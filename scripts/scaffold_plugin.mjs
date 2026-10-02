@@ -1,78 +1,122 @@
 #!/usr/bin/env node
-// DSH 插件组合包（bundle）脚手架。
-// 用法：node scripts/scaffold_plugin.mjs <plugin-dir> [--client]
-// 生成：package.json（含 dsh.bundle 声明）、cordis.patch.yml、index.js 入口；
-//       --client 追加 exports["./client"] 与 lib/client.js 双面骨架。
+// DSH 插件工程脚手架（零外部依赖，纯原生 Node.js 实现）。
+// 用法：node scripts/scaffold_plugin.mjs <target-dir> [--dual-face]
 
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
-import { basename, join, resolve } from 'node:path'
+import { mkdirSync, writeFileSync, existsSync } from 'node:fs'
+import { join, resolve, basename } from 'node:path'
 
-const dir = resolve(process.argv[2] ?? '.')
-const withClient = process.argv.includes('--client')
-const name = basename(dir)
+const args = process.argv.slice(2)
+const targetDir = args.find((a) => !a.startsWith('--'))
+const isDualFace = args.includes('--dual-face')
 
-if (existsSync(dir) && existsSync(join(dir, 'package.json'))) {
-  console.error('目标目录已存在 package.json，拒绝覆盖：' + dir)
+if (!targetDir) {
+  console.error('用法: node scripts/scaffold_plugin.mjs <target-dir> [--dual-face]')
   process.exit(1)
 }
+
+const dir = resolve(targetDir)
+if (existsSync(dir)) {
+  console.error('目标目录已存在：' + dir)
+  process.exit(1)
+}
+
+// 规范化包名：全部小写连字符
+const rawName = basename(dir)
+const sanitized = rawName.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '')
+const pkgName = sanitized.startsWith('dsh-') ? sanitized : 'dsh-' + sanitized
+const bundleId = pkgName.replace(/^dsh-/, '')
+
 mkdirSync(dir, { recursive: true })
 
-const pkg = {
-  name,
+// 1. package.json
+const pkgJson = {
+  name: pkgName,
   version: '0.1.0',
   type: 'module',
   main: 'index.js',
-  files: ['index.js', 'cordis.patch.yml'],
-  exports: { '.': './index.js' },
-  dsh: { bundle: { patch: './cordis.patch.yml' } },
-  peerDependencies: { '@deepseek-ai/dsh': '>=0.2.0-rc.1' },
+  exports: {
+    '.': './index.js'
+  },
+  dsh: {
+    bundle: {
+      id: bundleId,
+      description: 'DSH 插件：' + pkgName
+    }
+  },
+  peerDependencies: {
+    '@deepseek-ai/dsh': '>=0.2.0-rc.1',
+    '@deepseek-ai/cordis': '~4.0.4'
+  }
 }
-if (withClient) {
-  pkg.files.push('lib')
-  pkg.exports['./client'] = './lib/client.js'
-  pkg.dsh.client = { platform: 'web', inject: ['@deepseek-ai/dsh-client-ui-settings'] }
-  pkg.peerDependencies.react = '^18.2.0'
-}
 
-writeFileSync(join(dir, 'package.json'), JSON.stringify(pkg, null, 2) + '\n')
-
-writeFileSync(join(dir, 'cordis.patch.yml'), [
-  '- insert:',
-  '    - id: ' + name + '-entry',
-  "      name: '" + name + "'",
-  '      config: {}',
-  '      disabled: false',
-  '',
-].join('\n'))
-
-writeFileSync(join(dir, 'index.js'), [
-  '// ' + name + '：DSH 插件入口（Host 侧）',
-  "import type { Context } from '@deepseek-ai/cordis'",
-  '',
-  "export const name = '" + name + "'",
-  '',
-  'export function apply(ctx: Context) {',
-  '  // 在此注册效果；卸载时自动回滚',
-  '}',
-  '',
-].join('\n'))
-
-if (withClient) {
+if (isDualFace) {
+  pkgJson.dsh.client = {
+    platform: 'web',
+    module: './lib/client.js'
+  }
+  pkgJson.exports['./client'] = './lib/client.js'
   mkdirSync(join(dir, 'lib'), { recursive: true })
-  writeFileSync(join(dir, 'lib/client.js'), [
-    '// ' + name + '：浏览器侧（lazy factory，仅挂裸包名行）',
-    "import type { Context as ClientContext } from '@deepseek-ai/cordis'",
-    '',
-    'export function apply(ctx: ClientContext) {',
-    '  // ctx.slots.inject(...) 注册 UI 组件',
-    '}',
-    '',
-  ].join('\n'))
 }
 
-console.log('已生成 DSH 插件骨架：' + dir)
-console.log('  package.json（dsh.bundle 声明）')
-console.log('  cordis.patch.yml（装配补丁）')
-console.log('  index.js（Host 入口）')
-if (withClient) console.log('  lib/client.js（Browser 入口）')
-console.log('下一步：dsh plugin add ' + dir)
+writeFileSync(join(dir, 'package.json'), JSON.stringify(pkgJson, null, 2) + '\n')
+
+// 2. index.js（纯 JS ESM，使用 JSDoc 类型注解）
+const indexJs = `// ${pkgName} 插件入口
+// 遵循 DSH 0.2.0-rc.2 / Cordis 4.0.4 插件规范
+
+export const name = '${pkgName}'
+
+/**
+ * 插件装载入口
+ * @param {import('@deepseek-ai/cordis').Context} ctx
+ * @param {Record<string, unknown>} [config]
+ */
+export function apply(ctx, config = {}) {
+  ctx.logger('${bundleId}').info('${pkgName} 已装载')
+
+  ctx.on('ready', () => {
+    ctx.logger('${bundleId}').info('${pkgName} 运行时已就绪')
+  })
+}
+`
+writeFileSync(join(dir, 'index.js'), indexJs)
+
+// 3. client.js（仅在 --dual-face 时生成）
+if (isDualFace) {
+  const clientJs = `// ${pkgName} 浏览器端组件入口（Dual-Face Client UI）
+export const name = '${pkgName}/client'
+
+/**
+ * 客户端装载入口
+ * @param {import('@deepseek-ai/cordis').Context} ctx
+ */
+export function apply(ctx) {
+  // 统一通过 ctx.slots.inject / ctx.slots.register 注入插槽
+  // 严禁组件直接持有 ctx 实例
+}
+`
+  writeFileSync(join(dir, 'lib/client.js'), clientJs)
+}
+
+// 4. cordis.patch.yml
+const patchYml = `# ${pkgName} 组合包补丁配置
+- insert:
+    - id: ${bundleId}
+      name: ${pkgName}
+      config: {}
+      disabled: false
+`
+writeFileSync(join(dir, 'cordis.patch.yml'), patchYml)
+
+// 5. README.md
+const readmeMd = `# ${pkgName}
+
+DSH 插件组合包。
+
+## 安装与装载
+
+在所在 profile 的 `package.json` 中声明依赖并在 `cordis.patch.yml` 中组合生效。
+`
+writeFileSync(join(dir, 'README.md'), readmeMd)
+
+console.log('脚手架生成完成：' + dir)

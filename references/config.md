@@ -1,128 +1,55 @@
-# 插件配置与 Schemastery
+# DSH 运行时配置与补丁系统权威指南 (DSH 0.2.0-rc.2)
 
-配置系统允许插件定义强类型配置结构，并在运行时通过 Schemastery 进行验证与默认值填充。在 DeepSeek Harness (DSH) 中，配置既支持代码声明，也遵循严格的补丁叠加规范。
+本文件是 DeepSeek Harness (DSH 0.2.0-rc.2) 配置补丁系统、生效落点、动态表达式求值与运维避坑的官方权威规范。
 
-## 定义 Config 类型与 Schema
+---
 
-插件应导出 `interface Config` 与同名 `Config` Schemastery 运行时校验 Schema。默认值直接定义在 Schema 中：
+## 一、配置系统重大废弃警告
 
-```ts
-import type { Context } from '@deepseek-ai/cordis'
-import Schema from '@deepseek-ai/schemastery'
+> **绝对严禁教导用户修改 `$DSH_HOME/settings.yaml`！**
+> 该文件在 DSH 0.1.7+ 中已彻底废弃。DSH 启动时会自动将其重命名为 `settings.yaml.imported` 并不再生效。
+> 所有插件的增删改查一律通过 `cordis.patch.yml` 声明！
 
-export const name = 'my-configurable-plugin'
+---
 
-export interface Config {
-  apiKey?: string
-  endpoint: string
-  maxRetries: number
-  verbose: boolean
-  features: string[]
-}
+## 二、权威四层叠加落点与全量替换语义
 
-export const Config: Schema<Config> = Schema.object({
-  apiKey: Schema.string().role('secret').description('API 认证凭据'),
-  endpoint: Schema.string().default('https://api.example.com/v1').description('服务接口基地址'),
-  maxRetries: Schema.number().min(0).max(10).default(3).description('请求失败最大重试次数'),
-  verbose: Schema.boolean().default(false).description('是否输出详细运行日志'),
-  features: Schema.array(Schema.string()).default([]).description('启用的特性标签列表'),
-})
+代码级真源（见 `@deepseek-ai/dsh-app-boot` 的 `readProfilePatches` 函数）规定补丁严格按以下顺序自底向上逐层求值与覆盖：
 
-export function apply(ctx: Context, config: Config) {
-  // apply 执行时，config 已完成类型校验并合并了默认值
-  console.log('Endpoint:', config.endpoint)
-  console.log('Max retries:', config.maxRetries)
-}
-```
+1. **组合包自带补丁 (Bundles declared patches)**：
+   按所在 profile 的 `package.json` 中 `dsh.profile.bundles` 声明的列表顺序逐个加载；
+2. **Profile 本地补丁**：
+   `$DSH_HOME/profiles/<profile>/cordis.patch.yml`；
+3. **用户全局补丁**：
+   `$DSH_HOME/cordis.patch.yml`；
+4. **命令行动态 Overlay 补丁**：
+   按 CLI `--patch <path>` 参数传入的顺序逐个叠加。
 
-## 常用 Schemastery 构造器
+### 覆盖与合并核心语义：全量替换 (Wholesale Replacement)
+- 多个补丁层中针对相同 `id` 的插件条目，**后层按行胜出**；
+- 条目内的 `config` 对象采用**整体替换，绝不进行深合并 (Replaced wholesale, not deep-merged)**；
+- **防坑准则**：在 profile 补丁中修改已有插件的某一个配置项时，**必须提供该插件在该层所需的完整 config 字段**，不能仅传增量字段，否则会导致未列出的缺省字段丢失。
 
-- `Schema.string()`: 字符串类型，可搭配 `.role('secret')` 标记为密码脱敏，`.pattern(regex)` 正则匹配。
-- `Schema.number()`: 数值类型，可搭配 `.min(n)`、`.max(n)`、`.step(n)`。
-- `Schema.boolean()`: 布尔类型。
-- `Schema.array(innerSchema)`: 数组类型。
-- `Schema.dict(valueSchema)`: 键值对字典对象。
-- `Schema.union(['optionA', 'optionB', 'optionC'])`: 枚举联合类型。
-- `Schema.intersect([SchemaA, SchemaB])`: 结构交叉类型。
-- `Schema.hidden()`: 运行时专用字段，从前端表单或配置文件序列化中隐藏。
+---
 
-## 配置的真实生效落点 (至关重要)
+## 三、补丁语法与动态表达式规范
 
-### 废弃警告：不要修改 settings.yaml
-
-`$DSH_HOME/settings.yaml` 是早期版本的历史文件，**现已完全废弃**。在 DSH 启动时，`@deepseek-ai/dsh-settings` 的 `importLegacyDocument()` 会将其自动改名为 `settings.yaml.imported`，并将其中的节区导入至配置补丁。修改 `settings.yaml` 或 `settings.yaml.imported` **不会产生任何效果**。
-
-官方当前文档（0.2.0-rc.2）的任何页面均不再出现 settings.yaml：配置写入统一由 `@deepseek-ai/dsh-config-editor` 持久化到 profile 配置补丁（capability-seams 页原文："Persists profile config patches under the application file lock and HMR queue, then reconciles Loader entries"），设置表单层（settings 子系统）只负责投影与校验，落盘永远走 patch。
-
-### 配置落点是三层补丁（+ overlay）
-
-用户和安装脚本修改配置的真实落点全部是 `cordis.patch.yml` 系列补丁，共三个层级（官方 publish 页确认的生效顺序）：
-
-```
-1. dsh.profile.bundles 各包的 patch（按列表顺序，先 @deepseek-ai/dsh-base）
-   —— 组合包自带配置层（如 dsh-hello-plugin/cordis.patch.yml）
-2. profile 自身 cordis.patch.yml：$DSH_HOME/profiles/<profile>/cordis.patch.yml
-   —— 用户针对该运行装配体的配置（默认 Web 界面为 profiles/web/cordis.patch.yml）
-3. $DSH_HOME/cordis.patch.yml
-   —— 机器本地偏好层（跨 profile 生效）
-4. 每个 --patch overlay（按 argv 顺序）
-   —— 本地开发验证用（pnpm dsh web --patch ./scratch-plugin/cordis.yml）
-```
-
-后应用的层按行胜出。官方语义："patch 会替换目标行的整个 config 值，而不是深度合并各键"。`ctx.configEditor`（core 角色）正是在应用文件锁与 HMR 队列下持久化这些 profile 配置补丁、再协调 Loader 条目的服务。
-
-## 补丁写入语义与语法
-
-### 1. 全量替换语义 (Wholesale Replacement, Not Deep-Merged)
-
-在 `cordis.patch.yml` 中，对既有插件条目的 `config` 字段修改是**整体替换，不进行深度合并**（Config is replaced wholesale, not deep-merged）。
-
-如果某个插件原本拥有 `apiKey`、`endpoint`、`maxRetries` 三个字段，而在 patch 中仅声明了：
-
-```yaml
-- id: my-plugin-entry
-  config:
-    maxRetries: 5
-```
-
-则原有配置中的 `apiKey` 与 `endpoint` 将被全部抹除！因此：**修改既有插件配置时，必须将该插件全部需要保留的配置字段完整写入**。
-
-### 2. 插入新插件 (insert 语法)
-
-在补丁中声明全新安装的插件时，使用 `- insert:` 顶层节点：
-
+### 1. 新增插件条目：`- insert:`
+用于向 Cordis Loader 注册新插件条目：
 ```yaml
 - insert:
-    - id: my-custom-plugin
-      name: '@my-scope/dsh-custom-plugin'
+    - id: my-plugin-id
+      name: my-plugin-package-name
       config:
-        endpoint: 'https://api.custom.com'
-        maxRetries: 5
-        verbose: true
+        enabled: true
+        port: 8080
       disabled: false
 ```
+- 顶层 `- insert:` 插入根插件列表；
+- 若 `- insert:` 提供针对已有条目的插入，目标条目必须是 `group: true` 容器，新增条目会被推入该 group 的配置数组中。
 
-### 3. 条件激活与环境变量控制
-
-补丁支持 JS 表达式标签（`!!js`）进行环境条件求值：
-
-```yaml
-- insert:
-    - id: mcp-custom-service
-      name: '@deepseek-ai/dsh-mcp-client'
-      config:
-        serverName: custom-service
-        transport: streamable-http
-        url: !!js process.env.CUSTOM_MCP_URL
-      disabled: !!js '!process.env.CUSTOM_MCP_URL'
-```
-
-当环境变量 `CUSTOM_MCP_URL` 不存在时，该插件实例将被禁用，避免启动时因缺少环境变量而报错。
-
-### 4. 覆盖已有插件条目
-
-修改由底层 Bundle（如 `dsh-base`、`dsh-web-app`）提供的内置插件时，直接按条目 `id` 定位：
-
+### 2. 修改已有插件配置：`- id:`
+直接通过 `id` 索引已有条目并提供全量替换的 `config`：
 ```yaml
 - id: better-sidebar
   name: dsh-better-sidebar
@@ -130,38 +57,91 @@ export function apply(ctx: Context, config: Config) {
     titleBarCompat: true
 ```
 
-若目标 `id` 在当前组合中不存在，DSH 仅会在控制台打印跳过警告，不会阻止系统启动。
-
-## 历史节区名称映射 (Legacy Mappings)
-
-若从旧版文档或脚本迁移，需注意以下历史节区名称已重命名为现代条目 ID：
-
-| 旧版 Section 名称 | 现代 Profile 条目 ID | 对应说明 |
-| --- | --- | --- |
-| `ui-onboarding` | `ui-settings-general` | 通用界面设置与引导 |
-| `ui-developer-tools` | `ui-settings` | 开发者工具设置 |
-| `shell` | `pwsh-sandbox` (Windows) / `bash-sandbox` (其他平台) | 终端执行沙箱环境配置 |
-
-## 配置目录生成规则（勿手改官方生成文件）
-
-官方文档站以下目录页由生成器产出、`pnpm run verify-*` 校验（doc-sync），**禁止手工编辑**（中英两版同源）：
-
-- `config-catalog`：`scripts/gen-config-catalog.ts` 按部署为轴列出每个可加载包的 config 类型。生成器把运行时 schemastery schema 与粘贴声明交叉核对，每个 schema 验证键必须出现在声明类型中——**粘贴内容无法隐藏加载器接受的字段**。
-- `persistence-catalog`：所有持久会话事件信封与类型指纹（SHA-256，注释/位置/别名/readonly 不影响，元组顺序/属性名/值类型/可选性影响），机器可读 schema 在 `docs/persistence-schema.json`。
-- `tool-catalog`：`ctx.tools.schemas()` 运行时结果（生成器真实启动每个工具插件），执行 `pnpm run verify-tool-catalog` 验证。
-
-**误解纠正**：运行时 schema 有意排除的字段是仅供运行时使用的 seam（`inject` 注入的服务键等），**不能通过 cordis.yml 设置**——不是所有 Config 字段都可配。
-
-## 调试与验证配置树
-
-在修改 `cordis.patch.yml` 后，应通过 CLI 命令导出合并后的完整配置树，以排查语法错误或验证配置覆盖结果：
-
-```bash
-# 验证 web profile 的合并配置
-dsh --profile web --dump-config
-
-# 验证控制台 TUI profile 的合并配置
-dsh --profile dsh-tui --dump-config
+### 3. 动态求值标签：`!!js` 表达式
+DSH 允许在 YAML 中使用 `!!js` 标签执行安全的 JavaScript 表达式求值：
+```yaml
+- insert:
+    - id: mcp-context7
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: context7
+        transport: streamable-http
+        url: !!js process.env.CONTEXT7_MCP_URL
+        headers: {}
+        toolCallTimeoutMs: 60000
+        failOnStartupError: false
+      disabled: !!js '!process.env.CONTEXT7_MCP_URL'
 ```
+- **求值沙盒上下文**：通过 `new Function("ctx", "expr", "with (ctx) { return eval(expr) }")` 执行；
+- `ctx` 注入暴露了宿主环境信息（如 `dshHomePath`），且可自由访问全局 `process.env`；
+- 广泛用于读取环境变量、动态条件禁用（`disabled: !!js '!process.env.VAR'`）。
 
-如果 `--dump-config` 正常输出 YAML 树且 stderr 为空，说明补丁语法解析正确。
+---
+
+## 四、权威工程运维与避坑准则
+
+### 1. 致命教训：`--dump-config` 假阳性陷阱
+**重要结论：`--dump-config` 校验通过，绝对不等于 Web 或 TUI 能够启动成功！**
+- **根因**：`--dump-config` 仅解析 YAML 文本树与配置 Schema，**完全不加载插件物理代码，也不校验 peerDependencies**！
+- 如果插件版本不兼容、缺少依赖或导出的服务冲突，`--dump-config` 返回 0 字节 stderr 且退出码为 0，但实际启动时整个系统会立刻崩溃（报 `required plugin did not activate`）。
+- **官方权威的三步真实启动验收法**：
+  ```bash
+  # 1. 检查端口是否真实处于 LISTENING 状态
+  netstat -ano | findstr "127.0.0.1:3080" | findstr LISTENING
+
+  # 2. 检查启动输出中的鉴权 URL
+  # 格式形如：dsh web: http://127.0.0.1:3080/?token=<auth-token>
+
+  # 3. 带 token 请求根路径：必须返回 303 重定向并设置 dsh-auth-* Cookie；带 Cookie 请求必须返回 200 text/html
+  ```
+
+### 2. 包管理器避坑：npm 替代 pnpm 规避 OOM
+- 官方 `@deepseek-ai/dsh` 元包会递归带出 250+ 官方子包；
+- 使用 `pnpm` 解析超大依赖图时，链接阶段极易发生物理内存溢出（OOM，`invalid array length`）；若使用 `pnpm install --prod` 又会错误排除 devDependencies 导致插件全量卡死在旧版本；
+- **官方推荐解决方案**：
+  ```bash
+  cd ~/.dsh/profiles/web
+  npm install --legacy-peer-deps --no-audit --no-fund
+  ```
+  使用 `--legacy-peer-deps` 压制非致命 ERESOLVE 警告，npm 默认采用扁平化 `node_modules` 结构，解析极速且零 OOM。
+
+### 3. 版本兼容性豁免机制 (allow-version)
+DSH 0.1.7+ 会在启动时严格检查各插件的 `peerDependencies`。遇到第三方插件尚未适配最新 DSH 但功能完全兼容时，可通过官方豁免命令放行：
+```bash
+dsh plugin --profile <profile> allow-version <pkg-name>@<version> --dsh-version <exact-dsh-version> --accept-risk
+```
+该命令会将豁免记录写入 profile 目录下的 `compatibility.json`。
+
+---
+
+## 五、Web Profile 官方生效的 14 个 Bundles 清单
+
+在当前最新的生产基准（2026-10-01）中，Web profile 包含以下 14 个标准组合包：
+1. `@deepseek-ai/dsh-base`（基础微内核与大动脉服务）
+2. `@deepseek-ai/dsh-web-app`（Web 宿主控制台与会话管理器）
+3. `dshmarket`（插件市场）
+4. `dsh-context`（上下文增强）
+5. `dsh-better-sidebar`（侧边栏扩展）
+6. `@wenaixi/dsh-ponytail`（代码精简与极简工程引擎）
+7. `@wenaixi/dsh-superpower`（开发超级能力套件）
+8. `dsh-prompt-history`（提示词历史记录）
+9. `@linxin666/dsh-client-ui-git-graph`（Git 分支图可视化）
+10. `dsh-plugin-wallpaper-engine`（动态壁纸与视觉主题）
+11. `@deepseek-ai/dsh-experimental-agent-team-profile`（Agent Teams 多智能体协作团队预设）
+12. `@deepseek-ai/dsh-experimental-voice-input-bundle`（语音输入套件）
+13. `@deepseek-ai/dsh-experimental-schedule-bundle`（挂钟定时提醒系统）
+14. `@liustack/modsearch`（多引擎网络搜索桥接）
+
+---
+
+## 六、生成器目录规则 (Generator Catalogs)
+
+在 DSH 源码树中，有三个核心目录由代码生成脚本严格维护：
+- `config-catalog`
+- `persistence-catalog`
+- `tool-catalog`
+
+**规范约束**：
+- 这三个目录由 `scripts/gen-*.ts` 脚本根据源码类型定义自动生成，并通过 `verify-*` 脚本在 CI 中校验；
+- **严禁任何开发者手动修改这三个目录中的文件**；
+- 运行时 Seam 字段在配置 Schema 中被显式剔除，无法通过静态 `cordis.yml` 进行持久化配置，必须由插件动态装载。

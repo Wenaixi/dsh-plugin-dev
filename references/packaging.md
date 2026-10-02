@@ -42,6 +42,7 @@ my-feature-plugin/
 }
 ```
 
+- `dsh.client`：声明双面插件的前端半侧（`platform: "web"`）。Host 侧 `clientModules` 服务扫描到此字段时，将其加入 `window.__DSH_BOOT__` 并开放 Combo 路由。
 - `dsh.bundle.patch` 支持字符串路径（`"./cordis.patch.yml"`），也支持**有序文件数组**（`["./base.patch.yml", "./web.patch.yml"]`），按序作为同一层应用。
 - patch 行按**包名**引用（`- insert: - { id: hello, name: 'dsh-hello-plugin' }`），不是文件路径。
 
@@ -181,6 +182,33 @@ pnpm link --global dsh-plugin-foo
 2. **peerDependencies 严格解耦**：`@deepseek-ai/cordis`、`@deepseek-ai/dsh`、`react` 声明为 peerDependencies，确保运行时加载宿主统一实例。
 3. **发布前校验**：`files` 显式包含编译后的 `lib/` 与 `cordis.patch.yml`，避免遗漏关键补丁。
 4. **client 半侧挂载规则**：浏览器半侧**只挂在说明符恰为裸包名的那一行上**；子路径导出挂载的行永远不带半侧。拆成多行的组合包，其半侧留在根行，注册的每个页面随根行关闭而消失；需在其他行关闭时仍保留页面的子插件应作为**独立包**发布。`./client` 必须是客户端模块系统的 lazy-CJS factory 格式；生成它的 tsdown 预设只在仓库 `packages/client/tsdown.client.ts`，仓库之外需自行复刻。
+
+## 安装与依赖陷阱避坑指南 (npm & pnpm Pitfalls)
+
+在安装 DSH 插件或进行多包联调时，由于 DSH 的微内核多包架构与严格单例设计，极易触发以下两大包管理器陷阱：
+
+### 1. npm install --legacy-peer-deps 陷阱与根因
+
+- **现象**：直接运行 `npm install` 安装插件或依赖时，频繁抛出 `npm ERR! ERESOLVE unable to resolve dependency tree` 并阻断安装。
+- **根本原因**：
+  - DSH 规范强制将 `@deepseek-ai/cordis`、`@deepseek-ai/dsh` 以及 `react` 声明为 `peerDependencies`，以保证全局运行时仅存在单一实例。
+  - npm 7+ 默认开启了严格的 peerDependencies 自动安装与深层依赖图推导。当多个插件或间接依赖声明的 peer 版本范围存在微小的边界不重合，或者与全局安装树形成菱形依赖时，npm 会拒绝安装。
+- **规避与应对指南**：
+  1. **使用 `--legacy-peer-deps` 参数**：`npm install <plugin-package> --legacy-peer-deps`（回退到跳过严格 peer 冲突校验的经典行为）。
+  2. **在项目或 Profile 根目录配置 `.npmrc`**：写入 `legacy-peer-deps=true`。
+  3. **优先使用 DSH 官方 CLI 安装**：`dsh plugin add <package-name>`（官方 CLI 内部会安全调度包管理器并自动维护 Profile 的 cordis 补丁层）。
+
+### 2. pnpm 内存溢出 (OOM) 陷阱与性能优化
+
+- **现象**：在 Profile 目录或大型 monorepo 中执行 `pnpm install` 或 `pnpm run build` 时，Node.js 进程卡死并崩溃，报错：`FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory`。
+- **根本原因**：
+  - **超深依赖拓扑**：DSH 核心生态包含 260+ 个细粒度包，深层依赖符号链接图极其庞大复杂。
+  - **V8 默认堆内存限制**：Node.js 默认分配给 V8 的最大堆内存通常仅 1.4GB ~ 2GB。pnpm 在全量计算符号链接图、跨包校验依赖一致性、或 tsc 同时编译数十个包的双面 bundle 时，内存极易被打爆。
+- **避坑与解决实操**：
+  1. **临时/全局提高 Node.js 内存上限**：设置环境变量 `NODE_OPTIONS="--max-old-space-size=8192"`（提升至 8GB 堆内存）。
+  2. **避免盲目全局 pnpm link**：优先采用基于 `pnpm-workspace.yaml` 的 Monorepo 相对路径安装或 `pnpm add ./packages/<pkg>`，利用 pnpm 的硬链接与虚拟 store 机制节省内存。
+  3. **定向过滤构建 (Filtered Build)**：使用 `pnpm --filter <pkg> run build` 精准针对目标包构建，严禁在根目录无脑并发打包整个 monorepo。
+  4. **pnpm >= 10 构建脚本授权**：在 Profile 目录的 `pnpm-workspace.yaml` 中显式配置 `allowBuilds: { "<package-name>": true }`。
 
 ## 常见误解
 

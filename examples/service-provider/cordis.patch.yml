@@ -1,4 +1,6 @@
-# dsh-service-provider — 服务提供方与消费方演示层
+# dsh-memory-cache 补丁配置
 - insert:
-    - id: service-provider
-      name: dsh-service-provider
+    - id: memory-cache
+      name: dsh-memory-cache
+      config: {}
+      disabled: false

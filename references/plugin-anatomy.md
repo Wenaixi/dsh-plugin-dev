@@ -120,14 +120,140 @@ export function apply(ctx: Context, config: TaskQueueConfig) {
 - **stop() 钩子**：服务所属插件被卸载或环境退出时触发。
 - 服务内部注册的事件与 `ctx.effect()` 资源均与 fiber 生命周期绑定，卸载时自动注销。
 
-## 2. 插件标准要素解剖
+## 2. 双面插件模型 (Dual-Face Plugin Anatomy)
+
+在 DSH Web GUI 体系中，凡是需要贡献前端界面（如自定义侧边栏、聊天节点视图、设置表单卡片、状态指示器）的插件，均遵循**双面插件 (Dual-Face Architecture)** 规范：
+
+```
++----------------------------------------------------------+
+|                    Dual-Face Plugin                      |
++----------------------------+-----------------------------+
+|        Host 半侧           |         Client 半侧         |
+|      (Node.js 宿主)        |      (Browser 渲染层)       |
++----------------------------+-----------------------------+
+| lib/index.js               | lib/client.js               |
+| export apply(ctx)          | export apply(ctx)           |
+| Cordis 服务 / 工具注册      | ctx.slots.inject 插槽组件   |
++----------------------------+-----------------------------+
+```
+
+### 2.1 物理结构与 package.json 声明
+
+双面插件在 `package.json` 中必须同时声明主入口与 `./client` 导出，并提供 `dsh.client` 配置块：
+
+```json
+{
+  "name": "@my-scope/dsh-my-plugin",
+  "version": "0.1.0",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=0.2.0-rc.2",
+    "@deepseek-ai/dsh": ">=0.2.0-rc.2",
+    "react": ">=18.0.0"
+  }
+}
+```
+
+- **Host 半侧 (`lib/index.js`)**：导出 `apply(ctx)`。由服务端 Cordis Loader 在 Node 进程中挂载，负责注册工具、监听核心事件、发布 Remote 服务。
+- **Client 半侧 (`lib/client.js`)**：导出 `apply(ctx)`。由浏览器端独立的 Cordis 运行时加载，负责插槽组件注入与界面交互。
+
+### 2.2 惰性 CJS Bundle 与物化机制 (Materialization)
+
+1. **构建输出**：执行 `tsc -b && tsdown` 时，Client 半侧代码被打包为一个惰性 CJS bundle。
+2. **注册契约**：脚本加载时，仅向全局加载器注册工厂函数：`window.__ModuleLoader__.load({ id, factory })`，此时**不执行模块体代码，也不注入 CSS**。
+3. **按需物化**：当模块首次被消费（`import` 或 `require`）时，工厂函数被调用并缓存 (`loadCache`)。样式代码编译在 bundle 内部，物化时自动挂载带 `data-plugin` 属性的 `<style>` 标签。
+4. **HMR 自动回收**：插件卸载或热重载时，旧 fiber 及其拥有的 style 标签被 `removeOwnedStyles()` 精确清理。
+
+### 2.3 启动图注入与 Combo 路由
+
+- **启动图注入 (`window.__DSH_BOOT__`)**：Host 端的 `ctx.clientModules` 动态扫描所有声明了 `dsh.client` 且处于启用状态的插件，生成依赖图，直接内联注入到 HTML `<head>` 的 `window.__DSH_BOOT__` 清单中。
+- **Combo 批量路由**：浏览器通过单条多路复用请求按需批量下载插件脚本，路径格式为：
+  ```
+  /plugins/??<id1>/client.js,<id2>/client.js&rev=<composite-rev>
+  ```
+  受系统常量 `MAX_COMBO_URL_BYTES` 保护，若依赖插件列表超长则自动分页切分。
+
+### 2.4 Slots 插槽体系与组件无 ctx 铁律
+
+UI 插件绝不能直接操作宿主 DOM，必须通过插槽系统向宿主预设点位挂载 React 组件：
+
+```tsx
+// lib/client.tsx (Client 半侧)
+import type { Context } from '@deepseek-ai/cordis'
+import React from 'react'
+
+export function apply(ctx: Context) {
+  // 注入到会话输入框附加区域
+  ctx.slots.inject('conversation.input.attachments', () =>
+    ctx.slots.register(
+      {
+        order: 100, // 排序权重
+      },
+      // 核心铁律：React 组件绝不能接收 ctx！
+      // 只能接收宿主插槽传入的类型化 Props 或回调函数
+      ({ sessionId, disabled }: { sessionId: string; disabled?: boolean }) => {
+        return (
+          <button disabled={disabled} onClick={() => console.log('Clicked', sessionId)}>
+            My Attachment
+          </button>
+        )
+      }
+    )
+  )
+}
+```
+
+#### 核心铁律：组件绝不能接收 ctx (Zero-Context Component Rule)
+- **原因**：React 组件的生命周期由 React Fiber 驱动，而 Cordis 上下文拥有严格的局部依赖跟踪与可逆生命周期。若将 `ctx` 作为 Props 传给组件，会导致闭包泄漏、HMR 无法正常解构上下文、以及跨作用域状态污染。
+- **通信手段**：组件所需状态全部通过宿主插槽定义的 `props` 传入；若组件需要触发服务端操作，通过 props 传递的回调函数或自定义 hook 与 Client 侧的 `ctx.remote` 通信。
+
+#### 官方标准 Slot 层级树
+
+| 根节点 / 分支 | 典型 Slot 标识 | Cardinality（基数） | Scope（作用域） | 典型用途 |
+| --- | --- | --- | --- | --- |
+| **root** | `root` | single | root | 应用最外层骨架挂载 |
+| **sidebar.*** | `sidebar.brand` | single | root | 侧边栏品牌区域 |
+| | `sidebar.workspaces` | list | root | 工作区列表项 |
+| | `sidebar.settings` | list | root | 侧边栏底部设置入口 |
+| | `sidebar.files` | list | session | 会话关联的文件树视图 |
+| | `sidebar.terminal` | list | session | 侧边栏终端集成面板 |
+| **main.*** | `main.chat` | single | session | 主聊天交互区 |
+| | `conversation.session` | single | session | 会话状态外壳 |
+| | `conversation.view` | list | session | 消息流呈现视口 |
+| | `conversation.chat.node` | chain | session | 消息节点流水线包裹/拦截 |
+| | `conversation.composer` | list | session | 输入框下方功能区 |
+| | `conversation.input.attachments` | list | session | 输入框附加能力条 |
+| **rightbar.*** | `sidebar.right.pane.tab` | keyed | session | 右侧抽屉栏扩展 Tab（原 rightbar.session） |
+| **shell.*** | `shell.leading` | list | root | 顶部全局横幅通知 |
+| | `shell.overlay` | list | root | 全局模态框 / 浮层 |
+| **settings.*** | `settings.general.item` | list | root | 常规设置条目 |
+| | `settings.models.provider-card` | list | root | 模型提供方卡片 |
+| | `settings.plugins.tab` | keyed | root | 插件管理 Tab 面板 |
+| | `settings.section` | list | root | 扩展设置区块 |
+
+- **Cardinality（基数）**：`single`（唯一覆盖）、`list`（按 order 列表排布）、`keyed`（按 key 唯一索引替换）、`chain`（责任链环绕，提供 next 渲染后续组件）。
+- **Scope（作用域）**：`root`（全局单例）、`session-maybe`（会话可选）、`session`（强绑定当前会话生命周期）。
+
+## 3. 插件标准要素解剖
 
 1. **`name`（唯一标识）**：每个插件模块必须导出小写连字符命名的字符串 `name`，供 Cordis 跟踪生命周期与日志排查。
 2. **`inject`（依赖拓扑）**：声明运行所需的服务。列表位置不决定执行顺序，依赖关系才决定执行拓扑。声明形式有两种：数组（全部必需）或对象 `{ required: [...], optional: [...] }`。
 3. **`Config` 与 `Schema`**：导出 TypeScript 接口与同名运行时校验器，默认值直接写在 Schema 中。**不要导出普通对象作为 Config**——它不满足 Cordis 要求的 Standard Schema 接口。配置非法时插件加载失败并报告明确错误。
 4. **可逆副作用 (Reversible Effects)**：所有注册（工具、事件监听、中间件、服务）均受 Fiber 跟踪，卸载插件时自动逆向注销，零内存泄漏。通过 `ctx` 注册的任何东西——事件监听、工具、定时器——在插件卸载时都会被自动清理，无需手动 removeListener 或 clearInterval。
 
-## 3. Context 上下文 API 与作用域
+## 4. Context 上下文 API 与作用域
 
 `Context` 是 Cordis 运行时的根基，也是每个插件与微内核交互的唯一媒介。整个 DSH 系统由树状上下文（Context Tree）维系。
 
@@ -196,7 +322,7 @@ const isolatedCtx = ctx.isolate(['database'])
 isolatedCtx.plugin(SubPlugin)
 ```
 
-## 4. 核心能力切面 (Seams) 与依赖倒置
+## 5. 核心能力切面 (Seams) 与依赖倒置
 
 DSH 的设计精髓是**切面（Seam）化设计**：不存在特权或硬编码的内置逻辑，所有产品能力均被切分为抽象契约，由配置可替换的插件实现。DSH 官方将每种能力划分为四种角色之一：
 
@@ -260,7 +386,7 @@ DSH 的设计精髓是**切面（Seam）化设计**：不存在特权或硬编�
 - **命名规则**：单数 ctx 键用于 engine/runtime/policy/controller/resolver/store 等；复数键用于 registry 或拥有多个具名成员的服务（如 `ctx.sessions`、`ctx.agents`）。
 - **host 与 client 不得复用同一 Cordis Context 键**：TS 声明合并会同时看到两种类型。
 
-## 5. 设置表单与配置持久化 (Settings Forms)
+## 6. 设置表单与配置持久化 (Settings Forms)
 
 DSH 为插件提供统一的用户配置表单体系。插件导出的 Schemastery 配置契约会被自动反射为 Web GUI 设置界面的可视化表单控件，并在用户修改后持久化至配置补丁文件。
 

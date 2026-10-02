@@ -95,3 +95,9 @@
 - [x] J. CLAUDE.md 自身：A 节矩阵升级官方 core/seam/bundle 角色列、F 节 IPC 对齐 Typert Remote 架构（agent-a/b/f）
 - [x] K. 子代理产物清理：.doccheck/、docs-cache/、dsh-docs/、fetch-cache/、dsh-subsystems-doc-audit.md 已从工作树删除；examples/README.en.md、references/README.en.md 等冗余英文文件按 skill-designer-agent-skills 规范删除
 - [x] L. 失效链接清扫：grep 全库无 seams.md/context-api.md/plugin-forms.md/workspace-package.md 残留（CLAUDE.md 历史表除外，本表即为其新版本）
+
+- [x] M. 第三轮（0.2.0-rc.2 源码深度审计与四文档全量校准）：
+  - three-roles.md：精准区分 HTTP 一元 RPC POST /api/<ns>/<method> 与流式专用 /api/remote.mux；彻底排除 Client Runtime / HostFrame / events.mux / events.host 等伪概念；强调 argv 严格零 shell 解释安全边界。
+  - plugin-anatomy.md：补齐“双面插件模型 (Dual-Face Plugin Anatomy) 与 Slots 插槽体系”解剖学；解密 package.json dsh.client、lazy CJS bundle、window.__DSH_BOOT__、Combo 路由；明立“组件绝不能接收 ctx”铁律与官方 Slot 层级树。
+  - packaging.md：补全 package.json 中 dsh.client 配置规范；新增 npm install --legacy-peer-deps 根因剖析与 pnpm OOM 8GB 堆内存避坑指南。
+  - llm-adapter.md：补齐 LlmAdapter 抽象类契约与 7 种 StreamChunk 完整封闭判别联合 TypeScript 代码定义。

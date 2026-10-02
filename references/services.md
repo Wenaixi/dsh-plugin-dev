@@ -1,172 +1,135 @@
-# 服务与依赖注入
+# DSH 核心服务与拓展服务架构指南 (DSH 0.2.0-rc.2)
 
-服务是 Cordis 插件向其他插件暴露的核心能力抽象。插件通过 `inject` 声明所需服务，通过 `ctx.<serviceKey>` 使用服务，或通过继承 `Service` 类提供新服务。
+本文件是 DeepSeek Harness (DSH 0.2.0-rc.2) 核心服务总线、Seam 接口、Bundle 实现与宿主可选能力的权威技术规范。
 
-## 核心服务脊梁 (The Core Spine)
+---
 
-在 DSH 中，运行时能力由核心包挂载到 `ctx` 上。官方 capability-seams 口径用四种**角色**描述每个服务键：
+## 一、核心大动脉服务矩阵 (The Core Spine)
 
-| 角色 | 语义 |
-| --- | --- |
-| **core** | 每个组合必启动的主干服务 |
-| **seam** | 可替换能力缝：契约与实现分离，实现以不同名称注册提供方 |
-| **bundle** | 具体组合包（如 `dsh-base`、`dsh-sdk-minimal`），不是服务 |
-| **service** | 独立服务 |
+DSH 采用微内核架构，没有特权核心，所有核心能力均以 Cordis 服务形式挂载于共享 `Context`。
+核心包分为三类角色：
+- **core**：不可替代的平台骨干服务；
+- **seam**：契约与实现分离的抽象边界，支持多提供方替换；
+- **bundle**：唯一的具体实现组合包。
 
-**关键误区纠正**：
-
-- `ctx.llm` 的官方角色是 **seam**（契约 `@deepseek-ai/dsh-llm`，实现 `llm-deepseek` / `llm-pi-ai` / `llm-replay`），不是 core。
-- `ctx.agentLoop` 是 **bundle**：官方原文"唯一的具体循环插件；扩展包依赖 dsh-agent 的事件和服务，而不依赖此包"。扩展插件**绝不直接依赖** `@deepseek-ai/dsh-agent-loop`。
-- 服务键的单复数有严格约定：`ctx.sessions`（复数）、`ctx.agents`（复数）是 registry；单数键（如 `ctx.llm`）用于引擎/运行时/策略等。
-
-### 官方核心服务矩阵（capability-seams）
-
-| ctx 键 | 角色 | 契约包 | 实现/提供方 | 核心职责 |
+| 服务名称 | 挂载属性 | 角色 | 所属核心包 | 职责与官方权威规范 |
 | --- | --- | --- | --- | --- |
-| `ctx.sessions` | core | `@deepseek-ai/dsh-session` | session-memory + persistence-fs | 仅追加的 SessionEvent 唯一真源日志与状态快照（注意为复数） |
-| `ctx.systemPrompt` | core | `@deepseek-ai/dsh-system-prompt` | — | 系统提示词组装、片段收集、工具 Schema 呈现 |
-| `ctx.tools` | core | `@deepseek-ai/dsh-tools` | — | 注册能力、PTC 传输、调用经 策略前处理→单调守卫→环绕分派→策略后处理→最终结果观测 |
-| `ctx.agents` | core | `@deepseek-ai/dsh-agent` | agent-loop（经 setFactory） | 活跃 Agent 注册表、发起者作用域与 agent/* 事件（注意为复数） |
-| `ctx.settings` | core | `@deepseek-ai/dsh-settings` | config-editor | 从活动 profile 条目投影 volatile Config 字段成表单，委托 config-editor 持久化 |
-| `ctx.configEditor` | core | `@deepseek-ai/dsh-config-editor` | — | 在应用文件锁与 HMR 队列下持久化 profile 配置补丁，协调 Loader 条目 |
-| `ctx.agentPresets` | core | `@deepseek-ai/dsh-agent-presets` | — | 立即挂载 YAML 声明的 preset 版本，保留已替换版本直到最后使用者释放 |
-| `ctx.llm` | **seam** | `@deepseek-ai/dsh-llm` | llm-deepseek / llm-pi-ai / llm-replay | 提供方无关消息流式协议与适配器注册（消费方：agent-loop、compaction-basic） |
-| `ctx.credentials` | seam | `@deepseek-ai/dsh-credentials` | credentials-local | 用户凭证、环境变量与安全认证存储 |
-| `ctx.subprocess` | seam | `@deepseek-ai/dsh-subprocess` | subprocess-local | 子进程 spawn、终端原语（bash 执行器、PTY、LSP Host、ACP 后端均经它） |
-| `ctx.shell` | seam | `@deepseek-ai/dsh-shell` | bash-local / bash-sandbox / pwsh-local | 终端执行沙箱 |
-| `ctx.web` | seam | `@deepseek-ai/dsh-web` | web-search-exa/perplexity/deepseek、web-fetch-http | 网页搜索与抓取（提供方注册能力而非工具） |
-| `ctx.jobs` | seam | `@deepseek-ai/dsh-jobs` | jobs-local | 后台任务生命周期 |
-| `ctx.fs` | seam | `@deepseek-ai/dsh-fs` | fs-local / fs-sandbox / fs-ssh | 文件系统能力（配套 fs-observation-policy） |
-| `ctx.sessionPersistence` | seam | `@deepseek-ai/dsh-session-persistence` | session-persistence-jsonl | 会话持久化存储 |
-| `ctx.sessionQuery` | seam | `@deepseek-ai/dsh-session-query` | session-query-sqlite | 会话查询 |
-| `ctx.storage` | seam | `@deepseek-ai/dsh-storage` | storage-json / storage-sqlite | 通用键值存储 |
-| `ctx.skills` | seam | `@deepseek-ai/dsh-skill` | skill-filesystem / skill-badge / skill-office | 技能注册表与调用策略 |
-| `ctx.ptcRuntime` | seam | `@deepseek-ai/dsh-ptc-runtime` | ptc-runtime-local | PTC 模式程序执行运行时 |
-| `ctx.sandbox` | seam | `@deepseek-ai/dsh-sandbox` | sandbox-local（bwrap/Landlock、Seatbelt、Windows ACL） | 文件效果策略沙箱（SandboxMode 不管网络/进程可见性） |
-| `ctx.approval` | seam | `@deepseek-ai/dsh-approval` | approval-local | 审批请求（approval/request waterfall） |
-| `ctx.compaction` | seam | `@deepseek-ai/dsh-compaction` | compaction-basic | 上下文压缩 |
+| SessionStore | `ctx.sessions` (复数!) | core | `@deepseek-ai/dsh-session` | 仅追加的 SessionEvent 日志与会话状态唯一真源，严禁误写为单数 session。 |
+| SystemPrompt | `ctx.systemPrompt` | core | `@deepseek-ai/dsh-system-prompt` | 提示词片段组装、优先级排序与模型工具 Schema 生成。 |
+| ToolRuntime | `ctx.tools` | core | `@deepseek-ai/dsh-tools` | 工具注册表、单调卫士 (guard)、PTC 传输、16 阶段执行拦截流水线。 |
+| AgentRegistry | `ctx.agents` (复数!) | core | `@deepseek-ai/dsh-agent` | 活动 Agent 实例句柄注册表、发起者作用域与 `agent/*` 生命周期事件。 |
+| ConfigEditor | `ctx.configEditor` | core | `@deepseek-ai/dsh-config-editor` | 在应用文件锁与 HMR 队列保护下持久化 profile 补丁，协调 Loader 动态条目。 |
+| Settings | `ctx.settings` | core | `@deepseek-ai/dsh-settings` | 将 profile 动态条目投影为表单视图，校验输入并委托 configEditor 落盘。 |
+| ClientModules | `ctx.clientModules` | core | `@deepseek-ai/dsh-client-modules` | Host 侧挂载 `ctx.clientModules`，Browser 侧挂载 `ctx.modules`。掌管 Dual-Face 插件引导图、Combo 资源路由与 HMR 热重载。 |
+| AgentLoop | `ctx.agentLoop` | **bundle** | `@deepseek-ai/dsh-agent-loop` | 唯一的具体循环实现包；外部扩展插件依赖 `dsh-agent` 事件与服务，**严禁直接依赖此包**。 |
+| LlmRuntime | `ctx.llm` | **seam** | `@deepseek-ai/dsh-llm` | 提供方无关的统一流式协议 Chunk 派发与适配器注册（如 llm-deepseek、llm-pi-ai）。 |
 
-注意：`@deepseek-ai/dsh-scope` 是**纯函数库**（提供 `createScope`、`scopeOf`、`scopeTarget`、`ScopedLayers`），**不挂载任何 ctx 服务**。
+---
 
-**skills 注册表（`ctx.skills`）细节**：
+## 二、DSH 0.2.0-rc.2 新增核心与扩展服务
 
-- `SkillProvider{name; list(options)→SkillCandidate[]|SkillProviderObservation; get(candidate,options)}`；`SkillInvocationPolicy{modelInvocable; userInvocable}`（frontmatter 键 `disable-model-invocation`、`user-invocable`，双 false 仅受信 `ctx.skills.get()` 可取）。
-- 本地发现优先级 Rank（同层内低 rank 赢重名→提供方顺序→本地顺序）：100 project-dsh（`<projectRoot>/.dsh/skills`）、200 project-agents（`<projectRoot>/.agents/skills`）、300 custom（`Config.customSkillDirs`）、400 user-dsh（`<dshHome>/skills`）、500 user-agents（`<agentsHome>/skills`）、600 bundled（`Config.bundledSkillDir`/DSH_BUNDLED_SKILL_DIR）。项目根=含 .git 的最近祖先（找不到用 cwd）。
-- skill 名 `^[a-z0-9]+(?:-[a-z0-9]+)*$`；接受 `<name>/SKILL.md` 目录包或 `<name>.md` 扁平文件；**递归 `/**/SKILL.md` 发现不支持**。
-- 模型会话目录只用 name + description（XML 转义），**绝不使用正文/绝对路径/来源/提供方**；`catalogDescriptionMaxLength` 默认 500、最小 3；目录消息属于会话历史而非 World State；仅改正文只影响后续工具调用。
-- 注册表不缓存完整定义（`get()` 每次重读正文）；提供方代次变化→发现重试一次、再变→标不完整不缓存；事件 `skills/change`（emit，无 diff 失效通知）。
+### 1. 定时任务系统 (ScheduleService)
+- **挂载属性**：`ctx.schedule`（单数）
+- **所属包**：`@deepseek-ai/dsh-schedule`（配套组合包：`@deepseek-ai/dsh-experimental-schedule-bundle`）
+- **职责**：宿主范围内的持久化挂钟提醒与原始会话投递。
+- **配置项**：
+  - `deliveryHistoryDays`：保留交付记录的天数（默认 30）；
+  - `deliveryHistoryRecords`：保留交付记录的条数（默认 200）。
+- **投递保证**：交付承诺必须在会话确认 `session/flush` 后提交；冷会话在到期时由宿主自动拉起。
+- **暴露工具**：`schedule_create`, `schedule_list`, `schedule_delete`, `schedule_update`。
 
-**宿主侧可选能力（不进 seam 矩阵，按需加载）**：
+### 2. 团队协作大动脉 (TeamService)
+- **挂载属性**：`ctx.agentTeams`（复数!）
+- **所属包**：`@deepseek-ai/dsh-experimental-agent-team`（配套组合包：`@deepseek-ai/dsh-experimental-agent-team-profile`）
+- **职责**：同会话多 Agent 团队编排。当前会话 Agent 隐式成为 Lead，管理命名队友（Teammates）、持久化对等收件箱（Peer Mailbox）与共享任务有向无环图（Task DAG）。
+- **工具支持**：挂载配套包 `@deepseek-ai/dsh-experimental-tool-agent-team` 后暴露 `spawn_teammate`, `send_message`, `list_agents`, `wait_agent`, `interrupt_agent`, `team_task_create`, `team_task_list`, `team_task_get`, `team_task_update`。
 
-- `ctx.planMode`（`@deepseek-ai/dsh-plan-mode`）：`PlanModeController`——记入日志的逐 agent 协作状态，激活期间每个模型请求带 `plan:policy` 提示词段落（order 50 渲染）；`PlanModeConfig{ section }` 非法（缺失/空白/非字符串/未知键）→ 插件加载时失败；`set(agent, active)` 返回 `'committed'|'queued'|'cancelled'|'noop'`（重复选择幂等）。计划模式是**软性指引**：沙箱模式与审批策略分别强制限制且都不读写计划状态；该包可选、agent loop 不依赖它。
-- `ctx.workspaceRegistry`（`@deepseek-ai/dsh-workspace`）：用户工作目录的持久记录（`Workspace{id, path, title, sessionIds,...}`）。成员资格双条件：账本有 id 且 header 规范 `cwd === workspace path`；所有权真源是有序 `sessionIds`，绝不从 cwd 派生。宿主侧可选能力、**不对模型可见**（无工具/无提示词/无会话事件）。
-- `dsh-agent-instructions` **不是** workspace 消费方：它在 agent 自己 cwd 下发现 AGENTS.md 风格指令文件，从不触碰 `ctx.workspaceRegistry`。
+### 3. 计划模式控制器 (PlanModeController)
+- **挂载属性**：`ctx.planMode`（单数）
+- **所属包**：`@deepseek-ai/dsh-plan-mode`
+- **职责**：控制规划探索与用户审核流程。激活时向模型注入引导提示，通过 `exit_plan_mode` 呈现完成的计划供用户确认；用户可通过 `/plan off` 直接退出。
+- **软性指引设计**：planMode 属于软性提示工程指引，不硬性剥夺模型工具调用权。若需强制阻断高危操作，必须通过沙箱模式（`ctx.sandbox`）与审批机制（`ctx.approval`）实现。
 
-## 消费服务
+### 4. 工作区实体注册表 (WorkspaceRegistry)
+- **挂载属性**：`ctx.workspaceRegistry`（单数）
+- **所属包**：`@deepseek-ai/dsh-workspace`
+- **职责**：管理工作区实体元数据与稳定排序。
+- **注意**：不对模型直接暴露工具；删除工作区实体绝不删除底层物理会话日志文件。
 
-插件必须通过静态属性 `inject` 显式声明依赖。框架保证：只有当 `inject` 中声明的所有必需服务均已就绪（READY）时，插件的 `apply()` 或构造函数才会执行。
+### 5. 会话压缩策略 Seam (Compaction)
+- **抽象 Seam**：`@deepseek-ai/dsh-compaction`
+- **官方实现包**：
+  - `@deepseek-ai/dsh-compaction-basic`：基础多轮上下文剪枝；
+  - `@deepseek-ai/dsh-compaction-image-offload`：多模态图像外部转储；
+  - `@deepseek-ai/dsh-compaction-tool-result-pruner`：过期历史工具调用大结果裁剪。
 
-### 数组形式（必需依赖）
+### 6. 作用域纯函数库 (ScopeLib)
+- **所属包**：`@deepseek-ai/dsh-scope`
+- **规范说明**：纯函数库，导出 `createScope`, `scopeOf`, `scopeTarget`。**绝不在 Context 上挂载任何服务**，严禁使用 `ctx.scope` 形式调用。
 
-```ts
-import type { Context } from '@deepseek-ai/cordis'
+### 7. 外部信息桥接 (Modsearch Bridge)
+- **所属包**：`@liustack/modsearch`（替代旧版 Exa Filter）
+- **职责**：为会话提供多引擎网络搜索与抓取桥接（支持 `web_search`, `read_page`, `x_search`）。
 
-export const name = 'my-tool-consumer'
-export const inject = ['tools', 'sessions']
+---
 
-export function apply(ctx: Context) {
-  // apply 执行时，ctx.tools 与 ctx.sessions 保证已就绪
-  ctx.tools.register({ /* ... */ })
+## 三、常用 Seam 契约与提供方包对照
+
+| 抽象 Seam 领域 | 契约包 | 官方默认实现包 | 挂载属性 / 备注 |
+| --- | --- | --- | --- |
+| 子进程生成 | `@deepseek-ai/dsh-subprocess` | `@deepseek-ai/dsh-subprocess-local` | `ctx.subprocess` |
+| 终端管理 | `@deepseek-ai/dsh-terminal` | `@deepseek-ai/dsh-terminal-bash` / pwsh | `ctx.terminal` |
+| 文件系统 | `@deepseek-ai/dsh-fs` | `@deepseek-ai/dsh-fs-local` | `ctx.fs` |
+| 凭证存储 | `@deepseek-ai/dsh-credentials` | `@deepseek-ai/dsh-credentials-local` | `ctx.credentials` |
+| 会话持久化 | `@deepseek-ai/dsh-session-persistence` | `@deepseek-ai/dsh-session-persistence-jsonl` | 仅追加 JSONL 落盘 |
+| 会话查询 | `@deepseek-ai/dsh-session-query` | `@deepseek-ai/dsh-session-query-sqlite` | SQLite 查询索引 |
+| 沙箱策略 | `@deepseek-ai/dsh-sandbox` | `@deepseek-ai/dsh-sandbox-local` | `ctx.sandbox` |
+| 用户审批 | `@deepseek-ai/dsh-approval` | `@deepseek-ai/dsh-user-approval` | `ctx.approval` |
+| Agent 预设注册 | `@deepseek-ai/dsh-agent-preset-registry` | `@deepseek-ai/dsh-agent-preset` | `ctx.agentPresets` |
+| 技能系统 | `@deepseek-ai/dsh-skill` | `@deepseek-ai/dsh-skill-filesystem` | `ctx.skills` (六级排序 100-600) |
+
+---
+
+## 四、自定义服务的编写与生命周期规范
+
+### 1. 服务类定义规范
+```js
+import { Context, Service } from '@deepseek-ai/cordis'
+
+export class CustomMemoryCache extends Service {
+  // 声明在 Context 上的挂载属性名
+  constructor(ctx) {
+    // 第二个参数即为挂载属性 ctx.memoryCache
+    super(ctx, 'memoryCache', true)
+    this.store = new Map()
+  }
+
+  get(key) {
+    return this.store.get(key)
+  }
+
+  set(key, val) {
+    this.store.set(key, val)
+  }
+
+  // 停用或插件卸载时的清理钩子
+  [Service.tracker]() {
+    this.store.clear()
+  }
+}
+
+export function apply(ctx) {
+  ctx.plugin(CustomMemoryCache)
 }
 ```
 
-### 对象形式（区分必需与可选依赖）
+### 2. 消费方依赖注入规则
+消费方在声明依赖时，必须通过 `inject` 属性声明所需服务，确保 Cordis 加载器按依赖拓扑完成装载：
+```js
+export const inject = ['memoryCache', 'tools']
 
-```ts
-import type { Context } from '@deepseek-ai/cordis'
-
-export const name = 'my-hybrid-plugin'
-export const inject = {
-  required: ['tools'],
-  optional: ['llm', 'credentials'],
-}
-
-export function apply(ctx: Context) {
-  ctx.tools.register({ /* ... */ })
-  // 可选服务需在使用前进行存在性判定
-  if (ctx.llm) {
-    // 接入 LLM 额外能力
-  }
+export function apply(ctx) {
+  // 此时 ctx.memoryCache 与 ctx.tools 必定已可用
+  const cached = ctx.memoryCache.get('my-key')
 }
 ```
-
-## 提供服务
-
-编写自定义服务时，继承 `Service` 类并提供类型合并声明。
-
-### 1. 服务类实现
-
-```ts
-import { Service, type Context } from '@deepseek-ai/cordis'
-
-declare module '@deepseek-ai/cordis' {
-  interface Context {
-    database: DatabaseService
-  }
-}
-
-export class DatabaseService extends Service {
-  static inject = ['settings']
-
-  constructor(ctx: Context) {
-    // 第二个参数是挂载到 ctx 上的服务键名
-    super(ctx, 'database', true)
-  }
-
-  protected override start(): void | Promise<void> {
-    // 服务就绪时的启动逻辑，例如建立连接池
-  }
-
-  protected override stop(): void | Promise<void> {
-    // 插件卸载或服务销毁时的清理逻辑，例如关闭连接
-  }
-
-  public query(sql: string) {
-    return []
-  }
-}
-
-export const name = 'database-service'
-
-export function apply(ctx: Context) {
-  ctx.plugin(DatabaseService)
-}
-```
-
-### 2. 服务生命周期与就绪契约
-
-- **构造阶段**：`super(ctx, name)` 调用后服务**立即注册**到 `ctx.<name>`，并随所属 fiber **自动移除**（无需手动注销）。
-- **start() 钩子**：所有依赖就绪后调用。若返回 Promise，下游依赖该服务的插件会保持等待。
-- **stop() 钩子**：服务所属插件被卸载或环境退出时触发。
-- **可逆效果**：服务内部通过 `this.ctx.on()` 监听的事件、通过 `this.ctx.effect()` 注册的资源，均与当前上下文生命周期绑定，卸载时自动注销。
-- **命名规则**：单数 ctx 键用于 engine/runtime/policy/controller/resolver/store/当前配置；复数键用于 registry 或拥有多个具名成员的服务；host 与 client **不得复用同一个 Cordis Context 键**（TS 声明合并会同时看到两种类型）。
-
-## 声明合并与类型安全
-
-必须通过 `declare module '@deepseek-ai/cordis'` 扩展 `Context` 接口，以获得完整的代码提示与静态类型检查：
-
-```ts
-import type { DatabaseService } from './database'
-
-declare module '@deepseek-ai/cordis' {
-  interface Context {
-    database: DatabaseService
-  }
-}
-```
-
-## 循环依赖与加载顺序规则
-
-- **启动并发**：配置清单（`cordis.patch.yml`）中的各个插件条目是并发激活的，列表的前后物理顺序不代表插件加载顺序。
-- **依赖决序**：插件加载顺序完全由 `inject` 拓扑关系决定。
-- **死锁防护**：严禁两个插件之间出现相互必需的循环依赖（A 必需 B，B 必需 A），否则两个插件均处于永久 PENDING。如需双向交互，一方必须将依赖声明为 `optional`，或通过事件解耦。

@@ -1,219 +1,155 @@
-# 工具开发与 ToolRuntime
+# DSH 模型工具体系与 ToolRuntime 权威指南 (DSH 0.2.0-rc.2)
 
-面向模型的工具（Tools）由 `@deepseek-ai/dsh-tools` 的 `ctx.tools`（core 角色）统一管理。官方职责口径：**注册能力、负责 PTC 模式传输，并让调用依次经过策略前处理、单调守卫、环绕分派、策略后处理和最终结果观测**。
+本文件是 DeepSeek Harness (DSH 0.2.0-rc.2) 工具定义规范、16 阶段执行拦截流水线、单调守卫法则与官方工具归属全貌的技术规范。
 
-## 两种注册方式
+---
 
-1. **`defineTool`（第一方推荐）**：类型化 DSL。自动根据 `parameters` 推导并校验输入参数、根据 `output.schema` 校验返回值，并为 `output.render` 提供类型保障。
-2. **原始 JSON Schema `ToolDefinition`（直接注册）**：`ctx.tools.register()` 接受标准 JSON Schema 定义（MCP 工具导入常用）。此类工具自行负责输入合法性校验。
+## 一、ToolRuntime 核心职责与设计理念
 
-## 最小可用实现 (defineTool)
+`ctx.tools`（所属包 `@deepseek-ai/dsh-tools`）是面向大模型暴露能力的中央运行时：
+1. **单一入口 PTC 模式与原生 Function Calling**：支持原生模式、PTC (Program-Tool-Calling) 模式（`tools.presentAs`）；
+2. **多模态卡片投影**：支持在 Web GUI 呈现自定义参数与结果卡片；
+3. **单调安全保证**：执行单调守卫，确保权限阻断不可逆；
+4. **统一错误规范化**：工具抛出的异常被优雅捕获并规范化为 `isError` 结构，永不导致 Agent 轮次意外中断。
 
-```ts
-import { readFile } from 'node:fs/promises'
-import type { Context } from '@deepseek-ai/cordis'
+---
+
+## 二、官方 16 阶段工具执行流水线 (Tool Execution Pipeline)
+
+基于 `@deepseek-ai/dsh-tools` 与 `@deepseek-ai/dsh-agent-loop` 的源码实测，工具调用在宿主运行时的严格 16 阶段时序如下：
+
+```
+[阶段 1] tool/call 持久化记录
+         └─ agent-loop 在调用启动时先 append 至 SessionEvent，产生分配的 callSeq
+   ↓
+[阶段 2] presentCall 调用卡片投影
+         └─ Host-local 纯函数，产生 ToolCallView 卡片供前端展示
+   ↓
+[阶段 3] tools/pre-execute (waterfall) 策略前处理
+         └─ 返回 allow / ask / deny / cancel 决策；严禁改写 arguments
+   ↓
+[阶段 4] approval 一次性审批裁决
+         └─ 若 pre-execute 返回 ask，由 ctx.approval 弹出用户确认（allowed-once / rejected / cancelled / unavailable；非 allow 统一转 deny）
+   ↓
+[阶段 5] 单调 guard 守卫终极校验 (单调否决权)
+         └─ ctx.tools.guard 仅对 allow 调用执行；返回 string 立即拒绝，返回 undefined 弃权。审批通过仍可被 guard 否决！
+   ↓
+[阶段 6] tools/execute (waterfall) 环绕分派
+         └─ 包裹超时、重试与性能指标监控；仅允许替换并融合 exec.signal
+   ↓
+[阶段 7] execute 主体业务执行
+         └─ 工具定义中的 execute(args, exec) 执行核心逻辑，返回类型化规范输出
+   ↓
+[阶段 8] FS Gate 文件写网关
+         └─ 针对 tool-fs 可写操作，在写/改磁盘前触发 fs/write-intent、fs/edit-intent 拦截
+   ↓
+[阶段 9] 工具自有内部事件派发
+         └─ 工具派发专属领域事件（如 todo/write、fs/observed、tool/ptc-dispatch-start）
+   ↓
+[阶段 10] ToolDefinition.projectContent 内容预投影
+         └─ 在 post-execute 前安装已准备好的 content。注意：即使被 deny 阻断也会进入该阶段生成解释文本！
+   ↓
+[阶段 11] tools/post-execute (waterfall) 策略后处理
+         └─ accept (替换 content/value) 或 block (转换为纠正反馈 isError)
+   ↓
+[阶段 12] 外层结果规范化与错误定型
+         └─ materializeFinalResult 捕获全阶段异常，统一打包为 { content, isError, error? } 结构
+   ↓
+[阶段 13] ToolDefinition.finalizeContent 内容收尾
+         └─ 工具拥有的最终内容处理回调，保证恰好执行一次
+   ↓
+[阶段 14] tools/result (emit) 同步结果广播
+         └─ 结果已完全冻结不可篡改，同步广播给全局与 Agent 观察者，单个监听器异常被隔离
+   ↓
+[阶段 15] tool/result 持久化事件写入
+         └─ agent-loop 按模型顺序 commit 至 SessionEvent，附带 surfaceOp: 'append' 与 sourceEventSeqs: [callSeq]
+   ↓
+[阶段 16] presentResult 结果卡片展示投影与上下文注入
+         └─ 派生 ToolResultView，批次 additionalContexts 按 FIFO 排队注入下一轮历史
+```
+
+### 关键架构时序辨析
+1. **Approval 与 Guard 的先后关系**：源码中当 `pre-execute` 决策为 `ask` 时，**先调 `serviceAsk`（`ctx.approval`）获取用户审批**；用户点击允许后，**再执行单调 `guard`**！单调守卫拥有硬性一票否决权，防止用户意外误点批准了违规路径操作。
+2. **`projectContent` 在 Denied 场景下的生命周期保证**：即使工具调用被中间件阻断（`decision.kind === 'deny'`），主体 `execute` 会跳过，但流水线**依然会执行 `projectContent`**，为模型生成易于理解的阻断原因提示块。
+
+---
+
+## 三、单调安全守卫法则 (Monotonic Guard)
+
+注册单调守卫示例：
+```js
+ctx.tools.guard((exec) => {
+  if (exec.toolName === 'bash' && exec.args.command.includes('rm -rf /')) {
+    return '绝对禁止高危毁灭性根目录删除命令'
+  }
+  // 返回 undefined 表示弃权，不阻断
+})
+```
+- **单调不可逆性**：多个守卫链式检查，只要有任何一个守卫返回非空字符串（Deny 理由），该调用立即被判定为阻断；后注册的守卫绝无可能“取消”前序守卫的拒绝裁决。
+
+---
+
+## 四、官方工具归属包与命名全貌矩阵
+
+| 工具名 | 官方所属包 | 职责与模型用途 |
+| --- | --- | --- |
+| `run_code` | `@deepseek-ai/dsh-tools` | PTC 单入口沙箱，执行 TypeScript 代码以调用环境中的其他能力 |
+| `bash` | `@deepseek-ai/dsh-tool-bash` | 非交互式 Bash 命令执行 |
+| `pwsh` | `@deepseek-ai/dsh-tool-pwsh` | 非交互式 PowerShell 命令执行 |
+| `read`, `read_image`, `edit`, `write` | `@deepseek-ai/dsh-tool-fs` | 文本文件读取、图像多模态读取、文本精准替换、全量写入 |
+| `glob`, `grep` | `@deepseek-ai/dsh-tool-fs-search` | 路径模式匹配与基于 ripgrep 的文件内容正则检索 |
+| `skill` | `@deepseek-ai/dsh-tool-skill` | 载入技能指令规范（支持六级 rank 100-600 注入） |
+| `subagent`, `subagent_fork` | `@deepseek-ai/dsh-tool-subagent` | 委派全新独立子代理或继承当前上下文的分叉子代理 |
+| `list_agents`, `send_message`, `interrupt_agent` | `@deepseek-ai/dsh-tool-subagent-control` | 查看智能体列表、向智能体发送信件、中断执行 |
+| `job_output`, `job_kill`, `job_list` | `@deepseek-ai/dsh-tool-jobs` | 异步长耗时后台任务结果读取、终止与任务列表查询 |
+| `create_goal`, `get_goal`, `update_goal` | `@deepseek-ai/dsh-tool-goal` | 会话持久化目标管理与多轮次自驱推进 |
+| `exit_plan_mode` | `@deepseek-ai/dsh-plan-mode` | 退出计划模式，将完成的方案呈递给用户审核 |
+| `ask_user_question` | `@deepseek-ai/dsh-tool-ask-user` | 向用户发起结构化提问卡片 |
+| `todo_write` | `@deepseek-ai/dsh-tool-todo` | 记录并更新任务看板列表 |
+| `present` | `@deepseek-ai/dsh-tool-present` | 将本地现有文件声明为最终交付物卡片 |
+| `web_search`, `web_fetch` | `@deepseek-ai/dsh-tool-web` / `@liustack/modsearch` | 网络搜索引擎检索与网页全文内容提取 |
+| `schedule_create`, `schedule_list`, `schedule_delete`, `schedule_update` | `@deepseek-ai/dsh-schedule` | 宿主持久化定时任务管理四件套 |
+| `spawn_teammate`, `send_message`, `list_agents`, `wait_agent`, `interrupt_agent`, `team_task_*` | `@deepseek-ai/dsh-experimental-tool-agent-team` | Agent Teams 多智能体团队编排与共享任务看板协同工具 |
+| `ralph` | `@deepseek-ai/dsh-tool-ralph` | 代码重构与分析助手工具 |
+
+---
+
+## 五、自定义工具编写规范 (defineTool)
+
+```js
 import { defineTool } from '@deepseek-ai/dsh-tools'
 
-export const name = 'my-file-tool'
 export const inject = ['tools']
 
-export function apply(ctx: Context) {
-  const unregister = ctx.tools.register(defineTool({
-    name: 'read_text_file',
-    description: 'Read the text content of a file from disk.',
-    parameters: {
-      path: { type: 'string', required: true, description: 'Target absolute file path' },
-      encoding: { type: 'string', enum: ['utf-8', 'ascii'], description: 'File encoding, defaults to utf-8' },
-    },
-    output: {
-      schema: { type: 'string' },
-      render: (_args, value) => [{ type: 'text', text: value }],
-    },
-    async execute(args, exec) {
-      // args 已由 defineTool 依据 parameters 推导并校验
-      return await readFile(args.path, { encoding: (args.encoding ?? 'utf-8') as BufferEncoding })
-    },
-  }))
-  // unregister() 可手动注销；所属插件 fiber 卸载时自动注销
+export function apply(ctx) {
+  ctx.tools.register(
+    defineTool({
+      name: 'calculate_hash',
+      description: '计算指定字符串的 SHA-256 哈希值',
+      parameters: {
+        type: 'object',
+        properties: {
+          text: { type: 'string', description: '待计算哈希的明文字符串' }
+        },
+        required: ['text']
+      },
+      // 必须声明返回类型
+      output: {
+        type: 'object',
+        properties: {
+          hash: { type: 'string' }
+        }
+      },
+      async execute({ text }, exec) {
+        // exec 提供信号和调用元数据
+        if (exec.signal.aborted) {
+          throw new Error('执行已被取消')
+        }
+        const crypto = await import('node:crypto')
+        const hash = crypto.createHash('sha256').update(text).digest('hex')
+        return { hash }
+      }
+    })
+  )
 }
 ```
-
-## ToolDefinition 字段契约
-
-```ts
-interface ToolDefinition extends ToolSchema {
-  // ToolSchema = { name; description; parameters; deferLoading? }
-  output: ToolOutputDefinition            // 必填
-  execute(args: unknown, exec: ToolRunContext): Promise<unknown>
-  projectContent?(ctx: ProjectContentContext): Promise<void> // 由定义自身控制
-  finalizeContent?(ctx: FinalizeContentContext): Promise<void>
-  timeoutMs?: number                      // 由 dsh-tool-call-timeout-policy（tools/execute 包装）执行
-  isConcurrencySafe?(args): boolean       // 控制与 extern 并发的合规性
-  presentCall?(args): ToolCallView | undefined
-  presentResult?(args, result): ToolResultView | undefined
-}
-```
-
-- **`schemas()` 白名单**：模型请求中只包含 `name` / `description` / `parameters`。`output`、`execute`、`projectContent`、`finalizeContent`、`timeoutMs`、`isConcurrencySafe`、`presentCall`、`presentResult` **绝不泄漏到模型请求**。
-- **注册基于副作用**：dispose 工具所属插件 fiber 即注销；热替换 = dispose 副作用 + 注册替代品。
-- **注册借用只读定义**：注册后不得修改 schema、不得替换回调。
-- **`exec`（ToolRunContext）携带不可变身份**：`callId` / `name` / `arguments`（物化为无损 JSON 并冻结）/ `agent` / `token` / `signal` / `parent` 全程不可变；`exec.signal` 是操作字段（触发时取消工作），仅 around-dispatch 包装器可替换并恢复它（不能移除）。
-
-## 执行流水线（官方精确顺序）
-
-```
-tool/call session event 先记录（先于任何工具逻辑/Hook）
-       ↓
-presentCall(args) 卡点
-       ↓
-tools/pre-execute (waterfall)      →  allow / ask / deny 决策
-       ↓
-单调 guard（ctx.tools.guard）      →  deny（返回 string）或 abstain（返回 undefined），无 allow 结果
-       ↓
-ctx.approval 一次性 prompt        →  allowed-once；拒绝/取消/不可用 → denied
-       ↓
-tools/execute (waterfall)         →  环绕包装（timeout/retry/metrics）；只能替换 signal
-       ↓
-工具 execute()
-       ↓
-FS Gate（仅 tool-fs 可写）        →  fs/write-intent、fs/edit-intent
-       ↓
-工具自有事件                     →  todo/write、fs/observed、hook/invoked、hook/result、tool/ptc-dispatch
-       ↓
-ToolDefinition.projectContent     →  在执行后策略之前安装已准备内容
-       ↓
-tools/post-execute (waterfall)    →  accept / block / replace / add context
-       ↓
-外层规范化                        →  任一步 throw 变 isError 快照
-       ↓
-finalizeContent                   →  定义拥有的回调，恰好一次
-       ↓
-tools/result（同步通知）           →  观察冻结的权威结果；观察者失败隔离
-       ↓
-tool/result 事件 → presentResult → 批次 additionalContexts 按 FIFO 注入
-```
-
-要点：
-
-- **`tool/call` 会话事件先于一切工具逻辑/Hook 记录**。
-- 三个 waterfall（pre-execute / execute / post-execute）可以改写**一次调用**，但不能替换工具定义本身。
-- **guard 有两语义**：拒绝（返回 string）与**弃权**（返回 undefined）；没有 allow 结果，后注册监听器不可能把拒绝变回允许。
-- **审批是 allowed-once（一次性）**，不是持久授权；拒绝/取消/不可用统一转 denied。
-- **denied 时工具主体跳过执行，但仍进入 projectContent 阶段**。
-- 未知工具名或执行抛异常 → `UNKNOWN_TOOL` 结构化错误，**不终止轮次**。
-- **`tools/result` 是同步 emit 通知**（结果冻结不可变换）；**`tool/result` 是持久化 SessionEvent**（规范 value 仅执行期存在，持久化只存 `content` / `error` / `meta`）。
-- `ctx.approval` 询问在单调守卫之后（guard 之后、execute 之前）。
-
-## 官方工具归属表（tool-catalog，生成器以 `ctx.tools.schemas()` 运行时结果为准）
-
-| 工具名 | 所属工具包 |
-| --- | --- |
-| `run_code` | `tool-run-code`（dsh-tools，PTC 单入口） |
-| `bash` / `pwsh` | `tool-bash` / `tool-pwsh` |
-| `edit` / `read` / `read_image` / `write` | `tool-fs` |
-| `glob` / `grep` | `tool-fs-search`（`@vscode/ripgrep`） |
-| `skill` | `tool-skill` |
-| `subagent` / `list_subagent_models` | `tool-subagent` |
-| `interrupt_agent` / `list_agents` / `send_message` | `tool-subagent-control` |
-| `job_*` | `tool-jobs` |
-| `create_goal` / `get_goal` / `update_goal` | `tool-goal` |
-| `exit_plan_mode` | `plan-mode` |
-| `ask_user_question` | `tool-ask-user` |
-| `plugin_manager` | `plugin-manager` |
-| `session_*`（5 个） | `tool-session-query` |
-| `terminal_*`（6 个）、持久化 bash/pwsh | `tool-terminal` / `tool-terminal-persistent` |
-| `lsp`、`ralph`、`schedule_*`、`str_replace_editor`、MCP 资源三件套 | 各自工具包 |
-
-目录无法静态推断（运行时展开枚举/拼接描述/配置决定名称/MCP 原始 JSON Schema），官方生成器真实启动每个工具插件读 `ctx.tools.schemas()`——**以运行时的 `schemas()` 结果为准**。
-
-## 执行调度
-
-- `executionMode(exec)`：只有**精确 true** 才 `parallel`，否则 `exclusive`（屏障）。
-- `timeoutMs` 由 `dsh-tool-call-timeout-policy` 包裹 `tools/execute` 执行；超时是"环绕分发"关注点，不属于工具定义。
-
-## 策略钩子与决策类型
-
-```ts
-type PreToolDecision =
-  | { kind: 'allow' }
-  | { kind: 'deny'; reason: string; info?: ToolInfo }
-  | { kind: 'cancel'; reason?: string }
-  | { kind: 'ask'; reason?: string; displayReason?: string }
-
-type PostToolDecision =
-  | { kind: 'accept'; content?: ContentBlock[]; value?: unknown } // 二选一
-  | { kind: 'block'; reason: string; error?: string }
-```
-
-**单调安全法则（guard）**：
-
-- 任何匹配的守卫只要返回字符串错误原因，调用即被判定为拒绝（Deny）。
-- guard **没有 allow 结果**：后注册的监听器不可能把先前的拒绝变回允许（单调用器的单调性）。
-- 全局上下文注册的守卫对所有调用生效；`agent.ctx` 注册的守卫仅对该 Agent 生效。
-- 示例：
-  ```ts
-  ctx.tools.guard((call) => {
-    if (call.toolName === 'write_file' && !call.args.path.startsWith('/sandbox/')) {
-      return 'Permission denied: Writes outside /sandbox/ are restricted.'
-    }
-  })
-  ```
-
-**`restrict(filter)` 作用域限制**：
-
-```ts
-interface ToolRestriction {
-  allow?: string[] // 白名单
-  deny?: string[]  // 黑名单
-}
-```
-
-- 只掩码**继承的全局工具**（allow/deny 交集）；作用域自身注册与保留的 PTC 传输不受影响。
-- 空过滤器 / 未知名 / 作用域本地名 / 保留传输名都会失败。
-- scope 链上每个祖先 layer 都参与。
-
-## 呈现模式：`presentAs(mode)`
-
-- **Native 模式**：将工具转换为标准模型函数调用 JSON Schema。
-- **PTC 模式（Programmatic Tool Calling）**：将所有可见工具集中投影为 `tools.<name>(args)` 绑定，由模型编写可执行代码并发调度。
-- 采用就近优先原则（Nearest scope wins）；`presentAs` 仅作用域内生效、每 scope 一次，进程全局覆盖用 `mode` 配置字段。
-
-## PTC 模式调用约定
-
-```ts
-// 在 PTC 程序中：每个可见已注册工具都可用
-const value = await tools.calculate({ expression: '1 + 1' })
-```
-
-- 成功解析为**策略处理后的最终规范 JSON 值**（不是渲染后的 Native 内容）。
-- 失败以真正的 `ToolCallError` reject，程序只能访问 `name` / `toolName` / `message`——**无法取得内部错误码或失败联合**。
-- PTC 子调用重新进入完整且受守卫保护的流水线，携带父级 token，记录 `tool/ptc-dispatch` 事件。
-- **后台任务**：`ctx.jobs.start({ kind, label, owner: exec.agent, run })`，成功返回类型化句柄 `{ kind: 'background', jobId }`；**PTC 绝不能通过解析 Native 文本取 jobId**。任务发布后取消外层调用只停止等待、不终止已发布的工作（生命周期归 `job_kill` / owner dispose / teardown）。
-- `exec.agent.inject({ content, source: { kind: 'plugin', plugin: '<name>' } })`：追加持久化上下文（非唤醒；空闲 agent 保持空闲；对已 dispose 的 agent 用 try/catch 防御）。
-
-## 多模态输出与展示投影
-
-- `output.schema` 根可为对象 / 数组 / 标量 / null；`execute` 只返回推导出的规范值，注册表负责 快照 → 校验 → 冻结 → `output.render(args, value)`。
-- 抛异常或返回无效值 = isError；**领域不理想状态也应写进规范值**，由 Native 渲染器解释。
-- `output.presentationMeta(args, value)` 从同一规范值派生**可回放**的 JSON，核心持久化在 `tool/result` 并传给 `presentResult`（嵌套 Code 分发跳过该投影器）。
-- **展示词汇（纯函数）**：直播与回放都可能调用，禁止 I/O、读会话状态、时钟或随机数。
-  - `presentCall` → `ToolCallView`: generic / terminal / diff（read / search / web 工具无调用视图，pending 保持 generic）
-  - `presentResult` → `ToolResultView`: generic / terminal / diff / read / search / web
-  - `ToolCallKind`: read | edit | delete | move | search | execute | fetch | other
-- `defineTool` 对展示路径做**软校验**：格式错误或旧日志参数回退 generic，绝不抛异常。
-- UI 格式（\`\`\`console 围栏、diff、相对化路径）**绝不进入规范值或 Native 内容**。
-
-## Web Client 与展示的边界（重要）
-
-内置 Web Client **不消费 `presentCall` / `presentResult`**。Session 页面与 follow 运输原始 `tool/call` 与 `tool/result` 事件（含持久化的 `result.meta`）；Client 插件在 keyed slot `tool.call.toolview` 注册自己的 wire 工具名并自行派生组件 props。
-
-- 不要在 `metadata` 里保存 React props 或预选卡片。
-- 不要把 Host 工具实现导入浏览器 bundle。
-- 不要另建 Client presenter registry。
-
-## 常见误解
-
-- 认为 `tools/pre-execute` 可以改写参数——参数在 pre-execute 阶段禁止改写（历史 / 审计 / UI / 执行必须一致）。
-- 认为 `tools/result` 可以变换结果——它是 emit 观察，结果冻结。
-- 认为"替换 content"能隐藏程序化值——那是展示策略；要隐藏必须 block 或替换 value。
-- 钩子可跨工具系列工作，无需让工具与某个策略服务耦合。

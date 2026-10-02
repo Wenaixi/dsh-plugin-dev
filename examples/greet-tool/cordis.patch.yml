@@ -1,3 +1,6 @@
+# dsh-greet-tool 补丁配置
 - insert:
     - id: greet-tool
       name: dsh-greet-tool
+      config: {}
+      disabled: false

@@ -164,7 +164,7 @@ root
 
 由 `@deepseek-ai/dsh-subprocess`（Definition）+ `dsh-subprocess-local`（Provider）管理：
 
-- `ctx.subprocess.spawn(spec)` 同步返回活跃 handle；`spec.argv` 的 argv[0] 为程序、**绝不 shell 解释**；每条流处置（stdin/stdout/stderr/control）显式给出、seam 零默认。
+- `ctx.subprocess.spawn(spec)` 同步返回活跃 handle；`spec.argv` 实施**严格的零 shell 解释 (Zero Shell Interpretation)**，argv[0] 直接传给系统 exec，绝不经过 cmd.exe / sh 解析；每条流处置（stdin/stdout/stderr/control）全部显式给出，seam 绝不应用任何隐式默认值。
 - `SubprocessCollect`：`maxBytes` 溢出保 TAIL，可选 `spill: { maxBytes }` 落盘；offset reader `readFrom(fromByte)→{text; nextOffset; lossy; spillPath?}`，lossy 表示内存 tail 丢 head、完整流可从 spillPath 恢复。
 - `spawnTerminal`：唯一非管道原语，提供方拥有终端分配/UTF-8/前台进程组/信号/整体清停（TERM→KILL 须等待）；就绪/scrollback/沙箱策略归 PTY 消费方。
 - `DSH_*` 变量归 Harness：先丢弃环境已有 `DSH_*` 再合并显式 env；`undefined` tombstone 删普通环境值；env 字符串=有意凭据转发。
@@ -185,4 +185,4 @@ root
 - 把 `presentCall` / `presentResult` 当作 Web Client 的渲染入口——内置 Web Client 不消费它们；Session 页运输原始 `tool/call`、`tool/result` 事件，Client 插件在 keyed slot `tool.call.toolview` 注册自己的 wire 工具名。
 - 把 slot 组件做成直接拿 `ctx`——组件绝不收到 ctx。
 - 以为 `SandboxMode` 管控网络——它只管文件效果。
-- 以为 browser↔host 走 `/api/remote.mux` WebSocket 多路复用——当前官方架构是 Typert Remote（`/api/<ns>/<method>`）+ ctx.remote；不存在 events.mux/events.host。
+- 误以为全部 browser↔host 通信或事件广播都依赖一个通用的 WebSocket 事件总线（如臆造的 events.mux / events.host）——当前官方架构是：一元 RPC 严格走 HTTP POST `/api/<namespace>/<method>`；只有标记为流式的方法（@Remote({mode:'stream'})）才通过 `/api/remote.mux` 长连接传输；架构中绝对不存在 Client Runtime、HostFrame、events.mux、events.host 或通用 resync()。

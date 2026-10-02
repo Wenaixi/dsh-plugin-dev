@@ -81,3 +81,7 @@ dsh --profile web --dump-config
 # 3. 启动 DSH Web 实例
 dsh web
 ```
+
+---
+
+<p align="right"><sub style="color: gray;">本项目基于 <a href="https://github.com/omdsh-dev/dsh-plugin-dev" target="_blank" rel="noreferrer">omdsh-dev/dsh-plugin-dev</a> 进行深度校准与持续演进。</sub></p>

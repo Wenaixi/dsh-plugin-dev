@@ -174,7 +174,7 @@ dsh --profile test-env --dump-config
 对插件工程的 `package.json`、`cordis.patch.yml`、`apply` 入口导出契约、`exports['.']` 与依赖声明进行全量静态校验。支持多路径批量校验：
 ```bash
 # 批量检验本目录下全部 5 个示例工程
-node scripts/validate_plugin.mjs examples/hello-plugin examples/service-provider examples/configurable-plugin examples/greet-tool examples/event-interceptor examples/settings-tab-plugin
+node scripts/validate_plugin.mjs examples/hello-plugin examples/service-provider examples/configurable-plugin examples/greet-tool examples/event-interceptor examples/settings-tab-plugin examples/sidebar-tab-plugin examples/remote-storage-plugin
 ```
 
 ### 2. 标准插件脚手架生成器 (scaffold_plugin.mjs)

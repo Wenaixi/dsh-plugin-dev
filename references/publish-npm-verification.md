@@ -22,8 +22,8 @@ console.log(j["dist-tags"].latest);
 
 发布流水线常带幂等检查：`if npm view ... grep 版本 → echo already published, skipping`。
 
-- 这个分支**只跳过 npm 发布**；若脚本在 `skipped=true` 时跳过 GitHub Release 创建，就会出现「npm 有版本、Release 缺失」的错位——核对 release 要用 `gh release view` 单独验证；
-- 幂等脚本先跑门禁再发布，tag 指向的 commit 必须包含全部产物（`lib/` 已构建）与版本号。
+- `npm publish` 与 `gh release` 是两套独立产物、不自动成立：npm 发布成功不代表 Release 存在（`gh release view <tag>` 才是 Release 真值）；npm 发布成功也不代表 registry 可见（镜像缓存延迟，直查官方 API 为准）；
+- 发布流程先跑门禁再构建（`lib/` 为构建时产物，官方包 files 精确含 lib 不含 src），版本号是 package.json 的 manifest 字段；tag 指向的 commit 决定发哪个版本。
 
 ## 三、tag 指向错误的修正
 
@@ -31,7 +31,7 @@ console.log(j["dist-tags"].latest);
 
 ```bash
 git tag -d v1.2.3            # 删本地
-# 先完成遗留提交（add + commit 分开跑，PowerShell 的 && 不可用）
+# 先完成遗留提交（add + commit 分开跑，PowerShell 5.1 的 && 不可用（ParserError；7+ 才支持 &&））
 git add -A -- <files>; git commit -m "chore: bump to v1.2.3"
 git tag v1.2.3               # 在新 commit 重打
 git push origin main
@@ -47,10 +47,10 @@ git push origin v1.2.3 --force   # 强制更新远端 tag
 
 ## 五、发布前 checklist
 
-1. `bump-dsh` 递增版本（`-dsh.N` 后缀）；
+1. 递增版本：官方包用裸 SemVer 预发布（如 0.2.0-rc.2；`-dsh.N` 后缀只是社区第三方包约定，官方 289 包 0 命中）；`npm version 0.2.0-rc.3`（前置 `git add -A`）；
 2. CHANGELOG 补段（Added/Changed/Removed/Migration，含行为变更声明）；
-3. 四道门禁全绿（typecheck / build / verify / behavior）；
-4. commit（version + changelog + 产物）→ tag → `git push origin main --tags`；
-5. `gh run watch <id>` 等流水线完成（发布步骤 + Release 步骤都 ✓）；
-6. 官方 registry API 验证版本与 dist-tags；`gh release view` 验证 Release；
+3. 门禁用仓库真实存在的命令（如 `pnpm typecheck` / `pnpm build`；不存在同名脚本就删该项，官方发包 scripts 无 typecheck/verify/behavior）；
+4. commit（version + changelog；lib/ 是构建时产物不提交，版本号是 package.json 的 manifest 字段）→ tag → `git push origin main --tags`；
+5. 发布即 npm tarball，官方发布物不带 GitHub Actions/Release（.github/workflows 0 命中）——`gh run watch` 仅在仓库确配 Workflow 时用；
+6. 官方 registry API 验证版本与 dist-tags；`gh release view <tag>` 才是 Release 真值（npm 发布成功不代表 Release 存在）；
 7. 本地/远端 git 一致（`git rev-parse HEAD` == `git ls-remote origin main`）。

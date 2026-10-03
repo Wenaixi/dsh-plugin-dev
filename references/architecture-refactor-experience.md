@@ -25,7 +25,7 @@
 interface Deps {
   state: State
   readRawConfigMode: () => string | undefined
-  invalidateSkills: () => void
+  invalidate: () => void   // 插件自有回调名；官方技能注册表 API 是 registry.invalidateCache()，提供者控制句柄是 control.invalidate()（dsh-skill）
   patchMode?: string
   logger: { info(msg: string): void }
   envRaw?: string
@@ -47,10 +47,10 @@ export function createConfigHttpEndpoint(deps: Deps):
 
 ## 三、配置写盘：字段级 merge，别丢用户手写字段
 
-- 反例（真坑）：配置写盘函数只重建两键对象，`config.json` 里用户手写的未知字段被静默丢弃；
-- 正确：读原文 JSON → 字段级 merge → 写回（未知字段原样保留）；
-- 非法值（defaultMode 未归一）**拒绝写盘返回 null**，不覆盖原文件；
-- 两个写函数骨架相同（mkdir+read+merge+stringify）时合并为一个 `write(patch)`，语义以「保留未知字段 + 拒绝非法值」为准；
+- 反例（真坑）：配置写盘函数只重建两键对象，`cordis.patch.yml`（宿主唯一写盘目标）里用户手写的未知字段被静默丢弃；
+- 正确：读原文（cordis.patch.yml / 插件自有 JSON）→ 字段级 merge → 写回（未知字段原样保留）；
+- 非法值（defaultMode 未归一）**拒绝写盘并抛错中止**（SettingsConflictError 或校验 Error），原文件保持不变；
+- 两个写函数骨架相同（mkdir+read+merge+stringify）时合并为一个 `write(patch)`；注意宿主侧配置写盘走 dsh-settings 的 write(ns, change, expected, paths)（mergeLayers 保留未知键），语义以「保留未知字段 + 拒绝非法值」为准；
 - 补一条行为测试锁「未知键保留」——要防旧行为回归。
 
 ## 四、孤儿函数与失效类型

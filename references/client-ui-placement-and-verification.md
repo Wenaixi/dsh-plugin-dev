@@ -101,7 +101,7 @@ window.__MY_PLUGIN_UI__ = { startedAt: new Date().toISOString(), registered: [] 
 
 | 用户看到的界面 | 插槽 | kind | 注册参数 | 备注 |
 | --- | --- | --- | --- | --- |
-| 设置窗口左侧一级 Tab | settings.section | list | id + order + label | 右侧渲染完整页面；order 建议 50~500 |
+| 设置窗口左侧一级 Tab | settings.section | list | id + order + label | 右侧渲染完整页面；order 建议置于官方分区之后（官方 shipped：-10/0/10/15/20） |
 | 设置窗口「通用」页内的一行 | settings.general.item | list | id + order | 只放单行开关，别塞整页 |
 | 设置窗口「内置插件」页的二级 Tab | settings.plugins.tab | list | id + order + label | 按条目注册 id 匹配（renderSlot only: id；内置「全部」视图 id="all"） |
 | 插件页「官方」分组条目 | plugins.item | list | id + order + label | 点进去是独立详情页；组件按 props.view（summary / page）分态（分组标题为「官方」与「已安装」） |
@@ -164,7 +164,7 @@ Cache-Control: public, max-age=31536000, immutable
 URL 形如 /plugins/??包id/client.js&rev=12位hex——rev 是产物文件 mtime/ctime/size 的 framedHash（单包）与 id+rev 组合哈希（combo），不是内容哈希（内容变了 rev 必变，但重写文件可能 rev 变而内容同）。所以：
 
 - **刷新页面、重开面板、重开设置窗口都不够**；桌面端（Electron）必须**完全退出应用再启动**。
-- 开发期用 CLI 宿主的 HMR 通道可以热重建，桌面端不走同一条路。
+- 开发期由 dev:web 重建 client bundle，client-hmr（/plugins/events SSE）自动热替换插件条目；桌面端（desktop profile 未挂 client-hmr）只能重启。
 
 ### 2. 版本号会「先于」界面更新，制造假象
 

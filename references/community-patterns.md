@@ -101,7 +101,7 @@ apply 时探测宿主版本：低于支持基线给 fallback 单元（零数据 
 - DSH 的 /api 网关接受 "loopback OR 已声明 authority"（`--trusted-host <name>` + 绑定 0.0.0.0 被拒：web-app/startup.js 对 --host 0.0.0.0 直接报错拒启动（"would expose remote code execution"）；LAN/反代部署正解是 --trusted-host <authority>（可重复、port-less 匹配任意端口），经 webStartup 服务注入 connection Config.trustedHosts
 - **血泪坑（dsh-market #729）**：exact 路由赢过 /api fence 的 prefix 匹配，永远见不到它，必须自己决定 → 只信 loopback 会让所有经域名（反代/隧道/LAN 主机名）到达的部署写路由 403 而读路由正常，表现为"安装按钮点了没反应"。
 - trustedHosts 是 ConnectionConfig 配置项，HostConnectionService 构造时快照入私有字段，**不暴露 live getter**；isLoopbackHostname 宿主明确不导出（package-internal），插件只能复制语义。判定 = Host 头是 loopback（127/8、localhost、[::1]）或属于 trustedHosts，**且** Origin 语义：无 Origin 放行（浏览器读）、有必同源、null Origin 拒绝、sec-fetch-site cross-site 拒绝。better-sidebar 把 /api 网关的 fence 逻辑整体复制过来（BSD-3 注明出处），不 import 内部模块。
-- mutating 端点：same-origin POST + curated 来源白名单（dsh-market 安装路由）；`isTrustedApiRequest(request, trustedHosts)（单级：loopback/trustedHosts + sec-fetch-site 非 cross-site + Origin 同源；无 mutation 级参数；/api 是 kind:'prefix' 路由 + handler 内 admit() 双级 403/401，exact 表优先——'exact-table miss 后才走 prefix'）(req, mutation)` 两级（只 loopback vs 还要 Origin 校验）。
+- mutating 端点：same-origin POST + curated 来源白名单（dsh-market 安装路由）；`isTrustedApiRequest(request, trustedHosts)（不存在 isTrustedRequest(req, mutation) 两级函数；单级：loopback/trustedHosts + sec-fetch-site 非 cross-site + Origin 同源（无 Origin 放行、有必同源、null 拒绝）；/api 是 kind:'prefix' 路由 + handler 内 admit() 双级 403/401，exact 表优先——'exact-table miss 后才走 prefix'）(req, mutation)` 两级（只 loopback vs 还要 Origin 校验）。
 
 ### 3.3 长任务取消与 effect 内 throw 的坑
 - 从请求取取消信号（req 'aborted' / socket 'close'）传给运行时；插件卸载统一 AbortController。
@@ -556,7 +556,7 @@ DSH 只在文本变化时重新 append——稳定的 system/history 前缀缓�
 保持同一正文双形态，避免两份拷贝漂移。
 
 ### 11.55 审批/权限类插件三件套（auto-review/permission-rules 独立印证）
-- `approval/request` answerer 短路语义：匹配本插件策略的请求自己 settle，其余 `next()` 委托人类链；fail-closed 默认（approval 默认兜底（waterfall 尾 = Promise.resolve('unavailable')；OUTCOMES = ['allowed-once','rejected','cancelled','unavailable']） 默认 rejected）。
+- `approval/request` answerer 短路语义：匹配本插件策略的请求自己 settle，其余 `next()` 委托人类链；fail-closed 默认（ApprovalPolicy = 'ask' | 'never'（默认 'ask'）；无 answerer fail-closed → 'unavailable'（waterfall 尾 = Promise.resolve('unavailable')；OUTCOMES = ['allowed-once','rejected','cancelled','unavailable']）；allowed-once 是唯一 grant
 - `tools/pre-execute` 决策语义：deny/ask 短路；allow 委托 `next()` 是**推荐实践非契约**——官方语义 next() 委托且默认结果 = allow，listener 可直接返回 {kind:'allow'}。
 - invariant 伴生校验"模型可见 = 已记录"的审计一致性。
 
@@ -639,8 +639,7 @@ QuickJS（quickjs-emscripten）+ 静态扫描（先剥字面量再匹配 FORBIDD
 产物流过 assertJsonValue（拒绝非有限数字、循环引用、稀疏数组）。
 
 ### 11.74 关键动作过审批门的完整姿势（workflow）
-`needsApproval` → `approval.request({ agent, toolName, reason, signal })`，outcome 不是
-allowed-once 即 deny；**审批摘要来自确定性预检而非模型说法**。
+`needsApproval` 字段不存在——正解是 `approval/request` 事件 + `ApprovalService.request(req)`，outcome 四值 allowed-once/rejected/cancelled/unavailable；**审批摘要来自确定性预检而非模型说法**。
 
 ### 11.75 服务提供方 + 工具面分离（workflow/dynamicWorkflows）
 `ctx.plugin(ServiceClass, {...})` 注册服务，可选服务（approval/jobs/userQuestions）用
@@ -829,7 +828,7 @@ parseReason 解析 escalate 语义；callId 回溯 tool/call 取结构化路径�
 ### 11.117 patch CRUD append-only 安全模板（mcp-panel）
 loader 方言无 set/remove 动词——set/remove 作为残余键被写进 target（无效不报错，非跳过非警告）；无 id 才 warn——"禁用即删除"（disabled:true）；绝不
 合成 !!js；env/header 值永不进快照；写 patch 前审批 + 备份；callTool 走官方
-`ctx.tools.execute` 流水线。
+`ctx.tools.execute(exec: ToolExecutionInput)` 单对象签名（含 name/arguments/callId/signal，非 (name,args) 二参）→ pre-execute/guard → dispatch → finalize 流水线。
 
 ### 11.118 headless persona 禁 ask_user_question 纪律
 headless/无人值守组合里 `ask_user_question` 会卡死——persona 层禁用；stdio 帧协议

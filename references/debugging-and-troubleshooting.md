@@ -11,10 +11,10 @@ DSH 里有一批「看起来非常合理、但根本不存在」的 API 和「�
 | `ctx.settings.registerTab(...)`、`ctx.ui.addSettingsTab(...)` | 两者都不存在。`ctx.settings` 只把 volatile config 投影成表单描述符并委托 `ctx.configEditor` 落盘，不承担任何界面注册职责 | Client 半侧经 `ctx.slots.inject('settings.section', ...)` 挂载设置区块 | 在插件源码 grep `slots.inject`，命中 0 即说明走错了路径 |
 | `ctx.tools.registerTool(...)`、`ctx.toolRegistry` | 都不存在；容器就是 `ctx.tools`，方法名是 `register` | `ctx.tools.register(defineTool({...}))` | 运行时执行 `ctx.tools.schemas()`，按返回的名字查 |
 | 直接改 `$DSH_HOME/settings.yaml` 打开某个插件 | 该文件已废弃（不再被直接读取）：SettingsForms 服务在 Loader 就绪后把它**导入一次**到 profile 补丁，首次写入前改名为 `settings.yaml.imported`（**静默失效，零错误信号**）；不要手工编辑它 | 用 `cordis.patch.yml` |mported` 再导入），所以不要手工编辑它 | 一切增删改走 `cordis.patch.yml` | `ls $DSH_HOME/settings.yaml.imported`，存在即证明你改的那份早已失效 |
-| 「required plugin did not activate」= 依赖没装上 | 这是 Loader **激活图**的语言：某个 required 同伴插件没有 mount。与 `peerDependencies` 是两套独立机制 | 先定位是哪一个 id 没激活，再看它自己为什么没 mount | 读 `~/.dsh/profiles/<profile>/cfg.err`，它会点名未激活的插件 id |
+| 「required plugin did not activate」= 依赖没装上 | 这是 Loader **激活图**的语言：某个 required 同伴插件没有 mount。与 `peerDependencies` 是两套独立机制 | 先定位是哪一个 id 没激活，再看它自己为什么没 mount | 启动失败时读终端打印的 `$DSH_HOME/logs/startup-<ISO>-<uuid>.log`（完整诊断落点），它会点名未激活的插件 id |
 | 「peer 报错」= 该版本的 peer 区间写错了 | 常常是包管理器解析到了陈旧版本（pnpm 24 小时发布冷却期 + semver 预发布排序），装到的根本不是你要的那个版本 | 先确认实际解析版本，再决定改 peer 还是改解析 | 同一安装命令隔一段时间重跑两次：版本号会随时间前移 = 冷却期指纹；恒定不变才是缓存问题 |
 | 「装上了」= 该服务已就绪 | seam 契约包与实现包分离：只装 `dsh-llm` 之类的契约包，服务存在但没有任何提供方 | 契约包 + 实现包成对安装（如 `dsh-llm` + `llm-deepseek`） | `ctx.get('<服务名>')` 返回 `undefined` 即该能力未装配 |
-| 「`mcp__<server>__<tool>` 是 DSH 的标准工具命名」 | 该前缀来自 Claude Code，不是 DSH 惯例 | DSH 工具名见 [tools.md](./tools.md) 的归属表；MCP 工具经 `dsh-mcp-client` 桥接后由宿主分配名字 | `ctx.tools.schemas()` 是唯一权威清单，静态表仅供对照 |
+| 「`mcp__<server>__<tool>` 不是 DSH 惯例」 | 判断反了：`mcp__<serverName>__<rawName>` 正是 DSH 官方 `dsh-mcp-client` 的工具命名契约（超 64 字符或含非 `[A-Za-z0-9_-]` 时确定性规范化并追加 12 位哈希） | DSH 工具名见 [tools.md](./tools.md) 的归属表；MCP 工具经 `dsh-mcp-client` 桥接后以 `mcp__` 前缀命名 | `ctx.tools.schemas()` 是唯一权威清单，静态表仅供对照 |
 | 「界面没出来 = 组件写错了 / 渲染失败」 | 头号真相是 **`slots.inject(key, cb)` 的 callback 从未执行**——当插槽 spec 不存在（父条目未挂载、名字拼错）时它 `return` 掉，**零报错零日志** | 确认目标插槽确实被某个父条目的 `children` 表声明过；注册前先核对 kind 与 key/id | 在 `apply` 开头与每个注册成功处写全局标记，把「apply 没跑」与「inject 没触发」分开；见 [client-ui-placement-and-verification.md](./client-ui-placement-and-verification.md) |
 | 「UI 落点铺得越多越保险」 | 相反——同一面板注册到多个插槽会让它在设置窗口、侧边栏、插件页**同时出现**，属 UI 污染，用户会要求全部回滚 | **一个功能，一个入口**：先按「界面语义 → 插槽」映射表选定唯一落点 | 数 `ctx.slots.inject` 的调用数；加一条反向断言把落点集合锁进白名单 |
 | 「插件装上了 = 它生效了」 | `dependencies` 只管**装进来**，`dsh.profile.bundles` 才决定**是否作为补丁层参与组合**。只在前者里的插件完全不生效，且**不报错** | 声明了 `dsh.bundle` 的包会被 `plugin add` 自动加入 bundles；未声明的会被明确警告"installed as a plain dependency" | 安装后立刻检查 `dsh.profile.bundles` 是否含该包；对"装了像没装"的插件先查这里 |
@@ -63,17 +63,18 @@ dsh --profile test-env
 ### 1. 检查引导清单 (`window.__DSH_BOOT__`)
 在浏览器控制台输入：
 ```js
-console.log(window.__DSH_BOOT__.clientModules)
+console.log(window.__DSH_BOOT__.entries)  // wire 字段为 rev / entries[{id,url,rev,inject,external}] / batches
 ```
-- **排查点**：查看返回的已启用模块清单中，是否包含你的插件包名（如 `dsh-my-plugin`）；
+- **排查点**：在 `entries` 里找你的插件包名（如 `dsh-my-plugin`）；`window.__DSH_BOOT__.clientModules` 是伪字段（`clientModules` 是 Node 半侧服务名，浏览器侧不存在）；
 - **若没有**：说明 Host 宿主端的 Loader 并没有激活该插件的 `dsh.client`，请检查 `package.json` 是否遗漏了 `dsh.client: { platform: "web" }` 声明。
 
 ### 2. 检查模块加载器状态 (`window.__ModuleLoader__`)
 在控制台输入：
 ```js
-console.log(window.__ModuleLoader__.entries)
+// window.__ModuleLoader__ 的 facade 只有 create/load，没有公开的 entries 成员；
+// 排查组合面用 Network 面板看 bundle 请求，或检查返回的 modules 实例
 ```
-- **排查点**：查看你的插件客户端 bundle 是否已注册；
+- **排查点**：查看你的插件客户端 bundle 是否已注册（`window.__ModuleLoader__.entries` 无此公开成员）；
 - **排查 Combo 请求**：切换到 Network（网络）标签页，查看形如 `/plugins/??<id>/client.js&rev=...` 的批量加载请求是否返回了 200。若返回 404，检查 `package.json` 的 `exports["./client"]` 路径是否指向了真实存在的物理打包文件。
 
 ### 3. 客户端半侧的三种致命形态错误
@@ -116,7 +117,7 @@ window.__ModuleLoader__.load({
 });
 ```
 
-可对照的官方实现：`@deepseek-ai/dsh-better-sidebar`、`dsh-plugin-wallpaper-engine`、`@linxin666/dsh-client-ui-git-graph`。
+可对照的社区实现（非 `@deepseek-ai` 官方发布）：`dsh-better-sidebar`、`dsh-plugin-wallpaper-engine`、`@linxin666/dsh-client-ui-git-graph`。
 
 ### 4. 同一个界面渲染出两份
 
@@ -169,7 +170,7 @@ ctx.effect(() => {
 | **2. 修改了配置项，但其他配置全部丢失了** | 违反了补丁系统的**全量替换 (Wholesale Replacement)** 规则 | 补丁覆盖是整体替换而非深合并！在 `cordis.patch.yml` 中重写某个配置时，必须把该插件在该层所需的完整字段一次性提供全。 |
 | **3. 设置窗口左侧没有显示专属 Tab** | 1. 缺少双面导出；<br>2. 组件接收了 ctx 抛异常；<br>3. 忘记调 `slots.inject` | 1. 确保 `package.json` 有 `exports["./client"]`；<br>2. 确保在 `lib/client.js` 中调用 `ctx.slots.inject("settings.section", ...)`；<br>3. 检查控制台是否有报错。 |
 | **4. 页面报错 "Cannot read property of undefined (ctx)"** | 违背了 **“React 组件绝不能接收 ctx”** 核心铁律 | 宿主插槽容器渲染组件时不会注入 ctx。组件需要的数据与回调必须通过纯 Props 或前端自定义 Hook 传递。 |
-| **5. 运行 npm install 报 ERESOLVE 冲突** | npm 7+ 对 peerDependencies 的默认严格判定与 DSH 单例依赖产生冲突 | 运行安装时务必追加参数：`npm install --legacy-peer-deps --no-audit --no-fund`。 |
+| **5. 运行 npm install 报 ERESOLVE 冲突** | 与 DSH 安装链无关：`dsh plugin` 全链路转发 **pnpm**（dsh/bin.js → plugin 命令 → dsh-plugin-manager），npm/ERESOLVE 不在链路内 | 官方链路只用 `dsh plugin --profile <name> add/install`；确需宽松策略用 workspace 配置（如 noStrictPeerDependencies） |fund`。 |
 | **6. 启动报错 "1 required plugin did not activate"** | 盲目相信了 `--dump-config`，实际存在缺包或版本 peer 拦截 | `--dump-config` 不加载插件代码！检查 `~/.dsh/profiles/<profile>/cfg.err`，使用 `allow-version` 豁免兼容性或安装缺失插件。 |
 | **7. 执行系统命令报注入或权限错误** | 试图拼接 shell 字符串并传给 `ctx.subprocess.spawn` | DSH 的子进程生成参数 **严格零 Shell 解释**！必须传入扁平的 `argv` 数组（如 `['git', 'status', '-s']`），绝不要传 `'sh -c "..."'`。 |
 | **8. Typert Remote 方法调用报 AST 语法错误** | 远程暴露的方法签名中使用了对象解构或默认参数值 | 远程方法签名必须严格遵守规则：单一名命参数对象，禁止解构，禁止默认值，协作中断 `signal` 必须为末位参数。 |
@@ -195,9 +196,8 @@ export function apply(ctx) {
 ```
 
 ### 2. 宿主核心日志落盘位置
-若 DSH Web 宿主启动崩溃或静默退出，请直接查阅以下两个黑匣子日志：
-- `~/.dsh/profiles/<profile>/cfg.log`：运行时标准输出与插件加载拓扑
-- `~/.dsh/profiles/<profile>/cfg.err`：启动失败的核心崩溃堆栈与未满足的 Service 清单
+若 DSH 宿主启动崩溃或静默退出，官方唯一的结构化故障落点是 **`$DSH_HOME/logs/startup-<ISO>-<uuid>.log`**（`dsh` 的 `reportStartupFailure` 写入，含完整 inspect 报告、profile/版本/node 平台信息，终端会打印 `Full diagnostics: <path>`）。
+`~/.dsh/profiles/<profile>/cfg.log` / `cfg.err` **没有任何官方写入者**（全库 0 命中）；本机实测 `cfg.err` 为 0 字节、`cfg.log` 只是一次 `--dump-config` 残留的 YAML 树——不要拿它们当诊断入口。
 ---
 
 ## 五、插件安装失败的排障入口与决策路径
@@ -235,7 +235,7 @@ DSH 的宿主包大量导出**纯读取、不需要启动 Web GUI** 的公开函
 | --- | --- | --- |
 | `readPluginMeta(spec, parentURL)` | `@deepseek-ai/dsh-app-boot` | 卡片标题 / 描述 / 图标能不能读到 |
 | `resolveBundleDir(bin, name, installAnchor, profileDir)` | `@deepseek-ai/dsh-app-boot` | 某个 bundle 从哪个目录解析 |
-| `bundleManifest(location, name)` | 同上 | 该 bundle 的 manifest 与 `dsh.bundle` 声明 |
+| `bundleManifest(name, dir, anchor)` | `@deepseek-ai/dsh-plugin-manager/operations`（不在 dsh-app-boot） | 该 bundle 的 manifest 与 `dsh.bundle` 声明 |
 | `resolveDshHome()` | 同上（`dsh-home-paths` 同语义） | 当前配置数据根算出来是哪个 |
 
 ### 2. 跨平台调用的两个坑

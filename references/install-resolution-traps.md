@@ -30,9 +30,9 @@ dsh: restored package.json, pnpm-lock.yaml, and node_modules.
 
 ### 2.1 机制
 
-发布冷却期是 **pnpm 自身的配置项**（pnpm v11 起默认 `minimumReleaseAge: 1440` 分钟，即 24 小时）：一个新版本发布后必须满 24 小时才允许被解析安装。这是 pnpm 防供应链攻击的「冷却期」——公开资料显示近年多数被投毒的包在发布一周内被发现并撤下，冷却期能自动挡住大部分。**该机制由包管理器实现，不由 DSH 代码实现**（本机 DSH 0.2.0-rc.2 全部 289 个 @deepseek-ai 包与 dsh/lib 源码中 `minimumReleaseAge` 零命中）；可在 profile 的 `pnpm-workspace.yaml` 里调整（见 5.1）。
+发布冷却期是 **pnpm 自身的配置项**（`minimumReleaseAge`，单位分钟）：**默认关闭，只有显式配置 `minimumReleaseAge` 后才启用**（本机捆绑 pnpm 11.7.0 与全局 12.8.1 的 `config get minimum-release-age` 均为 undefined；源码按 `Boolean(minimumReleaseAge)` 判启、`?? 0` 兜底）。启用后，一个新版本发布不满阈值分钟数就不被考虑，解析会回退到更早的合格版本；`minimumReleaseAgeStrict` 也仅在显式配置时默认 true。这是 pnpm 防供应链攻击的「冷却期」。**该机制由包管理器实现，不由 DSH 代码实现**（本机 DSH 0.2.0-rc.2 全部 289 个 @deepseek-ai 包与 dsh/lib 源码中 `minimumReleaseAge` 零命中）；可在 profile 的 `pnpm-workspace.yaml` 里调整（见 5.1）。
 
-关键点：**方向与直觉相反**。不是「新版本太新不能装」，而是**只有发布满 24 小时的版本才被考虑**，于是新版本全被排除后，解析会一路回退到最老的合格版本。DSH 侧真正的兼容闸门是 **peer 兼容性预检 + allow-version 精确版本豁免**（写入 profile 的 `compatibility.json`，见第四节），与冷却期是两条独立机制。
+关键点：**方向与直觉相反**（在显式开启后）。不是「新版本太新不能装」，而是**只有发布满阈值的版本才被考虑**，于是新版本全被排除后，解析会一路回退到最老的合格版本。DSH 侧真正的兼容闸门是 **peer 兼容性预检 + allow-version 精确版本豁免**（写入 profile 的 `compatibility.json`，见第四节），与冷却期是两条独立机制。
 
 ### 2.2 时间指纹（判定冷却期的决定性证据）
 
@@ -136,7 +136,7 @@ dsh plugin --profile <profile> allow-version <pkg>@<exact-version> --dsh-version
   pnpm-lock.yaml         # 锁文件
   pnpm-workspace.yaml    # pnpm 工作区配置（nodeLinker / autoInstallPeers / minimumReleaseAge）
   cordis.patch.yml       # 该 profile 的配置补丁层
-  cordis.yml             # 组合后的配置
+  cordis.yml             # 空根 entry list（Loader Include 锚点，每次启动被重写为空 []，勿手改）；看组合用 `dsh --profile <name> --dump-config`
   compatibility.json     # 精确版本豁免表，默认 {}
   cfg.log / cfg.err      # 启动黑匣子日志
   .plugin-manager/logs/operation-*/pnpm.log   # 每次插件安装的完整 pnpm 输出
@@ -155,7 +155,7 @@ packages:
 nodeLinker: hoisted
 autoInstallPeers: false
 
-# 关闭 24 小时发布冷却期（pnpm v11+ 默认 minimumReleaseAge: 1440）。
+# 关闭发布冷却期（默认关闭；显式配置后才启用，这里是显式置 0 兜底）。
 # 本 profile 安装自研/刚发布的插件，冷却期会让解析回退到过时版本，
 # 进而撞上 DSH 的 peer 兼容性闸门。0 表示发布即可安装。
 minimumReleaseAge: 0
@@ -167,7 +167,7 @@ minimumReleaseAge: 0
 pnpm add <pkg> --config.minimum-release-age=0
 ```
 
-注意：写 `pnpm-workspace.yaml` 时若走某些编辑器工具可能引入 UTF-8 BOM 或 CRLF 换行，pnpm 的 YAML 解析会因此把注释与后续配置黏成一行而静默失效。写完务必回读文件确认字节头（应为 `112 97 99 107` 即 `pack` 开头，无 `239 187 191` BOM）。
+提示（已实测放宽）：BOM 或 CRLF 不会让 pnpm 的 YAML 解析把注释与后续配置黏成一行——pnpm 11.7.0 / 12.8.1 与 js-yaml/yaml 库对 BOM+CRLF+注释均正确解析（实测 `minimumReleaseAge: 0` 生效）。写完回读确认配置生效即可，不必担心字节头。
 
 ---
 
@@ -192,7 +192,7 @@ error: profile "desktop" is managed exclusively by the Electron application
 
 | 现象 | 判定 | 处置 |
 | --- | --- | --- |
-| 解析版本明显过旧，且过一段时间后自动前移 | pnpm 冷却期 | profile 配 `minimumReleaseAge: 0`，或改用精确版本 |
+| 解析版本明显过旧，且过一段时间后自动前移 | pnpm 冷却期（**显式开启后**才成立）或预发布排序 | profile 配 `minimumReleaseAge: 0`，或改用精确版本 |
 | 解析版本一直是同一个过旧值，清缓存也不变 | 预发布排序陷阱 | 显式写精确版本，或关闭冷却期 + 显式带预发布标记 |
 | `installation rejected` 且 pnpm 报 `Done` | 兼容性闸门后检 | 换用 peer 覆盖宿主版本的插件版本 |
 | 同一命令裸装拿不到 `-tag.N` 系列 | semver 不含 prerelease | 显式 `@<版本>` 精确安装 |
@@ -227,12 +227,13 @@ allowBuilds:
 
 放行后重跑同一条 `dsh plugin --profile <name> add <pkg>@<version>` 即可，被拦的安装会继续完成。
 
-### 7.2.2 `dsh plugin add` 不会写 `dsh.profile.bundles`
+### 7.2.2 `dsh plugin add` 是否写 `dsh.profile.bundles`（取决于包是否声明 `dsh.bundle`）
 
-首次 `dsh plugin --profile <new> add <pkg>` 会自动脚手架出 profile 目录（`package.json` / `cordis.patch.yml` / `pnpm-workspace.yaml` / `.plugin-manager`），并把包写进 `dependencies`——但 **`dsh.profile.bundles` 数组不会自动加入新包**，仍是初始的 `["@deepseek-ai/dsh-base", ...]`。
+首次 `dsh plugin --profile <new> add <pkg>` 会自动脚手架出 profile 目录（`package.json` / `cordis.patch.yml` / `pnpm-workspace.yaml` / `.plugin-manager`）。分的两种情况（源码实证 `dsh-app-boot` `reconcileProfilePlugins` 与 `dsh-plugin-manager` `operations.reconcile`）：
+- 包**声明了** `dsh.bundle.patch`：`plugin add` 会**自动把它 push 进 `dsh.profile.bundles`**，启动即可用；
+- 包**未声明** `dsh.bundle`（普通依赖）：**不会**加入 bundles，并打印警告 "installed as a plain dependency, not a profile layer"；此时包只在 `dependencies` 里、启动不生效（Loader 只装载 bundles 里列出的包）。
 
-后果：`package.json` 里明明有依赖，`dsh <profile>` 启动时却看不到它（Loader 只装载 bundles 里列出的包）。
-（注：本条未在本机源码复核，属经验结论。）
+判定：安装后立刻 `cat ~/.dsh/profiles/<name>/package.json` 对比 `dependencies` 与 `dsh.profile.bundles`；听到那条警告就说明它是普通依赖。
 
 判定动作：
 

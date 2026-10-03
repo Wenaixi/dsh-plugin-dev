@@ -70,7 +70,8 @@ export class SystemInfoService extends TypertRemoteService {
 
   // 真实签名是多参数扁平列表，不是单一名命对象；signal 可整体省略（SRC 模式下若写 signal 必须末位）
   @Remote
-  async getHostMetrics(payload, signal) {
+  async getHostMetrics(signal) {
+    // 零参业务方法：SRC 下参数列表可为空，signal 是保留的末位参数名，可整体省略
     if (signal?.aborted) {
       throw new Error('请求已取消');
     }
@@ -106,8 +107,7 @@ export function apply(ctx) {
     "./client": "./lib/client.js"
   },
   "dsh": {
-    "bundle": { "id": "system-info" },
-    "client": { "platform": "web", "module": "./lib/client.js" }
+    "client": { "platform": "web" } // 注意：无 dsh.bundle.id / dsh.client.module 字段（官方 schema 仅 platform/inject/external/immediately）；client 面路径唯一来源是 exports["./client"]
   }
 }
 ```
@@ -129,8 +129,10 @@ function SystemInfoSettingsPanel({ fetchMetrics }) {
   const handleQuery = async () => {
     setLoading(true);
     try {
-      const data = await fetchMetrics();
-      setMetrics(data);
+      // getHostMetrics 是零参方法，不能传参；返回信封 { ok, value } / { ok, error }
+      const result = await fetchMetrics();
+      if (result.ok) setMetrics(result.value);
+      else alert('查询失败: ' + result.error.message);
     } catch (err) {
       alert('查询失败: ' + err.message);
     } finally {
@@ -169,11 +171,9 @@ export function apply(ctx) {
       () => (
         <SystemInfoSettingsPanel
           fetchMetrics={async () => {
-            // 调用 Typert Remote RPC
-            const result = await ctx.remote.systemInfo.getHostMetrics(payload);
-// 返回值是信封 { ok, value } 或 { ok: false, error }，不是裸数据；零参方法不要传参
-if (result.ok) { /* 使用 result.value */ } else { /* 按 result.error.code 判别 */ }
-            return res;
+            // 调用 Typert Remote RPC：getHostMetrics 是零参方法，不传参；返回信封 { ok, value } 或 { ok: false, error }
+            const result = await ctx.remote.systemInfo.getHostMetrics();
+            return result;
           }}
         />
       )

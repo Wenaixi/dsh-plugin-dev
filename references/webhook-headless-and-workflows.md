@@ -85,9 +85,9 @@ dsh --profile headless --json "分析提交历史" > events.ndjson
 
 当插件涉及多阶段、长时间运行的复杂计算任务时（如全库大型重构、自动化代码迁移），单轮次的简单工具调用容易发生超时或状态丢失。
 
-官方核心包 `@deepseek-ai/dsh-workflow-ptc` 基于沙箱 Node.js PTC (Program-Tool-Calling) 虚拟机提供了工作流编排能力：
+服务是 `ctx.workflowEngine`（@deepseek-ai/dsh-workflow），执行引擎是 `@deepseek-ai/dsh-workflow-ptc`（PtcWorkflowEngine）；PTC 是基于沙箱 Node 进程的执行底座（官方未给缩写展开，无 Program-Tool-Calling 全称）：
 
 ### 1. 核心架构与隔离限制
-- **工作流状态持久化**：支持长任务的启动（`WorkflowStartRequest`）、子进程双向通信端口（`ChildPort`）与阶段性断点快照；
-- **沙箱资源配额限制 (`WorkerLimits`)**：精确限制工作流 Worker 子进程的最大内存占用、CPU 执行时限与文件写入上限，杜绝死循环或 OOM 耗尽主机资源；
-- **文件策略继承**：Worker 进程严格继承当前 Calling Session 的文件策略（`read-only` / `workspace-write`），权限绝不越界。
+- **工作流状态持久化**：支持的编排原语：agent/parallel/pipeline/phase/log/args 六个脚本 hooks；**无 ChildPort、无断点快照**——工作流不检查点（README「No journaling or resume」），进程重启无法续跑；
+- **进程侧配额（Node PTC 提供方）**：maxOldGenerationSizeMb(512)/maxOutputBytes(64MB)/maxPendingCalls(128)/timeoutMs(120s, max 600s)；引擎侧是 maxConcurrentAgents/maxTotalAgents/maxItemsPerCall/syncTimeoutMs 的协作式计数。**无 CPU 执行时限（timeout 不是 CPU meter）、无文件写入上限**（配额是协作式非宿主强制）；
+- **文件策略继承**：Worker 按 Calling Session 解析出的文件策略执行（`read-only` / `workspace-write`，workflow-ptc 用 sandboxPolicy.resolve({session})）。注意：VM 不是安全边界——进入 Node 后 Node API 仍可用（受所选 OS 文件策略限制），**网络不受文件策略限制**。

@@ -10,7 +10,7 @@
 // 在子上下文为 customCache 服务创建隔离槽
 const childCtx = ctx.isolate('customCache');
 
-// 子上下文注册的实现仅对自己及后代可见，父上下文完全感知不到
+// 隔离来自 isolate() 为 customCache 指派新 label（默认新建唯一 Symbol），子上下文注册的实现写入新 label 槽位，父上下文仍按旧 label 解析，因此互不可见
 childCtx.plugin(MyIsolatedCachePlugin);
 ```
 
@@ -18,11 +18,11 @@ childCtx.plugin(MyIsolatedCachePlugin);
 
 ## `ctx.intercept(key, config)` 动态拦截代理
 
-允许针对特定服务的方法调用或属性读取挂载动态拦截器（Intercept Map），在不重写服务类的情况下实现切面监控或参数注入。
+拦截的是服务配置而非方法调用：`inject` 声明的 config 写入 `Context.intercept`，`resolveConfig` 沿原型链自根向叶合并后交给服务自己的 `Config.merge`（不重写服务类）。
 
 ## `Context.is(value)` 全局跨 Realm 品牌检验
 
-Cordis 废弃了脆弱的 `value instanceof Context` 判定，改用全局 Symbol 品牌：
+Cordis 用全局 Symbol 品牌做跨环境识别（`instanceof` 对 Context 本就不适用；自定义 `[Symbol.hasInstance]` 的是 Service 的继承链判定）：
 
 ```js
 Context.is[Symbol.toPrimitive] = () => Symbol.for("cordis.is");

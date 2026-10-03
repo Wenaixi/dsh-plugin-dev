@@ -40,7 +40,7 @@ ctx.on('skills/change', () => {
 
 执行链：监听器调 `invalidate()` → `invalidateCache()`（`revision+1` + cache 清空 + `notifyChange()`）→ **再次 emit `skills/change`** → 再进监听器 → 同步无限递归 → `RangeError`。
 
-`invalid` 的守卫**只查「注册是否还存活」**，不抑制重入广播——防不住这条链。
+`invalidate` 的守卫**只查「注册是否还存活」**，不抑制重入广播——防不住这条链。
 
 **判定动作**：先 grep 官方 `dsh-skill` 的 `notifyChange()` 调用点，确认事件链再决定要不要订阅；把「反向调 invalidate」写进反向断言门禁（出现即 FAIL）。
 
@@ -53,7 +53,7 @@ ctx.skills.registerProvider((control) => new MyProvider(ctx, control, opts))  //
 // 后面 invalidateSkills() 的 if (providerInstance) 恒为 false → 空操作
 ```
 
-`registerProvider(create)` 的 `create(control)` 是**同步工厂**，返回值就是 provider。**必须在工厂内把它存进闭包变量**：
+`registerProvider(create)` 的 `create(control)` 是**同步工厂**，返回值就是 provider。**需要在 provider 外部触发失效时，必须在工厂内把它存进闭包变量（provider 内部变更点直接持 control 即可）**：
 
 ```ts
 // ✅ 正确：捕获实例，UI 变更点直调

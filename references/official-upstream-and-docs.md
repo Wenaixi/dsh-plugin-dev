@@ -14,7 +14,7 @@
 | Cordis 教程 | https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cordis-tutorial/index.md | 仓库内的 Cordis 入门教程源文件 |
 | 子系统文档 | https://github.com/deepseek-ai/deepseek-harness/tree/master/docs/subsystems | 每个子系统一篇，例如 attachment.md |
 | 包内 README | packages/域/包名/README.md | **单包最权威的说明**：组合规则、配置项、设计理由都写在包里 |
-| 类型声明 | packages/域/包名/lib/**/*.d.ts | 运行时真实契约，含 inject、Config、declare module 扩展 |
+| 类型声明 | 发布物 lib/index.js 内联 JSDoc 与 lib/types/*.js；多数包无 .d.ts（types 字段指向不存在的 lib/types/*.d.ts） | 运行时真实契约，含 inject、Config、declare module 扩展 |
 
 ### 1. 优先读包内 README，而非汇总文档
 
@@ -95,14 +95,14 @@ C:\Users\&lt;用户名&gt;\AppData\Roaming\npm\node_modules\@deepseek-ai\dsh\nod
 ├── package.json      # name / inject / dsh.client / exports（插件身份与声明）
 ├── README.md         # 组合规则、配置语义、设计理由（最权威说明）
 └── lib/
-    ├── index.d.ts    # 类型契约：export declare const name / inject / Config / apply
+    ├── index.js       # 打包产物（顶部注释写明服务角色与挂载名；内联 JSDoc 即类型契约，发布物无独立 index.d.ts）
     ├── index.js      # 运行时实现（已打包，含完整注释头）
     └── types/        # 细分类型定义与品牌类型（Branded Types）
 ```
 
 ### 2. 从类型声明头部直接读出插件身份
 
-官方每个包的 lib/index.d.ts 顶部都有模块级注释，**写明了它的服务角色与挂载名**，这是最快速的身份判定方式：
+官方每个包的 lib/index.js（打包产物）顶部注释写明服务角色与挂载名，**这是最快速的身份判定方式**（发布物无独立 index.d.ts；declare module 声明合并在源码 TS 层，文档站 cordis-api 页由 gen-cordis-catalog 生成）：
 
 ```ts
 /**
@@ -148,7 +148,7 @@ DSH 迭代频繁，出现与本库描述不符的行为时，按此顺序处理�
 
 1. **确认版本**：dsh --version，并核对 DSH_HOME/profiles/&lt;profile&gt;/compatibility.json；
 2. **看上游变更**：比对 Releases 与 packages/README.md 的包增删；
-3. **读本地新码**：打开对应包的新版 lib/index.d.ts，确认 inject 与 Config 是否变化；
+3. **读本地新码**：打开对应包的新版 lib/index.js（内联 JSDoc 与 lib/types/*.js），确认 inject 与 Config 是否变化；
 4. **跑运行时验证**：以 ctx.tools.schemas()、ctx.get('服务') 与实际启动日志为准；
 5. **回写本库**：修正对应 references/*.md 中与源码冲突的表述，并在 CLAUDE.md 的校准表中追加一条记录。
 
@@ -158,8 +158,8 @@ DSH 迭代频繁，出现与本库描述不符的行为时，按此顺序处理�
 
 | 误区 | 事实 |
 | :--- | :--- |
-| 只读官方文档站就动手写插件 | 文档站严重偏后端，前端插槽与设置面板几乎空白；必须配合本地源码与成熟插件反向验证 |
+| 只读官方文档站就动手写插件 | 文档站整体偏后端，但前端已有成体系章节（slots 插槽层次与注册契约、settings 设置面板 API、cookbook adding-a-settings-card）；插槽 key 枚举、优先级与样式变量仍须以运行时 catalogs 与本地源码为准 |
 | 直接改 DSH_HOME/settings.yaml | 该文件已废弃，启动时会被自动重命名为 settings.yaml.imported；一切配置走 cordis.patch.yml |
 | 把 src/ 当作发布产物 | 运行时加载的是 lib/，src/ 仅用于 TypeScript 源码与官方仓库查阅 |
 | 用 --dump-config 证明插件可用 | 该命令不加载插件，只能证明配置被解析 |
-| 依赖 dsh-agent-loop 扩展 | ctx.agentLoop 是唯一具体循环实现，扩展包只依赖 dsh-agent 的事件与服务 |
+| 依赖 dsh-agent-loop 扩展 | ctx.agentLoop 是唯一具体循环实现（全库仅 dsh-agent-loop 挂载）；扩展循环驱动需直接依赖 dsh-session/dsh-llm/dsh-system-prompt/dsh-tools 等服务，dsh-agent 本体零运行时依赖，不能经由它拿到循环能力 |

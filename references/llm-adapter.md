@@ -1,6 +1,6 @@
 # LLM 适配器与流式协议
 
-DeepSeek Harness (DSH) 采用提供方无关（Provider-neutral）的模型调用抽象。所有具体模型 API 均通过继承 `LlmAdapter` 并向 `ctx.llm` 注册实现接入。官方文档口径：`ctx.llm` 的角色是 **seam（可替换能力缝）**，契约在 `@deepseek-ai/dsh-llm`，实现由 `dsh-llm-deepseek-api-key`（deepseek-official）、`dsh-llm-deepseek-account`（deepseek-account）、`dsh-llm-pi-ai` 等包提供（`dsh-llm-retry` 是重试执行器不是适配器）；消费方包括 `agent-loop`、`compaction-basic`、会话标题生成（`dsh-session-title-first-prompt-llm` / `dsh-session-title-llm`）与 `token-meter`，它们只依赖与提供方无关的流服务。
+DeepSeek Harness (DSH) 采用提供方无关（Provider-neutral）的模型调用抽象。所有具体模型 API 均通过继承 `LlmAdapter` 并向 `ctx.llm` 注册实现接入。官方文档口径：`ctx.llm` 被本库归类为 **seam（可替换能力缝）**（官方 README 未用 seam 一词指代 ctx.llm，该词仅在 deepseek/pi-ai README 指 credential 缝），契约在 `@deepseek-ai/dsh-llm`，实现由 `dsh-llm-deepseek-api-key`（deepseek-official）、`dsh-llm-deepseek-account`（deepseek-account）、`dsh-llm-pi-ai` 等包提供（`dsh-llm-retry` 是重试执行器不是适配器）；消费方包括 `agent-loop`、`compaction-basic`、会话标题生成（`dsh-session-title-first-prompt-llm` / `dsh-session-title-llm`）与 `token-meter`，它们只依赖与提供方无关的流服务。
 
 ## 职责划分
 
@@ -10,8 +10,8 @@ export abstract class LlmAdapter {
   /** 唯一必需实现的流式调用抽象方法 */
   abstract stream(options: GenerateOptions): AsyncIterable<StreamChunk>
 
-  /** 可选覆写：返回该适配器支持的动态模型列表 */
-  listModels?(signal?: AbortSignal): Promise<LlmDiscoveredModel[]>
+  /** 可选覆写：返回该适配器支持的模型列表（参数是提供方路由，不是 signal） */
+  listModels?(provider: string): Promise<LlmModelInfo[]>
 
   /** 可选覆写：解析特定模型的上下文长度与特性 */
   resolveModel?(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo>

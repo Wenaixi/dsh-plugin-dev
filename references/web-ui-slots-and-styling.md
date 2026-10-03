@@ -21,7 +21,7 @@ Slot 标识清单、cardinality（single/list/keyed/chain）与 scope（root/ses
  [shell.leading] (全局顶部横幅)
  ────────────────────────────────────────────────────────────────────────
  ┌───────────────┬──────────────────────────────────┬───────────────────┐
- │ 左侧导航/活动栏│ 主对话区 (main.chat)             │ 右侧边栏面板      │
+ │ 左侧导航/活动栏│ 主对话区 (main，key conversation；注意无 main.chat 槽)             │ 右侧边栏面板      │
  │ (sidebar.*)   │                                  │ (sidebar.right.*) │
  │               │  [conversation.session.header.   │                   │
  │               │   utilities] (会话顶部快捷按钮)  │  [sidebar.right.  │
@@ -141,8 +141,7 @@ export function apply(ctx) {
     ctx.slots.register(
       {
         name: "conversation.chat.node",
-        key: "my-plugin:bubble-decorator", // keyed 槽必须提供 key（不是 id）
-        order: 50
+        key: "my-plugin:bubble-decorator", // keyed 槽必须提供 key（不是 id）；注意 keyed 只看 priority，order 无效
       },
       ({ node, hookContext }) => {
         // keyed 渲染函数按 key 命中；没有 next()，按需返回包装
@@ -154,7 +153,7 @@ export function apply(ctx) {
             </div>
           );
         }
-        return null; // 不命中则交还默认渲染
+        return null; // null 即该节点空渲染；fallback 仅在该 key 无注册者时出现（未知表面 JsonBlock），不是默认消息渲染
       }
     )
   );
@@ -246,7 +245,7 @@ DSH 前端提供了一套标准的主题 CSS 变量，支持自动跟随深色�
 ### 1. 官方核心颜色变量矩阵
 开发插件 UI 时，**严禁硬编码 `#ffffff` 或 `#000000`**，必须优先使用官方设计令牌（Tokens）。
 
-下表每一行都经本地官方包源码全量扫描核实。数量口径：全官方包 `lib/client.js` 提及 `--dsw-*` 去重 415 个；按 js+css 全口径为 417 个；其中真正由 `dsh-client-ui-theme` 定义在 `body/:root` 上、**照抄即可生效**的是 403 个（其余约 240 个名只是组件 css 的局部引用，宿主 body 未定义）——**下表只列 403 个已定义变量中的常用项**：
+下表每一行都经本地官方包源码全量扫描核实。数量口径：全官方包 `lib/client.js` 提及 `--dsw-*` 去重 415 个；按 js+css 全口径为 417 个；其中真正由 `dsh-client-ui-theme` 定义在 `body/:root` 上、**照抄即可生效**的是 403 个（全库 js+css 口径与 theme 定义数之差仅 14 个（如 primitives HoverCard 的 --dsw-hovercard-bg），引用它们宿主 body 未定义）——**下表只列 403 个已定义变量中的常用项**：
 
 | CSS 变量名 | 语义作用 |
 | :--- | :--- |
@@ -304,7 +303,7 @@ CSS 变量未定义时不会报错，只会用兜底值——**所以别给 `var
 
 **排版统一走字阶令牌**（形如 `--dsw-font-xxxs-11`、`--dsw-font-xxs-12`、`--dsw-font-xs-13`、`--dsw-font-s-14`、`--dsw-font-base-16`），名字末段是字号。写成 `font-size: 13px` 而不带 line-height 会丢掉官方行高节奏。
 
-**行分隔用相邻兄弟选择器**：官方是 `.row + .row { border-top: 0.5px solid var(--dsw-alias-border-l2) }`，不是每行自带 border-bottom，后者会在末行多出一条线。
+**行分隔用相邻兄弟选择器**：官方（ui-conversation）是 `.row + .row { box-shadow: inset 0 1px 0 var(--dsw-alias-border-l1) }`；0.5px solid + border-l2 组合官方未使用，不是每行自带 border-bottom，后者会在末行多出一条线。
 
 ### 2. 样式安全注入与 HMR 自动回收铁律
 为避免插件卸载或热重载时样式残留，推荐使用标准的 **带标识 `<style>` 标签注入法**：
@@ -344,7 +343,7 @@ export function apply(ctx) {
 
 DSH 把跨插件复用的 UI 控件沉淀在 `@deepseek-ai/dsh-client-ui-primitives` 包里，官方插件无一例外地复用它——**手写开关、分段控件、状态点、标签、按钮都是重复劳动，且必然与宿主观感不一致**。
 
-引入方式：在 `package.json` 的 `dsh.client.inject` 里列出该包，在 factory 内 `require`。
+引入方式：在 factory 内 `require` 即可；官方 50 个 require primitives 的客户端包中仅 5 个在 `dsh.client.inject` 里列出它，列不列均可。
 
 ```json
 {
@@ -380,7 +379,7 @@ P.Tag({ tone: "success" }, "生效中")                        // outline|solid|
 P.Button({ variant: "outline", size: "sm", onClick: reset }, "恢复默认")
 ```
 
-常用契约（取自 `lib/types/*.d.ts`）：
+常用契约（取自 `lib/index.js` 实现与 JSDoc（发布物无 lib/types 目录，types 字段指向不存在的 .d.ts））：
 
 - `SegmentedControl`：`options` 至少两项；每段 id 为 `<id>-<value>`。
 - `Switch`：`label` 必填（无障碍），`title` 用于说明为何被锁。
@@ -463,5 +462,5 @@ P.Button({ variant: "outline", size: "sm", onClick: reset }, "恢复默认")
 **焦点与动效是无障碍底线，不可省**：
 
 - 可交互元素必须有 `:focus-visible` 焦点环，用 `--dsw-focus-ring-width` + `--dsw-focus-ring-color`；
-- 任何过渡都要包 `@media (prefers-reduced-motion: reduce)` 降级，官方组件全部这么做；
+- 官方多数过渡组件包 `@media (prefers-reduced-motion: reduce)` 降级（SegmentedControl/Modal/Toast/DisclosureRow）；Switch 的 120ms 过渡是未降级的例外，自绘时仍应降级；
 - 开关/勾选这类控件的视觉状态要绑 `aria-checked` 而不是平行 class，让「看到的」和「辅助技术读到的」不可能不一致。

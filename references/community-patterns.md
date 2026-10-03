@@ -878,8 +878,8 @@ here）；设备码过期重发是常态（操作者稍后回来）而非报错�
 宿主默认组合没有 invariants 服务——放进默认 patch 会让整棵树启动失败（row 等缺席服务）；
 可选服务依赖行按组合条件挂载（diagnostic 组合才加）。
 
-### 11.128 patch 版本门控的唯一宿主信息源 = ctx.get('profileContext')?.installAnchor —— 是安装锚点路径非版本号（ProfileContext.installAnchor: string，核心用 dirname()）；读版本须解析其 package.json；'唯一宿主信息源'措辞过绝对（process 全局可用）（llm-workbuddy）
-patch 求值环境里唯一可用的宿主信息源是 `ctx.get('profileContext')?.installAnchor —— 是安装锚点路径非版本号（ProfileContext.installAnchor: string，核心用 dirname()）；读版本须解析其 package.json；'唯一宿主信息源'措辞过绝对（process 全局可用）`——
+### 11.128 patch 版本门控的唯一宿主信息源 = ctx.get('profileContext')?.installAnchor（仅 dsh 启动的 profile 存在；installAnchor 是权威宿主版本信息源，但非'唯一'——process 全局可用） —— 是安装锚点路径非版本号（ProfileContext.installAnchor: string，核心用 dirname()）；读版本须解析其 package.json；'唯一宿主信息源'措辞过绝对（process 全局可用）（llm-workbuddy）
+patch 求值环境里唯一可用的宿主信息源是 `ctx.get('profileContext')?.installAnchor（仅 dsh 启动的 profile 存在；installAnchor 是权威宿主版本信息源，但非'唯一'——process 全局可用） —— 是安装锚点路径非版本号（ProfileContext.installAnchor: string，核心用 dirname()）；读版本须解析其 package.json；'唯一宿主信息源'措辞过绝对（process 全局可用）`——
 读它做版本阈值判断（<0.1.7 禁用某行）；engines 用多段区间声明。
 
 ### 11.129 侧边栏/可选 UI 槽用 ctx.get 探测而非 inject（sidebar-qa）
@@ -1035,7 +1035,7 @@ link: 安装缺 node_modules 时动态 import 守卫降级 inert（不崩整树�
 宿主把 `{{name}}` 当模板变量解析、未注册直接 throw——记忆/外部文本内容必须净化双花括号，
 否则模型输入里出现未注册变量会崩。
 
-### 11.163 createRequire 锚 ctx.baseUrl 是插件侧姿势（宿主自身用 new URL(path, ctx.baseUrl) + loader.import；createRequire 只锚 import.meta.url） + 扁平兜底解析（memsearch）
+### 11.163 createRequire 锚 ctx.baseUrl 是插件侧姿势（profiles/node_modules 扁平兜底需引擎显式挂 resolve.paths）（宿主自身用 new URL(path, ctx.baseUrl) + loader.import；createRequire 只锚 import.meta.url） + 扁平兜底解析（memsearch）
 out-of-tree 包解析：createRequire 锚 `ctx.baseUrl`（profile 目录）+ `$DSH_HOME/profiles/node_modules`
 扁平兜底——开发包不经 npm 装也能被 loader 解析。
 

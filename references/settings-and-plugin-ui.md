@@ -195,7 +195,7 @@ ${specifier}/package.json
 ${specifier}/locale/en.json
 ```
 
-**任一子路径不在包的 `exports` 白名单里，Node 抛 `ERR_PACKAGE_PATH_NOT_EXPORTED`，该异常被宿主吞掉后返回 `undefined`——卡片上就只剩一个包名，标题、描述、图标全空，而且没有任何报错。**
+**任一子路径不在包的 `exports` 白名单里，Node 抛 `ERR_PACKAGE_PATH_NOT_EXPORTED`，被宿主吞掉且三种吞法不同：`package.json` 子路径吞成空（title 回退到完整包说明符，卡片只剩包名）；`locale` 子路径返回 `{ error: "Plugin metadata for …" }` 诊断（插件管理 UI 显示 metadata error）；icon 失败保留 title 并附 error。**
 
 这是最容易踩的一个坑：包明明装好了、插件也在跑，卡片却像没写 manifest。
 

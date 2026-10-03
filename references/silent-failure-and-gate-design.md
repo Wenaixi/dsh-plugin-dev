@@ -13,7 +13,7 @@
 | --- | --- |
 | **Cordis 微内核：一切能力都是可选插件装配** | 缺依赖不抛错，只是那个服务 `undefined`；契约包与实现包分离，装了契约包不等于有提供方 |
 | **客户端面板由插槽容器渲染** | props 形状不对、传了 ctx、样式没注入、用了不存在的 CSS 变量——都不报错，只是不生效 |
-| **元数据读取走 Node exports + 静默兜底** | 子路径没放行就抛 `ERR_PACKAGE_PATH_NOT_EXPORTED` 并被吞；`files` 写错开发期完全无感，发布后图标与文案消失 |
+| **元数据读取走 Node exports + 静默兜底** | 子路径没放行就抛 `ERR_PACKAGE_PATH_NOT_EXPORTED` 并被吞，三条子路径吞法不同：`package.json` 子路径吞成空（title 回退到完整包说明符，无 error）、`locale` 子路径返回 `{ error: "Plugin metadata for …" }` 诊断、icon 失败保留 text 并附 error；`files` 写错开发期完全无感，发布后图标与文案消失 |
 
 **总原则：静默失效只能靠「回读真值」发现，绝不能靠看界面。** 每次写操作后回读接口、内存对象或磁盘文件，值没变就是没生效。
 
@@ -56,7 +56,7 @@ DSH 大量契约校验失败后只写 `meta.error` 或直接 `return undefined`�
 | --- | --- | --- |
 | 装插件后行为像旧版 | 包管理器解析到陈旧版本（pnpm 冷却期 + semver 预发布排序） | 见 [install-resolution-traps.md](./install-resolution-traps.md)；**清缓存无效** |
 | 官方 provider 脚本「找不到模块」 | isolated 布局下那个包不在 profile 直连依赖里，只在 dsh 本体依赖树中 | 按 profile 入口、pnpm store `.pnpm`、全局本体三档找 |
-| `dsh <app> headless "..."` 报「too many arguments」 | web app 的参数解析器收 0 个位置参数 | headless 要走 headless app；纯 web app 只吃 `--port` 与 `--no-open` |
+| `dsh --profile web "..."` 报「too many arguments」 | **web** app 的参数解析器收 0 个位置参数（只吃 `--host`/`--port`/`--trusted-host`/`--no-open`）；headless 的 `[task...]` 是位置参数（多词 join、`-` 读 stdin），不会报该错 | 一次性任务走 `dsh --profile headless "…"` |
 | 某能力在 `ctx.get()` 里是 undefined | 契约包装了但没有实现方 | 契约包与实现包成对安装 |
 | 界面文案变裸 key / 单语孤岛 | 面板词典缺词（漏同步任一册）或渲染路径有未走 `t()` 的硬编码字符串 | 查字典 key 集双语对称；门禁正则扫渲染路径裸字面量并断言每个 key 双语声明 |
 
@@ -182,7 +182,7 @@ def wait_idle(limit_ms=60000):
 
 | 项 | 断言方式 |
 | --- | --- |
-| 插件真被加载 | 页面元素存在，且 console 无 `Failed to load plugins` |
+| 插件真被加载 | 页面元素存在，且没有「Failed to load plugins」启动失败遮罩（该文案是 DOM 渲染的遮罩标题，不出现在 console；console 层对应的是 `[cordis-client-runner]` 前缀的 error） |
 | 面板只渲染一份 | `locator("text=<面板文案>").count() == 1` |
 | 每个控件都点得动 | 点后回读接口字段确实变了 |
 | 落盘正确 | 读磁盘配置文件，不是只看接口 |

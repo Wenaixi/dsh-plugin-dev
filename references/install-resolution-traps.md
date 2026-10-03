@@ -30,9 +30,9 @@ dsh: restored package.json, pnpm-lock.yaml, and node_modules.
 
 ### 2.1 机制
 
-发布冷却期是 **pnpm 自身的配置项**（`minimumReleaseAge`，单位分钟）：**默认关闭，只有显式配置 `minimumReleaseAge` 后才启用**（本机捆绑 pnpm 11.7.0 与全局 12.8.1 的 `config get minimum-release-age` 均为 undefined；源码按 `Boolean(minimumReleaseAge)` 判启、`?? 0` 兜底）。启用后，一个新版本发布不满阈值分钟数就不被考虑，解析会回退到更早的合格版本；`minimumReleaseAgeStrict` 也仅在显式配置时默认 true。这是 pnpm 防供应链攻击的「冷却期」。**该机制由包管理器实现，不由 DSH 代码实现**（本机 DSH 0.2.0-rc.2 全部 289 个 @deepseek-ai 包与 dsh/lib 源码中 `minimumReleaseAge` 零命中）；可在 profile 的 `pnpm-workspace.yaml` 里调整（见 5.1）。
+发布冷却期是 **pnpm 自身的配置项**（`minimumReleaseAge`，单位分钟）：**pnpm 11 起内建默认 1440（1 天），并非「默认关闭、显式配置后才启用」**（本机捆绑 pnpm 11.7.0 与全局 12.8.1 的 dist 默认块均为 `minimum-release-age: 24*60`；`config get minimum-release-age` 返回 undefined 只说明无显式配置，不代表内建默认关闭）。启用后，一个新版本发布不满阈值分钟数就不被考虑，解析回退到更早的合格版本；显式设置了 `minimumReleaseAge` 时 `minimumReleaseAgeStrict` 才默认 true（否则宽松处理、可经 exclude 放行）。这是 pnpm 防供应链攻击的「冷却期」。**该机制由包管理器实现，不由 DSH 代码实现**（本机 DSH 0.2.0-rc.2 全部 289 个 @deepseek-ai 包与 dsh/lib 源码中 `minimumReleaseAge` 零命中）；可在 profile 的 `pnpm-workspace.yaml` 里调整（见 5.1）。
 
-关键点：**方向与直觉相反**（在显式开启后）。不是「新版本太新不能装」，而是**只有发布满阈值的版本才被考虑**，于是新版本全被排除后，解析会一路回退到最老的合格版本。DSH 侧真正的兼容闸门是 **peer 兼容性预检 + allow-version 精确版本豁免**（写入 profile 的 `compatibility.json`，见第四节），与冷却期是两条独立机制。
+关键点：**方向与直觉相反**。不是「新版本太新不能装」，而是**只有发布满阈值的版本才被考虑**，于是新版本被排除后解析回退到上一个「已满阈值」的合格版本（不是无限跌到底：pnpm 按发布时间取最近候选，阈值过长直接报 `ERR_PNPM_NO_MATURE_MATCHING_VERSION` 拒绝）。DSH 侧真正的兼容闸门是 **peer 兼容性预检 + allow-version 精确版本豁免**（写入 profile 的 `compatibility.json`，见第四节），与冷却期是两条独立机制。
 
 ### 2.2 时间指纹（判定冷却期的决定性证据）
 
@@ -64,7 +64,7 @@ pnpm add <pkg> --lockfile-only --config.minimum-release-age=1200   # 20 小时�
 pnpm add <pkg>@4.10.0-dsh.4 --lockfile-only   # 发布仅 9.5h，依然安装成功
 ```
 
-精确 spec 绕过冷却期检查。这是**最小侵入的应急手段**，也是判定「是否为冷却期问题」的快速验证法。
+精确 spec 在未显式开启 strict 时会被 pnpm **自动登记进 `minimumReleaseAgeExclude`**（写 pnpm-workspace.yaml，实测精确安装 9 小时前版本成功且自动写入 exclude）从而放行；显式设置了 strict 时精确版本同样被冷却拒绝。这是**最小侵入的应急手段**，也是判定「是否为冷却期问题」的快速验证法。
 
 ---
 
@@ -82,10 +82,10 @@ maxSatisfying(allVersions, '^4.10.0')           = null
 
 两个致命后果：
 
-1. **裸装（范围解析）默认排除预发布版**，`maxSatisfying(vers, '*')` 永远返回 `4.9.0` 而不是任何 `4.10.0-dsh.x`；
-2. **一旦冷却期把新预发布版筛掉，解析会一路跌回 4.9.0 系列**，而 4.9.0 系列的 peer 通常锁在旧版 DSH 契约上，立刻撞上兼容性闸门。
+1. **semver 库层面**：不带 `includePrerelease` 时范围不匹配 prerelease（`maxSatisfying(vers, '*')` 返回正式版而非 `4.10.0-dsh.x`）；**但 pnpm 的 registry 解析把 prerelease 纳入候选**（按发布时间取满足范围且已过冷却期的最近版本，实测裸装解析到 `4.10.0-dsh.5` 而非 4.9.0），两者不可互推；
+2. **pnpm 不回退到「最老合格版」**：实测回退链落在同系列较早的预发布版（age=180 → `.8`、age=1200 → `.5`、age=3000 → `.2`），阈值过长直接 `ERR_PNPM_NO_MATURE_MATCHING_VERSION` 拒绝；若持续拿不到新版，旧系列 peer 可能撞上 DSH 兼容闸门。
 
-所以插件作者若采用 `<主>.<次>.<修订>-<dsh>.<序号>` 这类后缀发布，**必须让使用者显式写精确版本或显式关闭冷却期**，否则冷却期 + 预发布排序两个机制会叠加成「永远装不上最新版」。
+所以插件作者若采用 `<主>.<次>.<修订>-<dsh>.<序号>` 这类后缀发布，**应提醒使用者显式写精确版本（自动登记 exclude）、显式关闭冷却期（`minimumReleaseAge: 0`）或显式放行 `minimumReleaseAgeExclude`**，否则新发布的序号版会被 1 天冷却期挡在解析之外。
 
 ---
 
@@ -95,7 +95,7 @@ maxSatisfying(allVersions, '^4.10.0')           = null
 
 dsh-plugin-manager 在安装前后各做一次 peer 兼容性评估（实现见 `@deepseek-ai/dsh-plugin-manager` 的 `lib/types/operations.js`）：
 
-- **预检（安装前）**：读包清单，`evaluatePluginCompatibility(manifest, exemptions)` 判定；不兼容则直接拒绝，一个包都不装（输出 `nothing was installed`）。
+- **预检（安装前）**：对 registry spec 用 `pnpm view <spec> name version peerDependencies --json` 向注册表读清单（本地路径/链接 spec 读本地包），`evaluatePluginCompatibility(manifest, exemptions)` 判定；不兼容则直接拒绝，一个包都不装（输出 `nothing was installed`）。
 - **后检（安装后）**：组合包组件的 peer 需要已安装内容才能评估，因此这一段落在 pnpm 已替换依赖树之后；一旦判定不兼容，插件管理器**恢复原始 `package.json` / `pnpm-lock.yaml` 并重新安装**，输出 `restored package.json, pnpm-lock.yaml, and node_modules`。
 
 **所以「包管理器报 Done」不等于安装成功。** 报错文案里的 `installation rejected` 与 `restored` 是闸门介入的标志。
@@ -120,7 +120,7 @@ dsh-plugin-manager 在安装前后各做一次 peer 兼容性评估（实现见 
 dsh plugin --profile <profile> allow-version <pkg>@<exact-version> --dsh-version <exact-dsh> --accept-risk
 ```
 
-豁免是**精确到版本对**的（包版本 + DSH 版本都必须精确匹配），落在 profile 的 `compatibility.json`。该文件**默认不存在**：读取端把 ENOENT 当作「无豁免」并标记可写（`readProfileCompatibility`），首次执行豁免才创建。豁免的对象是 **peer 兼容性检查**（DSH 侧闸门），与 pnpm 的发布冷却期无关——冷却期没有豁免入口，只有精确版本与 `--config.minimum-release-age=0` 两条路。
+豁免是**精确到版本对**的（包版本 + DSH 版本都必须精确匹配），落在 profile 的 `compatibility.json`。该文件**默认不存在**：读取端把 ENOENT 当作「无豁免」并标记可写（`readProfileCompatibility`），首次执行豁免才创建。豁免的对象是 **peer 兼容性检查**（DSH 侧闸门），与 pnpm 的发布冷却期无关——冷却期有自己的豁免入口 `minimumReleaseAgeExclude`（写 pnpm-workspace.yaml，精确安装时自动登记），与 DSH 的 allow-version 是两套无关机制；另有 `--config.minimum-release-age=0` 全局关闭。
 
 **豁免只应作为最后手段**：它绕过的正是防止崩溃与数据丢失的那道闸门。优先修版本选择，不要用豁免掩盖解析错误。
 
@@ -137,8 +137,8 @@ dsh plugin --profile <profile> allow-version <pkg>@<exact-version> --dsh-version
   pnpm-workspace.yaml    # pnpm 工作区配置（nodeLinker / autoInstallPeers / minimumReleaseAge）
   cordis.patch.yml       # 该 profile 的配置补丁层
   cordis.yml             # 空根 entry list（Loader Include 锚点，每次启动被重写为空 []，勿手改）；看组合用 `dsh --profile <name> --dump-config`
-  compatibility.json     # 精确版本豁免表（默认不存在，首次 allow-version 后生成）
-  cfg.log / cfg.err      # 启动黑匣子日志
+  compatibility.json     # 精确版本豁免表（缺省不存在 = 无豁免且不自动创建，grant 时才生成）
+  # 注意：cfg.log / cfg.err 不是通用 profile 产物（desktop profile 无、全部 289 个官方包零命中，仅个别 web 类 profile 出现）；启动日志在宿主 logs/ 目录
   .plugin-manager/logs/operation-*/pnpm.log   # 每次插件安装的完整 pnpm 输出
 ```
 
@@ -210,7 +210,7 @@ error: profile "desktop" is managed exclusively by the Electron application
 
 ### 7.2.1 `ERR_PNPM_IGNORED_BUILDS`
 
-现象：包已下载完（`Packages: +245`），却以 `Ignored build scripts: koffi@x.y.z` 收尾并退出码 1，报 `plugin command failed`。这不是安装失败，是 pnpm 10+ 的供应链策略主动拦截了原生构建脚本。
+现象：包已下载完（`Packages: +245`），却以 `Ignored build scripts: koffi@x.y.z` 收尾并退出码 1，报 `plugin command failed`。这不是安装失败，是 pnpm 11 的供应链策略主动拦截了原生构建脚本。
 
 **正解是在 profile 的 `pnpm-workspace.yaml` 里显式放行**，而不是找 CLI 子命令（`dsh plugin ... allow-build` 不存在，会报 `Command "allow-build" not found`）：
 
@@ -269,7 +269,7 @@ dsh plugin --profile <name> add <本地插件绝对路径>
 # 3. 装 Web 前端 bundle，务必锁与宿主同版本的精确版本
 dsh plugin --profile <name> add @deepseek-ai/dsh-web-app@<dsh 同版本号>
 
-# 4. 手动补 dsh.profile.bundles（插件 + web-app）
+# 4. （无需手动补 bundles：声明 dsh.bundle.patch 的包 add 时已自动 reconcile push；未声明的普通依赖本就不会进 bundles）
 
 # 5. 启动
 dsh <name> --port <port> --no-open

@@ -821,6 +821,7 @@ parseReason 解析 escalate 语义；callId 回溯 tool/call 取结构化路径�
 可能只读）。
 
 ### 11.116 settings 双轨兼容 + FEATURE DETECTION（catppuccin 印证）
+（0.2.0-rc.2 的 `dsh-settings` 已无 `installSection`，统一走 `Config.volatile` + `configForms`）
 <=0.1.6 用 installSection / >=0.1.7 用 Config.volatile + configForms——用**特性探测**
 不解析版本号；可选 settings 用 ctx.inject 降级 localStorage（只做首帧种子）。
 

@@ -73,7 +73,7 @@
 ```
 
 ### 3. 动态求值标签：`!!js` 表达式
-DSH 允许在 YAML 中使用 `!!js` 标签执行安全的 JavaScript 表达式求值：
+DSH 允许在 YAML 中使用 `!!js` 标签执行非沙盒的任意 JavaScript 求值（`new Function("ctx", "expr", "with(ctx) { return eval(expr) }")`，表达式在条目的 ctx 上执行，可访问完整 loader 上下文；**只应写可信补丁**，disabled 表达式求值失败会进入 inactiveEntries 启动警告）：
 ```yaml
 - insert:
     - id: mcp-context7
@@ -97,8 +97,8 @@ DSH 允许在 YAML 中使用 `!!js` 标签执行安全的 JavaScript 表达式�
 
 ### 1. 致命教训：`--dump-config` 假阳性陷阱
 **重要结论：`--dump-config` 校验通过，绝对不等于 Web 或 TUI 能够启动成功！**
-- **根因**：`--dump-config`（YAML）仅组合补丁层并渲染文本树，**完全不加载插件物理代码、不 apply 插件、不 eval `!!js`**——但组合阶段仍会跑 bundle 层的 peer 兼容性检查（`loadProfileDirectory` 对每个 bundle 调 `evaluatePluginCompatibility`，不兼容且未豁免的 bundle 被跳过并由 `reportSkippedBundles` 列出）。`--dump-config-schema` 则不同：它会 import 插件模块并执行其顶层代码（懒加载的 schema 构建器同样执行），只是不 apply 插件、不 eval `!!js`。
-- 如果插件版本不兼容、缺少依赖或导出的服务冲突，`--dump-config` 返回 0 字节 stderr 且退出码为 0，但实际启动时整个系统会立刻崩溃（报 `required plugin did not activate`）。
+- **根因**：`--dump-config`（YAML）仅组合补丁层并渲染文本树，**不加载插件物理代码、不 apply 插件、不 eval `!!js`**——但组合阶段仍会跑 bundle 层的 peer 兼容性检查（`loadProfileDirectory` 对每个 bundle 调 `evaluatePluginCompatibility`；不兼容且未豁免的 bundle 在 dump 时被跳过并向 **stderr** 打印 skipping 警告，不是静默）。`--dump-config-schema` 则不同：它会 import 插件模块并执行其顶层代码（懒加载的 schema 构建器同样执行），只是不 apply 插件、不 eval `!!js`。
+- 如果插件版本不兼容、缺少依赖或导出的服务冲突，`--dump-config` 可能仍返回退出码 0（bundle 跳过只写 stderr 警告），但实际启动时整个系统会立刻崩溃（报 `startup failed: N required plugins did not activate`）。
 - **官方权威的三步真实启动验收法**：
   ```bash
   # 1. 检查端口是否真实处于 LISTENING 状态

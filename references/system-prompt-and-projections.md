@@ -15,7 +15,7 @@ export function apply(ctx) {
   // 注册有序的提示词段落
   ctx.systemPrompt.section({
     name: 'my-coding-guidelines',       // 段落名（名称唯一，不是 id）
-    order: 700,                         // order 升序、数字越小越靠前；仓库核心槽位为 -1000/0/500~600/900/1000~3100/9900，业务插件宜取 > 600 避开
+    order: 700,                         // order 升序、数字越小越靠前；仓库核心槽位从 -1000 到 10200 分布（含 800 PTC_ONLY、5000 TOOLS_SDK、9000 DELIVERABLE_FILE_REFERENCES、10000/10100/10200），业务插件宜取 > 600 避开
     text: () => {
       // 支持动态返回文本（text 可以是字符串或函数）
       return `## 自定义代码规范\n- 严禁硬编码测试密钥\n- 所有模块导出必须包含 JSDoc 注解`;
@@ -26,12 +26,12 @@ export function apply(ctx) {
 
 ### 2. 专家级环绕中间件 (`system-prompt/assemble`)
 
-> 提示：真实事件是 `system-prompt/assemble`（waterfall，签名 (assembly, context, next)）。轮次结束没有 `agent/turn-end` 事件——用 `ctx.on('session/event')` 过滤 `turn/end`（载荷 {turn, reason}），或监听 `agent/turn-stopping`。
+> 提示：真实事件是 `system-prompt/assemble`（waterfall，签名 (assembly, context, next)）。轮次结束没有 `agent/turn-stopping（`turn/end` 是会话事件，不是 agent 生命周期事件）` 事件——用 `ctx.on('session/event')` 过滤 `turn/end`（载荷 {turn, reason}），或监听 `agent/turn-stopping`。
 若需要在提示词最终交付给模型前进行全局拦截、审计或占位符替换，可以监听 `system-prompt/assemble` waterfall 环绕事件：
 
 ```js
-ctx.waterfall('system-prompt/assemble', async (assembly, next) => {
-  // 1. 调用 next() 执行下游收集流程
+ctx.on('system-prompt/assemble', async (assembly, context, next) => {
+  // 注册监听用 ctx.on（ctx.waterfall 是派发方法，不是注册方法）；签名是 (assembly, context, next)
   const finalAssembly = await next();
 
   // 2. 对最终组装出的段落做过滤或替换：assembly 是 { sections, contexts, tools, variables }，
@@ -53,7 +53,7 @@ ctx.waterfall('system-prompt/assemble', async (assembly, next) => {
 ### 1. 核心铁律：仅追加日志 (Append-Only Log)
 - 所有会话历史（用户消息、模型回复、工具调用、审批记录、计划变更）均作为不可变的 `SessionEvent` 顺序落盘（JSONL 格式）；
 - **严禁任何插件通过 Node.js 原生 `fs` 直接修改底层 `.jsonl` 文件**！直接修改会破坏会话序号指纹（`SessionSeq`）与 SHA-256 结构校验，导致会话无法反序列化崩溃；
-- 任何状态变化（如取消、编辑、修剪），必须通过追加新的事件（带 `surfaceOp: 'replace'` 或专属事件）来合法表达。
+- 任何状态变化（如取消、编辑、修剪），必须通过追加新的事件（带 `surfaceOp` 的合法 replace 形状 `{ op: 'replace', startSeq, endSeq }`（裸字符串 `'replace'` 会被当作无效 replace 抛错）或专属事件）来合法表达。
 
 ---
 
@@ -79,21 +79,20 @@ DSH 官方引入了基于事件溯源（Event Sourcing）的 **状态投影引�
 ```js
 export function apply(ctx) {
   ctx.sessionProjections.register({
-    id: 'my-task-tracker',
-    // 1. 定义初始状态
-    initial: () => ({ completedTasks: 0, activeTasks: [] }),
-    // 2. 纯函数折叠器：遇到特定事件时计算下一时刻的状态（绝不产生副作用）
-    fold: (state, event) => {
+    stateSchema: myStateSchema, // 必需：zod schema 校验 state
+    stateVersion: 1,             // 必需：非负整数，升级需递增
+    key: 'my-task-tracker',      // 注意字段名是 key，不是 id
+    // 1. 定义初始状态（签名是 (header, inheritedEventCount) => state）
+    init: () => ({ completedTasks: 0, activeTasks: [] }),
+    // 2. 纯折叠器：遇到特定事件时计算下一时刻的状态（绝不产生副作用；字段名是 apply，不是 fold）
+    apply: (state, event) => {
       if (event.type === 'tool/result' && event.data?.toolName === 'task_complete') {
-        return {
-          ...state,
-          completedTasks: state.completedTasks + 1
-        };
+        return { ...state, completedTasks: state.completedTasks + 1 };
       }
       return state;
     },
-    // 3. （可选）将状态转换为供前端消费的精简视图
-    toClientView: (state) => ({ count: state.completedTasks })
+    // 3. （可选）将状态转换为供前端消费的精简视图（字段名是 wire：{ viewSchema, view }，不是 toClientView）
+    wire: { viewSchema: myViewSchema, view: (state) => ({ count: state.completedTasks }) }
   });
 }
 ```
@@ -117,7 +116,7 @@ export function apply(ctx) {
 export function apply(ctx) {
   ctx.on('agent/turn-end', async ({ sessionId, turnId }) => {
     // 查询该轮次造成的文件变动
-    const changes = await ctx.workspaceChanges?.getTurnSummary(sessionId, turnId);
+    const changes = await ctx.workspaceChanges?.summary(sessionId, seq)（第二参是那次 workspace/changes 事件的 seq，不是 turnId）;
     if (changes && changes.files.length > 0) {
       ctx.logger('audit').info(`轮次 ${turnId} 修改了 ${changes.files.length} 个文件:`, changes.files.map(f => f.path));
     }

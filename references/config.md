@@ -221,7 +221,7 @@ dsh plugin --profile <profile> version-exemptions
 **硬性工程要求：优先级解析必须是一个零 I/O 的纯函数，产出与运行时判定逐行一致的诊断链。**
 
 ```ts
-// 纯函数：只吃各来源的原始值，不碰磁盘、不读环境，便于单测穷举
+// 教学示意命名（本插件私有接口，非宿主 API）：纯函数，只吃各来源的原始值，不碰磁盘、不读环境，便于单测穷举
 export function resolvePriority(input: {
   envRaw?: string
   patchMode?: string

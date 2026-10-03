@@ -22,6 +22,7 @@
 
 ```ts
 // src/xxx-http.ts
+// 以下 Deps 字段均为本插件私有接口，与宿主 API 无关；与官方对接的只有 webServer.register(route) 与 node:http req/res
 interface Deps {
   state: State
   readRawConfigMode: () => string | undefined

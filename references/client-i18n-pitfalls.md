@@ -23,7 +23,7 @@ function apply(ctx) {
 exports.inject = ["slots", "locale"];   // 显式声明，时序更稳
 ```
 
-- `ctx.locale.register(ns, {zh, en})` 只校验 locale id（BCP 47 风格正则）与同 ns 同 locale 重复注册（抛错）；**不校验键成对、也不校验值**——键成对靠发布侧脚本自检（见铁律 1）。
+- `ctx.locale.register(ns, {zh, en})` 运行时只校验 locale 键为 BCP 47、重复 (ns,locale) 抛错，**不校验键集也不校验值**；zh/en 键成对是 `LocaleNamespaceMap` 的**编译期类型**强制（client-runner:1214）——运行时漏键不报错，切语言缺键时回退为 key。键成对仍建议发布侧脚本自检（见铁律 1）。
 - `t(key, {name})` 支持 `{name}` 占位符模板替换。
 - `exports.inject` 显式加 `"locale"`（成本零，注册时序更稳）。
 

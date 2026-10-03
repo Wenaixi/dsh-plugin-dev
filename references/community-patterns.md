@@ -252,3 +252,111 @@ cc-safety-net：守卫插件是跨宿主薄适配（每个宿主一个入口）�
 - memmy-agent 的 DSH 适配器约 90 行：agent/pre-step 注入 + session/event 捕获 + disposer 逆序清理 + schemastery Config——新插件照抄这个骨架即可起步。
 - superdesign-skill/treg：纯 ctx.skills 分发的最小技能提供方（无构建链、纯 ESM、frontmatter 单源解析）。
 - WeKnora：结构性类型免运行时依赖（纯 JSON Schema 拒绝 schemastery 实例）+ config 全环境注入。
+
+
+---
+
+## 十一、社区沉淀的进阶细节（补充条目）
+
+### 11.1 LLM 适配器包装（modlens 的完整踩坑）
+- `ctx.llm.registerAdapter([providerId], {...})` 的行型对象**必须自带基类默认方法**：
+  `providerInfo` / `providerRetryPolicy` / `prepareCall` / `imageRequestPricing`；
+  漏实现任何一个都是**静默注册失败**（不抛错，只是没生效）。dsh >= 0.1.1 所有调用（含 replay）
+  都走 prepareCall；>= 0.1.2 无 feature check 就调 imageRequestPricing。
+- 注册时宿主会 **snapshot** providerInfo / providerRetryPolicy；上游变化需要**重新注册**才能刷新。
+- `DUPLICATE_ADAPTER` 错误按"竞争成功"处理（不当作失败）。
+- `listModels` / `resolveModel` 要按家族 + inputModalities + 名字正则三重过滤包装目标，
+  避免把真视觉模型也包一层。
+- adapter 的 stream 里可以把消息中的图片块在**请求时**转成证据文本（持久日志保留原图块，
+  wire 上换文本），既省 token 又可回放。
+
+### 11.2 工具命名必须避开宿主保留名（静默走错路）
+宿主自带的 `read_image` 与插件同名注册**不报错**，但模型会解析到 scope 内更强的那个 →
+静默走错路径。对策：用自有命名（如 `<plugin>_read_image`），并在注册失败时 console.error
+大声降级（modlens issue #34）。
+
+### 11.3 ctx.inject 分包是兼容利器（inactive context）
+bundle loader 调 apply 时外层 ctx 可能仍在等服务，直接读 `ctx.llm` 会抛 "inactive context"。
+把相关注册全部放进 `ctx.inject(['llm'], scope => ...)`——Cordis 只在服务激活时启动子作用域
+并连带注销监听，天然适配"web profile 才有、headless 没有"的服务（modlens issue #79）。
+无 inject 的旧宿主走 feature-detect 退化路径。
+
+### 11.4 缓存与重试的三个纪律
+- **失败占位文本必须是常量**：每次失败措辞不同会改写 wire history 并 bust 提供方的前缀缓存。
+- **缓存 key 用文件身份而不是路径**：`dev:ino:mode:size:mtimeNs`（路径可被替换/软链）。
+- 失败进短期 cooldown（如 60s）而非永久缓存；LRU + 在飞请求可 join（pending 不逐出）。
+
+### 11.5 运行中宿主版本的可靠识别（dsh-plugin-shop）
+不要从 node_modules 走查 `@deepseek-ai/dsh` ——插件自身依赖会被 hoist/链接农场重指，
+实测把运行中的 0.1.5-rc.3 误判成 0.1.2-rc.1。可靠做法：**realpath 解析启动本进程的 bin 脚本**
+→ 其所属 package.json 的 version 就是运行版；其 import 的 `@deepseek-ai/dsh-app-boot` 的
+PROFILE_TEMPLATES 就是当前模板表。运行信息一次读取并缓存（进程内不变）。
+
+### 11.6 兼容判定借用宿主实现，不要自己重写
+0.1.7+ 宿主自带 `evaluatePluginCompatibility(manifest, exemptions, runtimeVersion)` 与
+`readProfileVersionExemptions(profileDir)`。自己重实现必与真实拒绝行为漂移；直接调用宿主
+判定来预测安装拒绝。注意该 API 默认每次重读 manifest（实测 75ms/2000 条），调用方要缓存。
+
+### 11.7 权限与沙箱随 profile 打包（漏了就是"装上但没工具"）
+`sandbox-policy` + `approval` + `permission` 三行联动定义多档预设
+（read-only / workspace-write / danger-full-access × ask / never），并显式恢复被通用 profile
+禁掉的工具：`tool-bash` / `tool-pwsh` 按 `process.platform` 互斥 disable，
+`tool-fs` / `tool-web` 显式 `disabled: false`。桌面型 Agent 插件漏掉这步就是
+"装上但模型没有命令/文件工具"的静默失效（dsh-tavern）。
+
+### 11.8 对官方包 monkeypatch 的三条安全前提（最后手段）
+1. 用 `createRequire` 从**正在运行的** DSH runtime resolve 官方包，不依赖自身 node_modules；
+2. **先断言包版本与目标源码原文精确匹配**（挂 assert，官方一变就大声失败）；
+3. 用 data: URL 重打包 import + `Object.defineProperty` 打/还原原型补丁，
+   **多实例引用计数**（最后一个释放才还原），WeakSet 标记已处理会话。
+仅当官方版本被精确 pin 时才安全（dsh-tavern）。
+
+### 11.9 token 计量要补偿 CJK
+宿主 `tokenMeter.estimateMessage` 按固定 4 字符/token 估计，严重低估中文 →
+中文场景自己加保守下限（nonAscii 每字符按 2 token 起算 + 固定开销）（dsh-tavern）。
+
+### 11.10 粘贴/附件落盘的安全要素（modlens）
+magic-byte 嗅探（PNG/JPEG/GIF/WebP/HEIC 白名单 + ftyp 品牌校验）+ 体积上限；
+私有临时根目录 0700 且 `lstat` 校验 leaf 非 symlink（防 /tmp 符号链接攻击）+ owner 校验
+（Windows 无 getuid 则跳过）；过期清扫 TTL（如 7 天）+ 总字节上限（如 1GB）。
+浏览器侧捕获用 capture 阶段监听；React 受控 textarea 需要 input 事件，
+contenteditable 无 value setter 走原型 setter 兜底。
+
+### 11.11 安装即副本的过期检测
+安装到机器上的 skill/资源是**安装时快照**，永不跟随发布更新。可扫描各 harness skill 目录，
+读取内嵌的版本标记并与当前 CLI 版本比对，尽早暴露停驻的老副本（modlens issue #33）。
+
+### 11.12 受管进程安装模式
+真正的 pnpm 安装跑在**外挂 manager 进程**，插件进程内只做编排与状态机，输出流式转发；
+支持"不改 profile 文件、进程内热挂载"（`hotMount`/`hotUnmount`，nodeHotFs 拦截 fs 层）。
+失败要有超时与宿主退出兜底（dsh-plugin-shop）。
+
+### 11.13 pre-step 注入的完整姿势（memsearch）
+- 监听 `agent/pre-step` 时**先 `await next()` 拿决策**，按需改判返回 `{ kind: 'enter', messages: [...] }`；
+  `{ prepend: true }` 把监听器排到最前，别人的注入可以被它再包一层。
+- 只改消息不改决策语义：step !== 1 直接放行、无搜索结果原样返回 decision（零成本）。
+- 消息形状用 `@deepseek-ai/dsh-llm` 的 `createUserMessage` 工厂（`source: {kind:'plugin', plugin, form:'snapshot', sections}`），
+  找不到模块就退化为手写同形状 `Object.freeze` 对象——注入绝不硬失败。
+- 审查/提醒类动作用 `agent.inbox.append('next-turn', message)` 排到下轮，绝不打断运行中的 turn。
+
+### 11.14 长驻 web 面不要假设 process.cwd()
+session 的持久 cwd 在 `session.header.cwd`；多个项目并行时按 session 取项目目录，
+用 `ctx.agents.get(sessionId).session` 反向解析，不是启动目录。
+
+### 11.15 webServer 起步前重试再放弃（headless 兼容）
+不声明 inject 硬依赖（headless/tui 组合永不提供 webServer），用 `setInterval(tryRegister, 1000)` +
+`unref()` + `once` 标记重试：服务出现即注册，headless 静默跳过；unref 保证不 hold 进程。
+
+### 11.16 文件浏览路由的路径纪律（补充）
+`resolve` + `pathIsWithin` 双重校验（防 `../` 逃逸），再 `realpathSync` 校验符号链接不指向根外；
+只读扩展名白名单 + 体积上限；GET 不渲染、POST 才写。
+
+### 11.17 CLI 包装三件套（memsearch）
+- 探测命令用 `bash -c 'command -v X'` 而非 which（看全 PATH）；
+- 命令串可能含引号/参数时全部经 `bash -c` 执行并 shellEscape 参数；
+- 读配置区分 `{ok:true,value:null}`（确认未配置）与 `{ok:false}`（命令失败/超时）——
+  失败不可当作权威"未配置"，否则首次冷启动会把 auto 模式静默翻错。
+
+### 11.18 非阻塞捕获的背压
+LLM 摘要串行化（promise 链），捕获失败仅记日志不中断；摘要器超时 killProcessTree；
+定时维护 `setInterval` + `unref` + due-state 门（每任务每 interval 至多一次）。

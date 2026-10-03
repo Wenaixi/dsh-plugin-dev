@@ -61,7 +61,7 @@ dsh-market 的机制（从 dsh-plugin-hub 移植）：
 dsh-TUI issue #183：CLI 从自己的安装锚点解析 bundle 的 cordis.patch.yml（通常全局 launcher），Loader 却从 profile 的副本 import 插件模块；两份不同步时 patch 里还没有某 row，硬 `inject` 会**死锁整个树**（`pending (waiting for service: xxx)`）。解法：把该服务从 code-level inject 移除，只在 patch 的 row-level inject 保留（存在时当顺序保证），代码内部走 local fallback。
 
 ### 1.5 聚合载具（family bundle）五段式
-dsh-web 的 aggregate.yml 是唯一手写源：`patchFrom` 贡献 insert 行（递归展开、带源注释）、`deps` 拉入依赖、`rows:` 外部行（显式 semver + 直挂真实包名）、`tombstones:` 给退役子路径保留空壳导出（防 ERR_PACKAGE_PATH_NOT_EXPORTED）、`inactive:` 出厂默认关闭行（渲染尾部 disabled:true）。行 id 命名空间化（web-ui-* 前缀）防 duplicate entry；生成脚本必须 --check 幂等门禁。
+聚合载具（family bundle）的 aggregate.yml 五段式（patchFrom/deps/rows/tombstones/inactive）是 dsh-web 仓库**早期/自建形态**——0.2.0-rc.2 官方 dsh-web-app 包已无 aggregate.yml（只有 cordis.patch.yml + presets/*.patch.yml，patchFrom/tombstones 关键词全无）。参考价值在行 id 命名空间化（web-ui-* 前缀）防 duplicate entry + 生成脚本 --check 幂等门禁，不按官方契约写。
 
 ### 1.6 多 bundle 套件 = 一个 patch 数组
 clearai 用 `dsh.bundle.patch: ["./cordis.patch.yml", "./presets/clearai/clearai.patch.yml"]`；Openwrite 的 suite 形态按产出物切包；每个子插件行 `name` 用 `@scope/pkg/<family>` 子路径让官方列表每行独立标题。
@@ -123,7 +123,7 @@ apply 时探测宿主版本：低于支持基线给 fallback 单元（零数据 
 - 插件客户端改动必须重建聚合 bundle（profile link 安装下宿主代码是新的、页面仍跑旧 UI）。
 
 ### 4.3 settings.section 渲染契约（血泪坑）
-宿主 ui-settings 的 settings.section 槽期望 **React 渲染函数**（register(descriptor, () => createElement(...))）；写成"返回带 render() 方法的对象"会抛 React #130（slot entry crashed）白屏。官方 primitives（SegmentedControl/Switch/StateDot/Tag/Button）优先复用。
+宿主 ui-settings 的 settings.section 槽（真实注入 = ctx.slots.inject('settings.section', () => ctx.slots.register({...}, Component))，组件必须是 (props)=>ReactNode 函数）期望 **React 渲染函数**（register(descriptor, () => createElement(...))）；写成"返回带 render() 方法的对象"会抛 React #130（slot entry crashed）白屏。官方 primitives（SegmentedControl/Switch/StateDot/Tag/Button）优先复用。
 
 ### 4.4 模块级可变状态会静默分裂
 同包经多个入口 artifact 加载时每个入口持有自己的模块拷贝，模块级可变单例状态分裂（路由重复注册 + 另一个入口伺服空状态）→ 跨条目/跨拷贝状态一律走 globalThis Symbol 注册表（Symbol.for 键，跨仓库契约，改变键形状会互踩）。
@@ -386,7 +386,7 @@ session v4 要求 producer-owned 的 `source.kind`（如 `plugin:<name>`、`form
   `prepare` 脚本会让每个用户先 allowlist 构建才能首装成功）。
 - SKILL.md frontmatter 描述用**正则解析**不引 YAML 依赖；load 失败返回 undefined/[] 而非抛错。
 
-### 11.22 MCP 连接器无凭据时整体禁用 + !!js 表达式若以 ! 开头必须带引号（裸标量会被当 YAML 标签）；官方 dsh-base 原文 disabled: !!js "!ctx.get('profileContext')" 就这么写（treg）
+### 11.22 MCP 连接器无凭据时整体禁用 + !!js 表达式若以 ! 开头必须带引号——js-yaml 4.3.2 实测无引号 `!!js !ctx.get(...)` 抛 "duplication of a tag property"（必然解析失败）；`name: @scope/pkg` 无引号抛 "bad indentation of a mapping entry"（不是解析成指令）。官方 dsh-base 原文 disabled: !!js "!ctx.get('profileContext')" 就这么写（treg）
 - 注册一个没有 token 的 connector 得到的是常开工具、每次调用都 401：`disabled: !!js
   (process.env.X ?? '') === ''` 让 patch 行缺 token 时根本不挂载。
 - **patch 里 `!!js` 表达式不能以 `!` 开头**：YAML 会把第二个 `!` 读成又一个 tag
@@ -445,8 +445,8 @@ session v4 要求 producer-owned 的 `source.kind`（如 `plugin:<name>`、`form
   核心行任何 profile 都可用。**按服务存在性拆行是 profile 兼容的标准做法**（data-agent）。
 
 ### 11.30 group 行做整组开关（记忆桥）
-- patch 里 `group: true` 行读取**核心行自身**的 disabled 表达式（`entry.evaluate(entry.options.disabled.__jsExpr)`，
-  避免递归祖先门）并广播给子组件——"一个总开关控制整组"。
+- patch 里 `group: true` 行自身 disabled **恒 false 短路**（`if (this.options.group) return false`）；组开关表达式经父链（parent.ctx.fiber.entry 逐层）
+  级联到子行——"一个总开关控制整组"。
 - provider 插件化：记忆后端做可插拔 provider 子包，`dependencies` 拉全部、运行时按配置选。
 
 ### 11.31 晚挂载服务的三种延迟注册姿势（chat-import）
@@ -530,12 +530,12 @@ handler 自带围栏**（loopback/trustedHosts/Origin 校验）。
 
 ### 11.49 组合一致性校验防陈旧应用（nexttavern）
 capture 当前组合快照 vs composeEntries 计算结果 isDeepStrictEqual；不一致（异步 compose
-漂移）要重试/保留上一代，避免把陈旧的 loader 组合写进去。disabled 表达式内 throw 会中止
-该行应用——用 try/catch 保留上一代。
+漂移）要重试/保留上一代，避免把陈旧的 loader 组合写进去。disabled 表达式 throw **不中止整个组合**，只判该 entry failed（inactiveEntries 区分 pending 等待服务 vs failed：
+import 失败/disabled 表达式失败/fiber FAILED 两类 outcome，inactiveDiagnostic 分开渲染）——用 try/catch 保留上一代。
 
 ### 11.50 volatile 配置值 0.2.0 是 Cosmokit Volatile 包装要 unwrap
 0.2.0 的 volatile 值是 `Volatile<T> = { get(): T }`（cosmokit 类型）——不是 { value } 也不是
-{ ref }。统一解包：`isVolatile(x) ? x.get() : x`。配套的 settings 服务是 SettingsForms
+{ ref }。统一解包：`isVolatile(v) ? v.get() : v（cosmokit createVolatile 返回 { get(): snapshot } + Symbol.for('cosmokit.volatile.write') 写口，**无 .value 也无 .ref**）`。配套的 settings 服务是 SettingsForms
 （configure/describe/update/replace/mutate/writable/documentPath/prepareDocument）。
 
 ### 11.51 generator 形态 ctx.effect
@@ -662,9 +662,8 @@ worker/派工类插件的递归防护：以 (backend, cwd) 做起源链标识，
 形状），不做静默降级。
 
 ### 11.79 patch insert-only 铁律 + duplicate 行为年级限定（trading）
-patch 行只能 insert，同 id 后层覆盖前层（多 bundle 并存互踩）；非 insert 行必须 id+name 匹配。duplicate entry id 行为分代：
-0.1.5 世代抛 "duplicate loader entry id"；0.2.0-rc.2 新世代 EntryGroup.update 用
-Object.fromEntries **静默塌缩为最后一条**（不崩溃）。顶层 YAML 数组形状强制（空层 []）。
+patch 行支持 **insert 与 id 覆盖两种动词**（last write winning per row，dsh-base 注释），非 insert 行必须 id+name 匹配。duplicate entry id 行为分代：
+0.1.5 世代抛 "duplicate loader entry id"；0.2.0-rc.2 新世代 EntryTree.create 用 `store[id] ??=` **复用已有 entry 不崩溃**（非静默塌缩）。顶层 YAML 数组形状强制（空层 []）。
 
 ### 11.80 storage-domain 无版本号加字段的兼容写法（mimir）
 新增可空字段用 `.optional()`、可缺省数组用 `.default([])`——旧 v2 JSON 继续加载，
@@ -732,7 +731,7 @@ CJK 0.6 / 拉丁 0.25 / 其他 0.5 token 每字符分族计价，比"每字符�
 模型速率默认表 + storage-domain 实时校准（defineDomain + domainTable + zod）持久化实测值。
 
 ### 11.94 volatile 配置统一解包函数（按 0.2.0 修正）
-写统一 `unwrapLive(x)` 解包函数：`isVolatile(x) ? x.get() : x`（Volatile<T> = { get(): T }）——
+写统一 `unwrapLive(x)` 解包函数：`isVolatile(v) ? v.get() : v（cosmokit createVolatile 返回 { get(): snapshot } + Symbol.for('cosmokit.volatile.write') 写口，**无 .value 也无 .ref**）`（Volatile<T> = { get(): T }）——
 所有读配置处复用，避免散落解包逻辑。
 
 ### 11.95 双通道设置（RPC channel + config）
@@ -826,7 +825,8 @@ parseReason 解析 escalate 语义；callId 回溯 tool/call 取结构化路径�
 不解析版本号；可选 settings 用 ctx.inject 降级 localStorage（只做首帧种子）。
 
 ### 11.117 patch CRUD append-only 安全模板（mcp-panel）
-loader 方言无 set/remove 动词——set/remove 作为残余键被写进 target（无效不报错，非跳过非警告）；无 id 才 warn——"禁用即删除"（disabled:true）；绝不
+loader 方言无 set/remove 动词——applyEntryPatches 只识别 insert + id 覆盖，set/remove 作为残余键被写进 target（无效不报错）；
+"- set:" 的 id 为 undefined → warn "id is required"——"禁用即删除"（disabled:true）；绝不
 合成 !!js；env/header 值永不进快照；写 patch 前审批 + 备份；callTool 走官方
 `ctx.tools.execute(exec: ToolExecutionInput)` 单对象签名（含 name/arguments/callId/signal，非 (name,args) 二参）→ pre-execute/guard → dispatch → finalize 流水线。
 
@@ -877,8 +877,8 @@ here）；设备码过期重发是常态（操作者稍后回来）而非报错�
 宿主默认组合没有 invariants 服务——放进默认 patch 会让整棵树启动失败（row 等缺席服务）；
 可选服务依赖行按组合条件挂载（diagnostic 组合才加）。
 
-### 11.128 patch 版本门控的唯一宿主信息源 = ctx.get('profileContext')?.installAnchor（仅 dsh 启动的 profile 存在；installAnchor 是权威宿主版本信息源，但非'唯一'——process 全局可用） —— 是安装锚点路径非版本号（ProfileContext.installAnchor: string，核心用 dirname()）；读版本须解析其 package.json；'唯一宿主信息源'措辞过绝对（process 全局可用）（llm-workbuddy）
-patch 求值环境里唯一可用的宿主信息源是 `ctx.get('profileContext')?.installAnchor（仅 dsh 启动的 profile 存在；installAnchor 是权威宿主版本信息源，但非'唯一'——process 全局可用） —— 是安装锚点路径非版本号（ProfileContext.installAnchor: string，核心用 dirname()）；读版本须解析其 package.json；'唯一宿主信息源'措辞过绝对（process 全局可用）`——
+### 11.128 patch 版本门控的唯一宿主信息源 = ctx.get('profileContext')?.installAnchor 是 dsh app 包内 package.json 的**绝对路径**（安装锚点，非版本号；ProfileContext 无版本字段）——版本门控需另读 package.json；且仅 dsh 启动的 profile 存在 —— 是安装锚点路径非版本号（ProfileContext.installAnchor: string，核心用 dirname()）；读版本须解析其 package.json；'唯一宿主信息源'措辞过绝对（process 全局可用）（llm-workbuddy）
+patch 求值环境里唯一可用的宿主信息源是 `ctx.get('profileContext')?.installAnchor 是 dsh app 包内 package.json 的**绝对路径**（安装锚点，非版本号；ProfileContext 无版本字段）——版本门控需另读 package.json；且仅 dsh 启动的 profile 存在 —— 是安装锚点路径非版本号（ProfileContext.installAnchor: string，核心用 dirname()）；读版本须解析其 package.json；'唯一宿主信息源'措辞过绝对（process 全局可用）`——
 读它做版本阈值判断（<0.1.7 禁用某行）；engines 用多段区间声明。
 
 ### 11.129 侧边栏/可选 UI 槽用 ctx.get 探测而非 inject（sidebar-qa）
@@ -995,7 +995,7 @@ priority=0，插件用 -10 替换——"替换官方渲染器"的正确姿势是
 连接悬挂；幽灵队列清理（/bubble/clean-ghost）防陈旧轮询堆积。
 
 ### 11.154 pending entry = FAILED PROFILE（agy）
-静态 inject 的服务永不出现 → entry 永久 pending（设计内等待状态，不阻塞 root boot）；插件 TUI 实测 loader 把 pending entry 当 FAILED PROFILE（"1 entry did not activate"）——未从打包产物证实，以实测为准。web 面拆分必须用
+静态 inject 的服务永不出现 → entry 永久 pending（设计内等待状态，不阻塞 root boot）。官方 inactiveEntries 区分 **pending（等服务/无 fiber）与 failed（import 失败/disabled 表达式失败/fiber FAILED）两种 outcome**，inactiveDiagnostic 分开渲染；插件 TUI 实测的 "1 entry did not activate" 属 failed 归类。web 面拆分必须用
 `ctx.inject(['webServer'])` 懒取，缺席时 ACTIVE 但能力不发（ctx.get 探测降级；注意 inject 缺席是纤维 PENDING 不是 active-inert）——管理面走受保护 RPC 通道，
 OAuth 回调才裸路由，loopback-only 注册栅栏。
 

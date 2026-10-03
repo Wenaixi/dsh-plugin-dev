@@ -951,3 +951,25 @@ patch 不含 `!!js` 表达式**；**绝不编造连接状态**；配置 env/head
 ### 11.144 工具输出 schema 对齐语义（quant）
 数组类输出的对齐语义（前 window-1 位为 null）写进 output schema：`oneOf: [number, null]`——
 模型不会误解 null 前缀；description 写公式与对齐规则（模型正确使用所需全部信息）。
+
+### 11.145 linked 插件改宿主事件目录的正确姿势（Ephemeral plugins）
+改宿主 KNOWN_SESSION_EVENT_TYPES 类目录时，用
+`createRequire(pathToFileURL(realpathSync(process.argv[1]))).resolve('@deepseek-ai/dsh-session')`
+锚**运行中的 DSH**（realpath 后 import 绝对路径）——锚 checkout 副本会改错实例。
+
+### 11.146 协议桥类插件骨架（acp-interactive）
+inject 写全（agents/commands/llm/skills/tools/sessions/sessionPersistence/sessionQuery）；
+session Map + 状态机簿记；outputTail promise 链串行化 notify；assertOpen 闭包守卫；
+子代理 SubagentTracker；四段验证门禁（test:harness / check:profile / check:registry /
+verify:packed）。
+
+### 11.147 主题 UI 用 dsh.client.immediately:true 首帧生效
+纯 JS 无构建最小形态：`immediately: true` 让 client 半首帧生效（不等待 lazy 加载）。
+
+### 11.148 "patch" 三义辨析
+cordis.patch.yml（插件补丁）/ git diff（源码补丁）/ patch-package（node_modules 补丁）是
+三个不同的东西——**判定 DSH 插件只看第一种**（cordis.patch.yml 或 dsh.bundle.patch）。
+
+### 11.149 市场插件验证管线（plugins-store）
+固定源码 SHA（钉提交）+ 隔离沙箱验证管线（Linux 隔离跑安装/冒烟）——防供应链投毒；
+聚合数据 schema 带版本戳与来源声明（schema_version / as_of / metrics_source）。

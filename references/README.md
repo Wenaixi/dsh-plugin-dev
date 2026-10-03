@@ -90,3 +90,23 @@
 ### 十六、子智能体引擎、文件系统安全观察与 ACP 协议 (Subagents, FS Policy & ACP)
 - **[subagents-fs-policy-and-acp.md](./subagents-fs-policy-and-acp.md)**：
   子智能体生命周期与文件安全策略指南——`ctx.subagents` 服务切面、三大提供方 (`spawn-in-process` 独立运行 / `fork-in-process` 继承分叉 / `acp` 远程进程)、单次 (`start`) vs 持续通信 (`startContinuable`)、文件系统弱引用观察表与防覆盖锁机制 (`fs-observation-policy`)、以及自动化 Agent Client Protocol (ACP)。
+
+### 十七、社区实践图谱：高星插件共性工程经验 (Community Patterns)
+- **[community-patterns.md](./community-patterns.md)**：
+  由 GitHub topic:dsh-plugin 高星仓库（约 100 个，2026-10 快照）逐一分析蒸馏的
+  **跨仓库通用工程经验**——插件形态判定三信号（`dsh.bundle.patch` / `cordis.patch.yml` /
+  `@deepseek-ai/*` 依赖）、patch 整块替换与 `!!js` 版本自适应、版本兼容层四种写法
+  （能力探测 / Symbol.for / peer 枚举 / 基线门）、webServer 路由与浏览器信任围栏
+  （`--trusted-host` 语义、exact 路由赢过 /api fence 的坑）、客户端半区纪律
+  （`__ModuleLoader__` 握手、external 白名单、settings.section React 渲染契约、
+  globalThis Symbol 防模块状态分裂）、自定义 session 事件类型词汇表注册、
+  `sessionProjections` 单元契约、记忆/用量插件挂点三件套、渐进式工具暴露、
+  意图工具 + 投影 fold、服务提供方与 Typert RPC 的坑、凭据引用、prepare-before-swap
+  热更新、Windows / Electron / DSH_HOME 环境坑、发布与验收纪律。每条经验带出处仓库，
+  属"第三级证据"（社区实现），与官方源码冲突时以官方为准。
+
+### 十八、静默失效防线、门禁设计与真机验收 (Silent Failures & Verifiable Gates)
+- **[silent-failure-and-gate-design.md](./silent-failure-and-gate-design.md)**：
+  静默失效三类根因（代码从未执行 / 契约错误被吞 / 解析到错误对象）与判定动作、
+  可验证门禁设计（解析→执行→落盘→回读四段）、真实浏览器验收清单（Playwright 指本机
+  Chrome、domcontentloaded、dialog 处理器、force=True 不等于命中、写后回读磁盘）。

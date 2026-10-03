@@ -415,3 +415,220 @@ session v4 要求 producer-owned 的 `source.kind`（如 `plugin:<name>`、`form
 - Windows 驱动 npm：`.cmd` 不能直接 spawn（无 shell 时），找 `npm-cli.js` 用
   `process.execPath` 执行；所有 spawn 显式 `windowsHide: true`。
 - CLI 自更新必须先证明"自己被 npm 管理"（realpath 等于 npm root -g 的同名包），否则引导迁移。
+
+### 11.25 wiring-only apply + 可测试性分层（reddit-radar 教科书）
+- apply() 只做装配；业务逻辑不依赖 dsh，fetch/store/writeReport/sleep/now 全部接口注入，纯离线单测。DSH API 只出现在最薄的 wiring 层。
+- **storageDomain 用 `ctx.get('storageDomain')` 探测 + 文件回退**；探测到就在 ctx.effect 里 async 打开 domain（open 返回的 handle 必须由调用方 close 做 disposer）；清单里绝不写死 inject 只在部分组合存在的服务（写进去会让插件在别处 PENDING）。
+- **默认导出是毒药**：dsh Loader 的 unwrapExports 遇到 default export 会 collapse 模块并丢弃 inject，然后 ctx.tools 被 Guard 拒绝。插件模块绝不能有 default export。
+- 动态拉取的远程 MCP 工具：参数 schema 不手抄，从远程 tools/list 的 JSON Schema 原样转发（落在宿主 JSON Schema subset 内即可透传，不用 defineTool 的编译期 DSL）；转发注册放独立 ctx.effect 且不 await，失败只 warn 吞掉。
+- **状态推进语义**：transient（暂时失败）不推进 lastRunAt 让 heartbeat 尽快重试；非 transient 才推进，否则 heartbeat 每小时重试。写状态要幂等（基于最新 persisted 而非 before）。
+- run 串行化：heartbeat 与手动工具碰撞时第二个调用者直接跳过（running 标志 + finally 复位）。
+- **错误分类错误比错误本身贵**：fetch 失败/读 body 失败都算 networkError，不能吞成 status:200 空结果——否则一次坏响应会把未见数据永久标记为已见。
+- **tsc 不重写相对 specifier**：extensionless 的 `./client` 编译后 Node ESM 直接 ERR_MODULE_NOT_FOUND，dsh Loader 裸 import 也救不了——相对 import 一律带 `.js` 后缀，且"npx tsc 通过"不证明产物可加载，要用真实 Node import 断言。
+- sleep 用 `ctx.timeout(ms)`（宿主定时服务）而非裸 setTimeout。
+
+### 11.26 插件互操作协议与命名空间治理（T-Auto/dsh-std）
+- 插件生态第三层建设 = 跨插件契约：命令格式 / 连接语义 / 消息 schema / 存储命名空间 / UI 组件规范。做"通用能力"插件按 core → 能力域（command/connection/messages/storage/skill/tool/ui）→ sdk → 宿主 adapter 分层组织。
+- namespace-guard 防止插件间命名冲突，与 DSH slot 命名空间化（web-ui-* 前缀）同理。
+- 协议包是约定不是宿主 API：引用前确认 peer 依赖已装；rc 版本频繁演进，兼容层照用。
+
+### 11.27 独立产品 + 插件子目录形态（summer1238/dsh-remote-web-gateway）
+- 插件放 `plugin/` 子目录（自带 package.json/pnpm-workspace/tsdown），与仓库主体隔离；安装用 `dsh plugin add link:.../plugin` 或 GitHub 子路径。
+- 远程访问类插件：pairing 一次性配对 + JWT 会话凭据 + 代理只转发授权路径 + 本地默认只绑 loopback；"根无 dsh 声明 ≠ 仓库非插件"，判定要进子目录看。
+
+### 11.28 patch 行 name 必须完整 scoped + @ 开头加引号（LLM 适配器共识）
+- pnpm 按真实 scoped 名链接包：`name: dsh-xxx`（无 @scope）会 ERR_MODULE_NOT_FOUND 崩启动。
+- **YAML 标量以 @ 开头会被解析成指令/指示符**，必须加引号：`name: "@scope/pkg"`。
+
+### 11.29 "两行 patch 拆分"：核心服务行 + 路由行
+- 路由行只挂 `webServer` 存在处（`ctx.inject(['webServer'])` 或 patch 条件），headless 不激活；
+  核心行任何 profile 都可用。**按服务存在性拆行是 profile 兼容的标准做法**（data-agent）。
+
+### 11.30 group 行做整组开关（记忆桥）
+- patch 里 `group: true` 行读取**核心行自身**的 disabled 表达式（`entry.evaluate(entry.options.disabled.__jsExpr)`，
+  避免递归祖先门）并广播给子组件——"一个总开关控制整组"。
+- provider 插件化：记忆后端做可插拔 provider 子包，`dependencies` 拉全部、运行时按配置选。
+
+### 11.31 晚挂载服务的三种延迟注册姿势（chat-import）
+- webServer：`ctx.inject(['webServer'], ...)`（apply 时 ctx.get('webServer') 仍为空）；
+- commands：headless 不挂 → 服务可用时注册，不阻塞插件激活；
+- 核心事件（session-start 等）host 必备 → 直接 `ctx.on`。
+
+### 11.32 llm/stream 瀑布嵌套计费防重（cost-meter）
+包装路由适配器会多次触发下游计费监听器——用 AsyncLocalStorage 标记当前请求已计费，
+usage 只在最外围记一次；峰谷按请求发起时刻归档。
+
+### 11.33 tombstone 追加式删除（不可变日志契约）
+不可变事件日志下删除 = 追加空消息 + 专用 provider/model 标记；`surfaceOrigins` 链追溯 +
+`turnBracket` seq 区间定位；压缩回合拒绝删除。
+
+### 11.34 __ModuleLoader__ factory 只注入 require（recall-unread）
+`window.__ModuleLoader__.load({ id, factory })` 的 factory **必须 return 导出、不能碰
+module/exports 变量**——使用即启动失败；客户端注册（slots/事件）必须包 ctx.effect。
+
+### 11.35 loader 行名必须 = 包名（client-modules 契约）
+0.1.2 起 client-modules 扫描按包名匹配 loader 行：别名 → UI 静默消失（零报错）。
+bundle patch 指向子目录时同样按包根 specifier 扫描，子路径行 UI 不挂。
+
+### 11.36 工具注入档位可配置（injectTools 三档）
+`'off' | 'minimal' | 'full'` 按档位注销/重注册工具——工具注入量是上下文预算的一部分，
+可配置化；历史 boolean 设置要归一为三档字符串。
+
+### 11.37 自更新纪律（TUI 系）
+缓存 TTL（1h）权衡；npm-only 判定（先证明自己被 npm 管理）；缓存落包 home 而非 workspace；
+`SKIP_UPDATE` 环境变量 + CI 检测跳过更新。
+
+### 11.38 patch 平台条件做"运行时替换"（win32 / skin 系）
+官方行 `disabled: true` + 自研行 `insert` 精确互斥（如按 `process.platform` 切换
+subprocess-local 与自研实现）；跨平台差异单独成模块，避免两套逻辑纠缠。
+
+### 11.39 接管宿主 provider/服务 = 替换其 config 行而非只禁用旧行
+无优先级链时"禁用旧行 + 插新行"会留下钉子（旧 provider 仍注册同名能力）；正确做法是
+**钉死 config 行**（`- id: <官方行>
+  config: { ...restate 全量 }`），全量替换必须重述
+基座原值。客户端扫描只认裸包名行——纯 client 形态必须保持裸包名 UI 行让浏览器发现。
+
+### 11.40 对官方包做指纹门（版本 + sha256 清单）
+接管官方能力的插件在加载时断言目标包版本与内容哈希匹配清单，不匹配大声抛——防止
+静默接管被官方升级打碎（AuthInOne）。
+
+### 11.41 host 空 apply + 纯 client 是合法形态
+皮肤/桌宠类插件 host 半可以只有 `export function apply() {}`；但浏览器侧 UI 必须
+保持裸包名 loader 行（客户端扫描按包根 specifier 发现）。
+
+### 11.42 typed OAuth 凭据适配
+字符串凭据适配成 typed OAuth 存储：断言结构 → 串行化刷新 → **刷新与取值同快照配对**
+（先取快照再刷新，避免读到刷新前后的混合状态）；Settings API 双版本适配器。
+
+### 11.43 IM 通道插件模板（qqbot）
+中间件栈 + 双向传输 + 会话映射三件套；凭据用 `__FROM_ENV__` 占位符 + 扫码绑定回写
+profile；审批/提问渲染成 IM 平台原生卡片按钮。
+
+### 11.44 安全导出模板（config-manager）
+加密口令仅内存（AES-256-GCM）；路径根限定 + secret-scanner；导入 require
+`confirm: true` 安全阀；可选服务 `ctx.get` 调用期判空。
+
+### 11.45 本地端口守护做跨进程共享（damage-pulse）
+用量/监控类插件用本地端口守护进程共享跨进程状态（EADDRINUSE 检测复用已有守护）；
+`withFileLock` 原子写累加；端口占用可取消重试。
+
+### 11.46 凭据占位符与回写（qqbot 补充）
+配置模板里写 `__FROM_ENV__` 占位符，运行时发现占位符则从 env 解析；扫码/设备授权后
+把真实凭据回写 profile（含权限校验）。
+
+### 11.47 三角色 seam 一体化 + 懒读热生效（memento）
+- Service Definition + Provider + Consumer 三角色可在一个插件里，但只有入口文件 import DSH 包，实现文件零依赖可测。
+- 写方法内部强制走审批门（waterfall 审批接缝）——模型经任何路径间接调用都无法绕过。
+- **懒读是热生效的全部机制**：0.1.7+ Loader 把表单编辑提交进 Config 的 volatile 引用，每次读都重新解引用；把配置冻成快照会静默失效。
+- 热切换先建新再拆旧（先拆后建会在建新抛错后留下"配置说开实际没开"的半状态）；dbPath 同理先 open 新库再 close 旧库。
+- 自持 disposer 防 HMR 二次调用：fiber 卸载时清空本地引用（ctx.effect(() => () => { ref = null })）。
+- 运行期配置校验失败 → 保持旧值 + 审计留痕（settings-rejected），不崩插件但可查。
+
+### 11.48 exact 路由赢过 /api 前缀 fence → 每 handler 自带 loopback 围栏（usage 独立印证）
+宿主 /api fence 只保护 prefix 匹配的路由；`kind: 'exact'` 的路由赢过它，必须**每个
+handler 自带围栏**（loopback/trustedHosts/Origin 校验）。
+
+### 11.49 组合一致性校验防陈旧应用（nexttavern）
+capture 当前组合快照 vs composeEntries 计算结果 isDeepStrictEqual；不一致（异步 compose
+漂移）要重试/保留上一代，避免把陈旧的 loader 组合写进去。disabled 表达式内 throw 会中止
+该行应用——用 try/catch 保留上一代。
+
+### 11.50 volatile 配置值 0.1.7 是包装对象要 unwrap
+`config.apiKey` 在 0.1.7+ 可能是 `{ value }` 包装（volatile 引用），读取前必须解包；
+旧版是裸值。settings installSection 三态兼容（注册/替换/absent）。
+
+### 11.51 generator 形态 ctx.effect
+`ctx.effect` 的工厂可以是 async generator/回调形态（yield disposer），配合
+`ctx.fiber.entry?.options.id` 取插件行 id 做命名空间（多实例安全）。
+
+### 11.52 systemPrompt context 尾消息注入保缓存（与 pre-step splice 并列）
+记忆/上下文注入的另一正确接缝：`ctx.systemPrompt.context` 渲染成 user-role 尾消息，
+DSH 只在文本变化时重新 append——稳定的 system/history 前缀缓存得以保留。pre-step splice
+与 context 注入二选一，别混用。
+
+### 11.53 配置持久化必须 $DSH_HOME + 内容指纹防重复吸收
+用户配置/状态落盘 `$DSH_HOME`（跨 profile 稳定）；批量吸收配置前先算内容指纹
+（hash），同指纹跳过，防重复导入（status-rotator issue #51 根因）。
+
+### 11.54 静态 bundle 同一正文双形态（popout-sidebar）
+同一份 client 正文既当 host 侧注入 code（`new Function` 包裹）又当浏览器侧脚本：
+保持同一正文双形态，避免两份拷贝漂移。
+
+### 11.55 审批/权限类插件三件套（auto-review/permission-rules 独立印证）
+- `approval/request` answerer 短路语义：匹配本插件策略的请求自己 settle，其余 `next()` 委托人类链；fail-closed 默认（fallbackPolicy 默认 rejected）。
+- `tools/pre-execute` 决策语义：deny/ask 短路，**allow 永远 `next()` 委托**（不自己放行）。
+- invariant 伴生校验"模型可见 = 已记录"的审计一致性。
+
+### 11.56 审查上下文隔离模板（auto-review）
+只读审查子代理的消息源白名单：agent/pre-step 只留 user/tool 源（防仓库文本/历史污染裁决者），工具 allow-list 限制审查者能力，结构化 verdict schema。
+
+### 11.57 localStorage origin 漂移陷阱（dream-skin）
+Desktop 宿主端口每次重启随机 → localStorage 的 origin 每次变化 → 浏览器侧偏好设置"丢失"。
+正确做法：宿主半区做 stable 持久化（`$DSH_HOME`/profile）+ fenced API，localStorage 只做首帧种子。
+
+### 11.58 回滚/fork 类操作 = 日志完整 + 视图裁剪
+撤回不是删除：fork 新版本保留完整日志、surface 裁剪 marker 只剪模型可见（rewind surfaceOp /
+easyrewrite fork / dream-skin 整对象替换三仓库同哲学）；备份在 tools/execute around 阶段捕获
+（审批短路不记录/denied 从不记录）+ post-execute 提交。
+
+### 11.59 存储类的三条纪律（meow-memory/git-memory）
+- operation-lock 跨进程判活（processAlive 而不是只靠文件存在）；
+- SQLite 用 `node:sqlite` 零依赖（WAL）；文件树即真相 + 可重建 search index；
+- 事件落库节流（5s 合并）+ 插件自身轮副作用排除（isPluginTurn 防自激）+ 空闲阈值才 dream。
+
+### 11.60 学习管线（run2skill）
+静默期协调器：尾部检测完 + 空闲 + 无 agent 才动；快/慢/指数退避分级重试；pre-step step1 时
+先追平持久化再 snapshot（catchup 门槛）；WeakMap scope disposer + agent/disposed 清理；
+RecoveryLifecycle 崩溃后可重放。
+
+### 11.61 预设编辑器双渠道（preset-plus）
+systemPrompt.section 与 llm/stream fake 消息双渠道注入；**不能用 agent/request 改消息**
+（该瀑布不可变）；scope 门控 scopedPresets。
+
+### 11.62 视觉/设备流插件铁律（android/ios/openpencil 三仓独立印证）
+DeepSeek adapter 拒绝请求内 ImageBlock → 工具结果**纯 JSON + presentationMeta 投影** +
+渲染时现铸签名 URL（不发原始图片，只发寻址引用）。工具永远注册 execute 抛解释错误
+（不用未注册工具）。
+
+### 11.63 签名 URL 安全基线（ZSeven 家族）
+HMAC-SHA256 + per-DSH-home 0600 密钥原子创建 + 短 TTL（10 分钟）+ 路由先过
+loopback/trusted 围栏再看 capability + `lstat` 禁 symlink + realpath 包含校验；
+内容寻址签名投递（name + 字节长 + SHA-256）。
+
+### 11.64 进程外二进制插件样板（noema 拉式生命周期）
+懒启动 + idle 回收 + 崩溃退避 + 状态面；子进程二进制缺失是**静默性能悬崖**
+（npx 回退 3.6-6.5s/tap vs 57ms）→ 启动时探测 + warn；绝不两个 xcodebuild（busy
+cooldown）；命令串用 tokenize 而非 shell 解析。
+
+### 11.65 插件 id 与 npm 包名解耦 + patch 不含本机路径
+插件行 id 可以独立于包名（兼容已装用户与重命名）；patch 永远不写本机绝对路径
+（用 !!js dshHomePath 或相对包路径）。
+
+### 11.66 路由注册全 ctx.effect + 可选服务 ctx.inject
+webServer/路由注册包 `ctx.effect`（卸载自动摘除防 duplicate）；可选服务用
+`ctx.inject` 按需拿（headless 组合不崩）；前缀路由找不到包时显式 404 而非静默。
+
+### 11.67 cordis.patch.json 是合法形态（nexttavern）
+patch 可以是 JSON（cordis.patch.json），与 YAML 等价——对 YAML 块标量/引号敏感场景是
+零歧义替代；`disabled: { __jsExpr: ... }` 表达式形态做 entry-policy 判定。
+
+### 11.68 !!js 表达式里解析包（没模块上下文）
+patch 求值环境无模块上下文：用 `createRequire` 锚在 `ctx.profileContext.dir` 的
+package.json 来 resolve 包路径。
+
+### 11.69 替换默认实现类插件 = 运行时 registerProvider + 三段接管（free-search）
+**不要在 patch 静态写 `- id: web config: {...}`**（整块替换副作用）；正确做法是
+运行时 `registerSearchProvider({ id, available, search })`，接管规则：未设置/仍是
+官方默认 → 接管；显式指向别家 → 只警告不抢占。不在 patch 静态写 searchProvider。
+
+### 11.70 投影单元 warm-up
+注册 sessionProjections 后要 `sessions.list()` 全部 snapshot 一次，否则前端打开看到
+空数据；warm-up 异常按单会话 try/catch。
+
+### 11.71 增量折叠的缓存纪律（usage）
+revision 变更不保证旧前缀存活（rewrite/truncate）——增量系统一旦变更必须整段重折叠；
+缓存 key 含全部影响维度（model/route/时间窗）。
+
+### 11.72 SkillProvider list() 不完整就不缓存
+list() 返回 complete:false 时不要缓存（注册表会把截断目录当权威）；双层取消契约：
+`control.signal`（注册级）+ `options.signal`（查询级）。

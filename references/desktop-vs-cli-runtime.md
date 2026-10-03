@@ -35,7 +35,7 @@ DSH 有两种主流宿主形态，它们的**插件包格式完全相同**，但
 <App>/                               ← Electron 应用根
   <Product>.exe                      ← 主程序
   resources/
-    app.asar                         ← 【整个 dsh 运行时都打在这里】
+    app.asar/dsh/                    ← 【dsh 运行时打在这里】（289 个官方包；asar 顶层另有约 10 个共享主进程依赖）
     app.asar.unpacked/
     runtime/
       cli/bin/dsh.cmd                ← 桌面版自带的 CLI 入口
@@ -44,7 +44,7 @@ DSH 有两种主流宿主形态，它们的**插件包格式完全相同**，但
       versions.json                  ← 仅 {schemaVersion, node, pnpm}
 `
 
-- **dsh 本体与全部官方包都在 `app.asar` 内**，不在 profile 的 `node_modules` 里。
+- **dsh 本体与全部官方包都在 `app.asar` 的 `dsh/` 子目录内**，不在 profile 的 `node_modules` 里。
 - profile 实体仍在 `$DSH_HOME/profiles/<name>/`，**结构与 CLI 完全一致**。
 - 依赖布局：常见 **hoisted**（`nodeLinker: hoisted`，顶层扁平、`.pnpm` 下只有 `lock.yaml`）。
 - `runtime/versions.json` 只含 `{schemaVersion, node, pnpm}` 三个键，**没有 python**；python 版本在 `primary-runtime/runtime.json`（实测 node 24.18.1 / pnpm 11.7.0 / python 3.12.14）。
@@ -53,7 +53,7 @@ DSH 有两种主流宿主形态，它们的**插件包格式完全相同**，但
 
 | 维度 | CLI Web | 桌面版 (Electron) |
 | --- | --- | --- |
-| dsh 本体来源 | npm 全局包 | `resources/app.asar` |
+| dsh 本体来源 | npm 全局包 | `resources/app.asar` 的 `dsh/` 子目录 |
 | 官方包位置 | 全局 `node_modules` | asar 内 |
 | profile 目录 | `$DSH_HOME/profiles/<name>` | **相同** |
 | 配置文件名 | `cordis.patch.yml` | **相同** |
@@ -102,12 +102,13 @@ npm 全局那份（%APPDATA%\\npm/dsh.cmd，即 npm 全局 bin，非 pnpm）  = 
 ### 参数形式的一个坑
 
 `text
-dsh --profile <name> web         # ❌ 位置参数 web 会被当成 app-args，报 too many arguments
-dsh web --profile <name>         # ✅  app 名在前，--profile 是启动器标志
-dsh <name> [app-args]            # ✅  等价写法：第一个位置参数即 profile 名
+dsh web --port 8080            # ✅ 第一个位置参数即 profile 名（launcher 展开为 --profile web）
+dsh --profile web --port 8080   # ✅ 等价
+dsh web --profile web           # ❌ 展开后 --profile 出现两次 -> select a profile only once
+dsh --profile web web           # 等价 dsh web web：web 成为 app-args；与 --dump-config 等 launcher 形态互斥时报 unknown option（实测）
 `
 
-另外：`select a profile only once` 只在命令行重复传 `--profile` 时触发（launcher 未读取任何 `DSH_PROFILE` 环境变量；shell-env 注入的是出站环境的 `DSH_PROFILE` 值，与选中 profile 无关）。
+另外：`select a profile only once` 在命令行重复传 `--profile` 或位置参数展开后撞上显式 `--profile` 时触发（launcher 未读取任何 `DSH_PROFILE` 环境变量；shell-env 注入的是出站环境的 `DSH_PROFILE` 值，与选中 profile 无关）。
 
 ---
 

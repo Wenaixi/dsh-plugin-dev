@@ -23,7 +23,7 @@ function apply(ctx) {
 exports.inject = ["slots", "locale"];   // 显式声明，时序更稳
 ```
 
-- `ctx.locale.register(ns, {zh, en})` 只校验「键值字典**成对**、同 ns 同 locale 重复注册抛错」，**不校验值**。
+- `ctx.locale.register(ns, {zh, en})` 只校验 locale id（BCP 47 风格正则）与同 ns 同 locale 重复注册（抛错）；**不校验键成对、也不校验值**——键成对靠发布侧脚本自检（见铁律 1）。
 - `t(key, {name})` 支持 `{name}` 占位符模板替换。
 - `exports.inject` 显式加 `"locale"`（成本零，注册时序更稳）。
 

@@ -63,6 +63,10 @@
 - **[install-resolution-traps.md](./install-resolution-traps.md)**：
   插件安装版本解析三大陷阱的权威排查手册——pnpm 发布冷却期 `minimumReleaseAge: 1440`（24 小时，只装发布满 24h 的版本，新版本被排除后解析回退到最老合格版本）、semver 预发布排序（`-tag.N` 后缀被范围解析默认排除，`maxSatisfying(vers,'*')` 返回旧正式版）、DSH 兼容性闸门两段式预检与后检语义与精确版本豁免机制、profile 目录结构与 `minimumReleaseAge: 0` 配置落点、desktop profile 的 Electron 独占守卫。附可复现的参数实验、时间指纹判定法与排障决策表；并覆盖**全新 profile 首次安装的三大坑**：`dsh plugin add` 不写 `dsh.profile.bundles` 需手动补、原生依赖的 `ERR_PNPM_IGNORED_BUILDS` 需在 `pnpm-workspace.yaml` 里加 `allowBuilds` 放行、以及从零到可跑的五步落地顺序。
 
+### 九之二、静默失效防线与可失败门禁 (Silent Failures & Verifiable Gates)
+- **[silent-failure-and-gate-design.md](./silent-failure-and-gate-design.md)**：
+  把「代码写全了、门禁全绿、运行时毫无作用」这类零报错缺陷归纳成三类根因（代码从未被执行、契约被吞掉、解析到了别的东西），每类配可执行的判定动作；并给出**门禁设计方法论**——先按「错了会不会报错」分类，再决定写运行时回读、源码形态正则还是产物断言，**每条新断言必须做破坏实测证明它会红**；另含真机浏览器验收的环境坑速查（遮罩吞点击、导航等待超时、写入期间控件禁用）、收敛判定的「两帧相同加目标谓词」纪律、发布前后的双重复验与 manifest 自动规范化坑。
+
 ### 十、多模态附件、人机交互与最终交付物呈递 (Multimodal & Deliverables)
 - **[multimodal-and-deliverables.md](./multimodal-and-deliverables.md)**：
   多模态与人机交互权威指南——最终交付物卡片 (`present` 工具与前端 Deliverables 原生打开/预览)、人机协同结构化提问 (`ask_user_question` 与 `ctx.userQuestions` 挂起/恢复)、多模态图像附件规范化存储 (`dsh-attachment-local`)、以及长上下文工具结果智能剪枝 (`compaction-tool-result-pruner`)。
@@ -104,9 +108,3 @@
   意图工具 + 投影 fold、服务提供方与 Typert RPC 的坑、凭据引用、prepare-before-swap
   热更新、Windows / Electron / DSH_HOME 环境坑、发布与验收纪律。每条经验带出处仓库，
   属"第三级证据"（社区实现），与官方源码冲突时以官方为准。
-
-### 十八、静默失效防线、门禁设计与真机验收 (Silent Failures & Verifiable Gates)
-- **[silent-failure-and-gate-design.md](./silent-failure-and-gate-design.md)**：
-  静默失效三类根因（代码从未执行 / 契约错误被吞 / 解析到错误对象）与判定动作、
-  可验证门禁设计（解析→执行→落盘→回读四段）、真实浏览器验收清单（Playwright 指本机
-  Chrome、domcontentloaded、dialog 处理器、force=True 不等于命中、写后回读磁盘）。

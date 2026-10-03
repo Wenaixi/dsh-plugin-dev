@@ -148,6 +148,26 @@ registerProvider(create: (control: SkillProviderControl) => SkillProvider): () =
 - `registerProvider` 的返回值交给 `ctx.effect` 托管，插件卸载时自动注销；
 - `invalidate()` 在注册被 dispose 时会被宿主 abort 掉，实现里要容忍"被 abort 后再被调用"；
 - 想让用户改配置后立刻生效，**配置写入点和 invalidate 调用点必须在同一处**，否则必然出现"改了不生效且零报错"。
+### 屏蔽技能的官方唯一通道：覆盖 invocation，不剔除条目
+
+插件要「关掉某个技能」时，**不要从 `list()` 的返回里过滤掉它**。正确做法是把该候选的 `invocation` 两个布尔改掉：
+
+```ts
+// 覆盖而不是剔除
+candidate.invocation = { ...candidate.invocation, modelInvocable: false }
+// 等价于在该技能的 SKILL.md 里写 disable-model-invocation
+```
+
+| 做法 | 后果 |
+| --- | --- |
+| **覆盖 `invocation` 布尔**（正确） | 技能仍占注册表名额与同名裁决权；语义与写 frontmatter 完全一致；改回去即恢复 |
+| 从 `list()` 结果里 filter 掉（错误） | 丢失同名裁决权；`get()` 若未同步过滤仍能取到；宿主侧 `skill` 工具的报错从「该技能对当前不可见」退化为「未知技能」，用户拿不到有效诊断 |
+
+**两处都必须套用**：`list()` 与 `get()` 都要按同一份屏蔽表改写。只改 `list()` 会让模型目录里看不到它，但 `skill` 工具调用依然成功，这是「看起来生效了其实没生效」的典型形态。
+
+**热生效要双失效**：想让运行时改开关立刻生效，必须同时让「注册表的目录缓存」与「你自己的候选快照」双双作废。前者靠 provider 的 `control.invalidate()`（宿主据此广播 `skills/change`），后者靠你自己在数据源变化时清快照。缺任一方都表现为「UI 已更新而模型侧目录不变」。
+
+**验证要分两侧取证**：宿主侧用真实 `SkillRegistry` 复核「模型可见集」与「用户可见集」，UI 侧逐行比对显示值与宿主目录。只看界面等于没验。
 
 ---
 

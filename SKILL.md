@@ -183,6 +183,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 > [community-patterns.md](./references/community-patterns.md)——高星插件共性做法与高频坑
 > （patch 整块替换、版本兼容层、信任围栏、客户端纪律、事件词汇表等）已按专题蒸馏完毕。
 | **W** | 想把自研资源（打包资源、远端、动态裁剪）变成原生技能，或替换技能发现逻辑 | 自定义技能发现：实现 `SkillProvider` 的 `list`/`get`，经 `ctx.skills.registerProvider` 接入，取 `rank` 裁决重名，用 `complete: false` 表达发现未完成 | [skill-provider.md](./references/skill-provider.md) |
+| **X** | 代码与门禁都写完了，运行时功能却不生效且无任何报错 | 静默失效排查：按「代码从未执行 / 契约被吞 / 解析到别的东西」三类定位；给每条新断言做破坏实测；真机浏览器验收并逐次回读真值 | [silent-failure-and-gate-design.md](./references/silent-failure-and-gate-design.md) |
 
 ---
 

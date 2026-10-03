@@ -250,6 +250,34 @@ DSH 前端提供了一套标准的主题 CSS 变量，支持自动跟随深色�
 
 CSS 变量未定义时不会报错，只会用兜底值——**所以别给 `var(--x, #fff)` 写硬编码兜底**，那等于把错误藏起来。变量拼错时应当直接在 DevTools 里查 Computed Style 确认真实值。
 
+#### 令牌的三层结构与两条硬事实
+
+`--dsw-*` 分三层，**只用语义层（alias）**：
+
+```text
+`--dsw-static-*`   原始色板常量（调色板本身，不随主题变）
+      ↓
+`--dsw-alias-*`    语义层（浅色/深色两套取值，主题切换时整组换）
+      ↓
+组件级令牌      官方组件自己的变量
+```
+
+**硬事实一：颜色变量定义在 `body` 上，不是 `:root`。** 所以在 `document.documentElement` 的 computed style 里查不到颜色变量，必须查 `body`（或元素本身）。落在 `:root` 的只有 `--dsw-radius-*`、`--dsw-font-family*`、`--dsw-corner-shape`、`--dsw-focus-ring-width` 与 shiki 相关变量。
+
+**硬事实二：主题切换是 `body[data-ds-dark-theme]` 属性。** 不是 `data-theme`，不是 `.dark`。想在自己的验收脚本里模拟深色，就给 `body` 加这个属性。`--dsw-static-*` 的浅深两套取值几乎相同，**引用它等于放弃主题联动**。
+
+#### 三条容易踩的令牌事实
+
+| 事实 | 说明 |
+| --- | --- |
+| **不存在间距令牌** | 没有 `--dsw-space-*`，一律用裸 px。官方实际使用的间距阶梯约为 2/4/6/8/10/12/14/16/18/20/22/24/28/32 |
+| **状态色命名反直觉** | 信息色叫 `state-business-primary` 而不是 info；错误色叫 `state-error-primary` 而不是 danger |
+| **别名可能只在官方组件的局部作用域里存在** | 某些名字官方 CSS 引用了却没在 `body` 上定义，写上去等于写空值。判定办法：在 DevTools 里选中该元素看 Computed Style，值为空即不存在 |
+
+**排版统一走字阶令牌**（形如 `--dsw-font-xxxs-11`、`--dsw-font-xxs-12`、`--dsw-font-xs-13`、`--dsw-font-s-14`、`--dsw-font-base-16`），名字末段是字号。写成 `font-size: 13px` 而不带 line-height 会丢掉官方行高节奏。
+
+**行分隔用相邻兄弟选择器**：官方是 `.row + .row { border-top: 0.5px solid var(--dsw-alias-border-l2) }`，不是每行自带 border-bottom，后者会在末行多出一条线。
+
 ### 2. 样式安全注入与 HMR 自动回收铁律
 为避免插件卸载或热重载时样式残留，推荐使用标准的 **带标识 `<style>` 标签注入法**：
 

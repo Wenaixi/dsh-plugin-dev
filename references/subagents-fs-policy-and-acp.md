@@ -12,7 +12,7 @@
 - **`spawn`（插件 `@deepseek-ai/dsh-subagent-spawn-in-process`）**：在当前进程中拉起全新的独立子智能体，完全不继承父会话历史，用于全新无污染的独立任务（如全网背景调研）；
 - **`fork`（插件 `@deepseek-ai/dsh-subagent-fork-in-process`）**：分叉继承父会话当前已完成的全部轮次历史，用于需要上下文背景的后续分析与审查；
 - 以上两个插件的注册名均可通过各自 `Config.providerName` 覆盖（默认 `spawn` / `fork`）；
-- **`acp`（`@deepseek-ai/dsh-subagent-acp`）**：通过标准 Agent Client Protocol 连接外部独立进程或远程智能体。**注意：该客户端包未随 0.2.0-rc.2 发布集安装**，本机已装的是服务端 `@deepseek-ai/dsh-acp`（JSON-RPC stdio，启动入口 `dsh --profile acp`），因此当前注册表中不存在 `acp` 提供方。
+- **ACP（`@deepseek-ai/dsh-acp` + `dsh-acp-app`）**：基于 `@agentclientprotocol/sdk` 的 Agent Client Protocol **服务端适配层**（JSON-RPC stdio，启动入口 `dsh --profile acp`，由 `dsh-acp-app` 解析），**不注册为 `ctx.subagents` 的 provider**。注意：客户端包 `@deepseek-ai/dsh-subagent-acp` 未随 0.2.0-rc.2 发布集安装（asar 289 包中不存在），因此注册表中没有 ACP 提供方。
 
 ### 2. 单次运行 (One-Shot) vs 可持续会话 (Continuable)
 `ctx.subagents` 明确区分了两种调用者意图：

@@ -20,7 +20,7 @@
 └────────────┬────────────┘
              │
 ┌────────────▼────────────┐
-│  dsh-mcp-client 插件桥   │ (管理连接池、序列化协议、超时控制)
+│  dsh-mcp-client 插件桥   │ (单受监督连接 + 代次重建、直接 SDK callTool、超时控制)
 └────────────┬────────────┘
              │ Streamable-HTTP / StdIO 管道
 ┌────────────▼────────────┐
@@ -106,7 +106,7 @@ mcp__<serverName>__<rawToolName>
 export function apply(ctx) {
   ctx.tools.guard((exec) => {
     // 匹配特定 MCP 服务下的高危工具
-    // guard 阶段 exec 只有 name / callId / agent / signal 等元数据，arguments 尚未物化
+    // guard 阶段 exec 携带 name / callId / rootCallId / agent / parent / signal / schema（arguments 在守卫判定前已物化并 deepFreeze，可直接用于匹配）
     if (exec.name.startsWith('mcp__database__') && exec.name.endsWith('drop_table')) {
       return '安全策略阻断：禁止通过 MCP 执行删库操作';
     }

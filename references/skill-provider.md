@@ -39,6 +39,19 @@ registerProvider(create: (control: SkillProviderControl) => SkillProvider): () =
 同名技能由 rank 小者胜，**只在同一层内比较**；跨层由层优先级先决。项目条目 > 运行时条目 > 用户条目。
 
 官方常量（从 `dsh-skill` 源码读出，随版本漂移，写代码前以本地 `lib/index.js` 为准）：
+官方 filesystem 提供方扫描的六类根（`dsh-skill-filesystem`，0.2.0-rc.2）：
+
+| rank | 根 | source |
+| --- | --- | --- |
+| 100 | `<projectRoot>/.dsh/skills` | project-dsh |
+| 200 | `<projectRoot>/.agents/skills` | project-agents |
+| 300 | 每个 `customSkillDirs` 配置项 | custom |
+| 400 | `<dshHome>/skills`（默认 `~/.dsh/skills`，可经 `$DSH_HOME` 覆盖） | user-dsh |
+| 500 | `<agentsHome>/skills`（默认 `~/.agents/skills`） | user-agents |
+| 600 | `bundledSkillDir`（`$DSH_BUNDLED_SKILL_DIR`） | bundled |
+
+其中 `projectRoot` 是最近含 `.git` 的祖先目录；技能既可以是目录 bundle `<name>/SKILL.md`，也可以是根下平铺 `<name>.md`；发现深度只有一层。
+
 
 | 常量 | 值 | 含义 |
 | --- | --- | --- |
@@ -87,7 +100,7 @@ registerProvider(create: (control: SkillProviderControl) => SkillProvider): () =
 
 - `complete: false` 的结果**不进缓存**，宿主保留上次的好结果并在下一个请求边界重试；
 - 绝不能用一个空数组假装"这次没找到技能"，那会被缓存成权威结果，技能凭空消失且无任何报错；
-- 目录不存在、不是目录这类可预期情形，返回 `complete: false` 并打一条 warn，是正确姿势。
+- 目录不存在、不是目录这类可预期情形，**不要**返回 `complete: false`：官方 `dsh-skill-filesystem` 对缺失根返回空数组，视作完整空状态并正常缓存（目录出现后由 ancestor watcher 探测并 `invalidate`）。`complete: false` 在官方实现里只对应 watcher 启动失败这一条错误路径。
 
 ---
 

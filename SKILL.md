@@ -180,11 +180,13 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 | **T** | 沙箱内核级隔离、多模态图片压缩转储与网络代理 | 底层安全与基础设施：理解 Windows ACL/Landlock 原理、image-offload 恢复、undici 代理 | [sandbox-internals-and-proxy.md](./references/sandbox-internals-and-proxy.md) |
 | **U** | 子智能体持续多轮交互、文件系统防覆盖锁与 ACP 协议 | 委派与文件安全：使用 `ctx.subagents.startContinuable`、理解 fs-observation 读后写规则 | [subagents-fs-policy-and-acp.md](./references/subagents-fs-policy-and-acp.md) |
 | **V** | 装插件解析到过时的旧版本、被 incompatible 拒绝、版本选择与预期不符 | 安装解析排障：读 `.plugin-manager/logs/` 确认解析版本，识别 pnpm 冷却期与 semver 预发布排序，配置 `minimumReleaseAge: 0` 或改用精确版本 | [install-resolution-traps.md](./references/install-resolution-traps.md) |
+| **W2** | 自定义技能失效不生效、UI 开关后模型目录不刷新、怀疑 skills/change 误用 | 失效链路与 invalidate 正确姿势：`provider-catalog-invalidation.md`（消费方通知缝 vs 提供者直调、registerProvider 捕获实例、反模式两例） | [provider-catalog-invalidation.md](./references/provider-catalog-invalidation.md) |
+| **W3** | 双面插件接入 ctx.locale 双语、构建产物内嵌字典、宿侧文案客户端覆盖、发布后 npm 验证假阴性 | i18n 六铁律 + 发布验证：`client-i18n-pitfalls.md` / `publish-npm-verification.md` / `architecture-refactor-experience.md` | [client-i18n-pitfalls.md](./references/client-i18n-pitfalls.md) · [publish-npm-verification.md](./references/publish-npm-verification.md) · [architecture-refactor-experience.md](./references/architecture-refactor-experience.md) |
 
 > **通用工程经验（社区图谱）**：开发任何形态插件前，先查
 > [community-patterns.md](./references/community-patterns.md)——高星插件共性做法与高频坑
 > （patch 整块替换、版本兼容层、信任围栏、客户端纪律、事件词汇表等）已按专题蒸馏完毕。
-| **W** | 想把自研资源（打包资源、远端、动态裁剪）变成原生技能，或替换技能发现逻辑 | 自定义技能发现：实现 `SkillProvider` 的 `list`/`get`，经 `ctx.skills.registerProvider` 接入，取 `rank` 裁决重名，用 `complete: false` 表达发现未完成 | [skill-provider.md](./references/skill-provider.md) |
+| **W** | 想把自研资源（打包资源、远端、动态裁剪）变成原生技能，或替换技能发现逻辑 | 自定义技能发现：实现 `SkillProvider` 的 `list`/`get`，经 `ctx.skills.registerProvider` 接入，取 `rank`（小者胜）裁决重名；`complete: false` 只用于发现未完成（目录缺失返回空数组即可）；`invocation` 的 `modelInvocable`/`userInvocable` 控制模型/用户两侧可见性 | [skill-provider.md](./references/skill-provider.md) |
 | **X** | 代码与门禁都写完了，运行时功能却不生效且无任何报错 | 静默失效排查：按「代码从未执行 / 契约被吞 / 解析到别的东西」三类定位；给每条新断言做破坏实测；真机浏览器验收并逐次回读真值 | [silent-failure-and-gate-design.md](./references/silent-failure-and-gate-design.md) |
 | **Y** | 界面注册了却不出现、改完看不出效果、分不清「没渲染 / 渲染在别处 / 用的旧缓存」 | 客户端 UI 落点与取证：先查「界面语义 → 插槽」映射表，坚持**一个功能一个入口**；记住 `slots.inject` 在插槽 spec 不存在时**静默不执行**；改完桌面端必须完全重启；用 Node 直跑 factory 与 CDP 真机取证 | [client-ui-placement-and-verification.md](./references/client-ui-placement-and-verification.md) |
 | **Z** | 同一插件在桌面版与 CLI Web 上表现不一致；要把插件与配置从一个 profile/运行时迁到另一个 | 跨运行时差异与迁移：桌面版本体在 `app.asar`、profile 被 Electron 独占（部分 CLI 操作仍可用）、依赖多为 hoisted；**官方包由运行时提供不必装**；**装了 ≠ 挂载**（`dependencies` vs `dsh.profile.bundles`）；pnpm **不检测文件缺失**；配置迁移要追加不覆盖 | [desktop-vs-cli-runtime.md](./references/desktop-vs-cli-runtime.md) |

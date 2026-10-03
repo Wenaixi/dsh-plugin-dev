@@ -79,15 +79,10 @@ export class TaskQueueService extends Service {
   })
   private runningCount = 0
   constructor(ctx: Context, public config: TaskQueueConfig) {
-    // 第二个参数是挂载到 ctx 上的服务键名（name 即 ctx 挂载键）
-    super(ctx, 'taskQueue', true)
+    // 第二个参数是挂载到 ctx 上的服务键名（name 即 ctx 挂载键）；官方 Service 构造器只有 (ctx, name?) 两参
+    super(ctx, 'taskQueue')
   }
-  protected override start(): void | Promise<void> {
-    // 所有依赖就绪后调用；返回 Promise 时下游插件保持等待
-  }
-  protected override stop(): void | Promise<void> {
-    // 优雅停机、释放连接池或未完成任务
-  }
+  // 官方不存在 start/stop 生命周期钩子；依赖就绪后的初始化用静态符号 [Service.init]()，清理用构造期 ctx.effect 注册
   public enqueue(task: () => Promise<void>) {
     // 公开的业务能力
   }
@@ -99,8 +94,7 @@ export function apply(ctx: Context, config: TaskQueueConfig) {
 ```
 **服务生命周期契约**：
 - **构造阶段**：`super(ctx, name)` 后服务立即注册到 `ctx.<name>`，并随所属 fiber 自动移除（无需手动注销）。
-- **start() 钩子**：所有依赖就绪后调用。若返回 Promise，依赖该服务的下游插件会保持等待。
-- **stop() 钩子**：服务所属插件被卸载或环境退出时触发。
+- **依赖就绪初始化**：官方没有 start()/stop() 钩子；需要「所有依赖就绪后」执行一次的初始化写在静态符号 `[Service.init]()` 方法里（类插件构造后调用）；清理一律用构造期 `ctx.effect` 注册的可逆副作用，随 fiber 卸载自动执行。
 - 服务内部注册的事件与 `ctx.effect()` 资源均与 fiber 生命周期绑定，卸载时自动注销。
 
 ---

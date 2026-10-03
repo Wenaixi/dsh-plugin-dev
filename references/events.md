@@ -36,7 +36,7 @@ export function isBailed(value: any) {
   ```
   在 `ctx.on(name, listener, true)` 中，第三个参数传布尔值即为 `{ prepend: true }` 的简写。
 - **Disposer 注销函数**：
-  `ctx.on()` 与 `ctx.once()` 返回一个 `() => boolean` 注销函数。若执行时成功移除监听器返回 `true`，未找到返回 `undefined`。监听器由所属 Fiber 的 `effect` 生命周期自动托管，Fiber 卸载时全自动注销。
+  `ctx.on()` 与 `ctx.once()` 返回一个可调用的注销函数（`fiber.effect` 包装）；调用它即卸载该监听器（内部 `unregister` 成功移除返回 `true`，未找到返回 `undefined`）。监听器由所属 Fiber 的 `effect` 生命周期自动托管，Fiber 卸载时全自动注销。
 - **`thisArg` 首参重载**：
   所有五大派发方法均原生提供首参为 `thisArg` 的重载，支持显式指定监听器内部 `this` 绑定。
 
@@ -130,9 +130,9 @@ ctx.on('some/hook', async (payload, next) => {
 export const inject = ['tools']
 
 export function apply(ctx) {
-  // 1. 同步广播监听
-  const unbindReady = ctx.on('ready', () => {
-    ctx.logger('my-plugin').info('服务完全就绪')
+  // 1. 同步广播监听（注意：`ready` 事件不存在；真实生命周期事件是 `agent/created`）
+  const unbindReady = ctx.on('agent/created', (agent) => {
+    ctx.logger('my-plugin').info('Agent 已创建: ' + agent.id)
   })
 
   // 2. waterfall 环绕中间件（拦截工具前置决策）

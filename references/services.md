@@ -99,8 +99,8 @@ import { Context, Service } from '@deepseek-ai/cordis'
 export class CustomMemoryCache extends Service {
   // 声明在 Context 上的挂载属性名
   constructor(ctx) {
-    // 第二个参数即为挂载属性 ctx.memoryCache
-    super(ctx, 'memoryCache', true)
+    // 第二个参数即为挂载属性 ctx.memoryCache（官方 Service 构造器只有 (ctx, name?) 两个参数）
+    super(ctx, 'memoryCache')
     this.store = new Map()
     // 清理逻辑在构造期用 ctx.effect 注册，随所属 fiber 卸载自动执行
     ctx.effect(() => () => this.store.clear())

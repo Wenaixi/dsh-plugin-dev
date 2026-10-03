@@ -72,7 +72,7 @@ clearai 用 `dsh.bundle.patch: ["./cordis.patch.yml", "./presets/clearai/clearai
 
 ### 2.1 能力探测优先于版本号分支
 - 事件名新旧并存：0.1.6 起 agent 就绪事件是 `agent/created（payload 恒带 source: 'startup'|'resume'|'clear'|'compact'，按 source 值判而非 'source' in payload）；SessionStartSource = 'startup'|'resume'|'clear'|'compact'）——agent/session/created 是旧版事件名，0.2.0 全包 0 命中
-- 方法探测：`typeof session.snapshotEvents === 'function'` 优先，回退 `session.events`；`typeof service.register === 'function'` 区分 Settings 新旧 API；`WEB_SERVER_KEYS = ['webServer', 'httpServer']` 新旧服务键并存。
+- 方法探测：0.2.0-rc.2 已移除 session.events（用 snapshotEvents；eventAt/ownEvents deprecated）；Settings 无 register 方法（用 describe/update/replace/configure）；官方无 WEB_SERVER_KEYS 常量（服务名就是 ctx.webServer）。
 - 版本号分支只用在"补丁/配置键名"这类真的按版本变化的场景（dsh-TUI 的 persona→personaPrefix）。
 
 ### 2.2 进程级稳定符号做跨包通信
@@ -100,7 +100,7 @@ apply 时探测宿主版本：低于支持基线给 fallback 单元（零数据 
 ### 3.2 信任围栏（DNS-rebinding 防御，不是认证）
 - DSH 的 /api 网关接受 "loopback OR 已声明 authority"（`--trusted-host <name>` + 绑定 0.0.0.0 被拒：web-app/startup.js 对 --host 0.0.0.0 直接报错拒启动（"would expose remote code execution"）；LAN/反代部署正解是 --trusted-host <authority>（可重复、port-less 匹配任意端口），经 webStartup 服务注入 connection Config.trustedHosts
 - **血泪坑（dsh-market #729）**：exact 路由赢过 /api fence 的 prefix 匹配，永远见不到它，必须自己决定 → 只信 loopback 会让所有经域名（反代/隧道/LAN 主机名）到达的部署写路由 403 而读路由正常，表现为"安装按钮点了没反应"。
-- 正确做法：trustedHostsSource 从宿主的 connection 服务读（每次请求取 live 值），判定 = Host 头是 loopback 或属于 trustedHosts **且**浏览器跨站标记同源（Origin 与 Host 一致）。better-sidebar 把 /api 网关的 fence 逻辑整体复制过来（BSD-3 注明出处），不 import 内部模块。
+- trustedHosts 是 ConnectionConfig 配置项，HostConnectionService 构造时快照入私有字段，**不暴露 live getter**；isLoopbackHostname 宿主明确不导出（package-internal），插件只能复制语义。判定 = Host 头是 loopback（127/8、localhost、[::1]）或属于 trustedHosts，**且** Origin 语义：无 Origin 放行（浏览器读）、有必同源、null Origin 拒绝、sec-fetch-site cross-site 拒绝。better-sidebar 把 /api 网关的 fence 逻辑整体复制过来（BSD-3 注明出处），不 import 内部模块。
 - mutating 端点：same-origin POST + curated 来源白名单（dsh-market 安装路由）；`isTrustedApiRequest(request, trustedHosts)（单级：loopback/trustedHosts + sec-fetch-site 非 cross-site + Origin 同源；无 mutation 级参数；/api 是 kind:'prefix' 路由 + handler 内 admit() 双级 403/401，exact 表优先——'exact-table miss 后才走 prefix'）(req, mutation)` 两级（只 loopback vs 还要 Origin 校验）。
 
 ### 3.3 长任务取消与 effect 内 throw 的坑
@@ -136,7 +136,7 @@ apply 时探测宿主版本：低于支持基线给 fallback 单元（零数据 
 ## 五、事件、生命周期与状态（33/86 提及）
 
 ### 5.1 自定义 session 事件类型必须先注册词汇表（最危险的静默故障）
-graph-memory + working-activity 双重印证：`session.append()` 无法标记事件可忽略；自定义 session 事件类型不在宿主的 `KNOWN_SESSION_EVENT_TYPES` 里，严格读取路径（恢复种子校验、持久化加载）会**拒绝整个会话**，导致"写进去没报错、下次打不开"。发布前必须注册到所有物理可达 dsh-session 副本的词汇表（realpath 去重）。
+graph-memory + working-activity 双重印证：自定义 session 事件类型不在宿主的 `KNOWN_SESSION_EVENT_TYPES`（generated 只读集合，**注册机制被官方否决**——known-event-types.d.ts 注释原文 "event-name registration was rejected"）。持久化读取只认 `ignorable: true` 信封标记（lib/index.js：未知类型+ignorable=true 才接受），自定义事件必须写 ignorable:true，不存在"注册事件名"操作；严格读取路径会拒绝整个会话（写进去没报错、下次打不开）。
 
 ### 5.2 事件派发模式的坑
 - `agent/pre-step` 用 `{ prepend: true }` 注册且挂在**具体 Agent 的 context** 上；根组合拿不到每 agent 钩子，需 agent/created（payload 恒带 source: 'startup'|'resume'|'clear'|'compact'，按 source 值判而非 'source' in payload）；SessionStartSource = 'startup'|'resume'|'clear'|'compact'）——agent/session/created 是旧版事件名，0.2.0 全包 0 命中
@@ -259,9 +259,9 @@ cc-safety-net：守卫插件是跨宿主薄适配（每个宿主一个入口）�
 ## 十一、社区沉淀的进阶细节（补充条目）
 
 ### 11.1 LLM 适配器包装（modlens 的完整踩坑）
-- `ctx.llm.registerAdapter([providerId], {...})` 的行型对象**必须自带基类默认方法**：
-  `providerInfo` / `providerRetryPolicy` / `prepareCall` / `imageRequestPricing`；
-  漏实现任何一个都是**静默注册失败**（不抛错，只是没生效）。dsh >= 0.1.1 所有调用（含 replay）
+- `ctx.llm.registerAdapter([providerId], {...})` 基类（LlmAdapter）已实现全部默认方法：
+  providerInfo→{id,name}、providerRetryPolicy/imageRequestPricing→undefined、prepareCall 基类实现调
+  resolveModel+stream——**只有 stream 是 abstract 必须实现**。漏实现抽象方法才是静默注册失败。dsh >= 0.1.1 所有调用（含 replay）
   都走 prepareCall；>= 0.1.2 无 feature check 就调 imageRequestPricing。
 - 注册时宿主会 **snapshot** providerInfo / providerRetryPolicy；上游变化需要**重新注册**才能刷新。
 - `DUPLICATE_ADAPTER` 错误按"竞争成功"处理（不当作失败）。
@@ -557,7 +557,7 @@ DSH 只在文本变化时重新 append——稳定的 system/history 前缀缓�
 
 ### 11.55 审批/权限类插件三件套（auto-review/permission-rules 独立印证）
 - `approval/request` answerer 短路语义：匹配本插件策略的请求自己 settle，其余 `next()` 委托人类链；fail-closed 默认（approval 默认兜底（waterfall 尾 = Promise.resolve('unavailable')；OUTCOMES = ['allowed-once','rejected','cancelled','unavailable']） 默认 rejected）。
-- `tools/pre-execute` 决策语义：deny/ask 短路，**allow 永远 `next()` 委托**（不自己放行）。
+- `tools/pre-execute` 决策语义：deny/ask 短路；allow 委托 `next()` 是**推荐实践非契约**——官方语义 next() 委托且默认结果 = allow，listener 可直接返回 {kind:'allow'}。
 - invariant 伴生校验"模型可见 = 已记录"的审计一致性。
 
 ### 11.56 审查上下文隔离模板（auto-review）
@@ -810,7 +810,7 @@ apply 的同步段若不同步载配置，注册闸门会"结构性恒假"（异
 
 ### 11.113 双 entry 拆分 web 面（agy）
 主插件（llm 注册）+ web entry（等 ctx.webServer 激活后注册 RPC/OAuth）；headless 下
-主插件照常；无 Config 合法（env 逃生口 DSH_AGY_DISABLE）；registerAdapter 包 ctx.effect。
+主插件照常；无 Config 合法（env 逃生口 DSH_AGY_DISABLE）；registerAdapter 官方已内部 ctx.effect，插件再包一层是双保险不必要。
 
 ### 11.114 零运行时 @deepseek-ai 依赖 = 全 type-only import
 多个仓库独立印证（taskboard/with-chatgpt/cloader）：零运行时依赖的插件全用 type-only
@@ -996,8 +996,7 @@ priority=0，插件用 -10 替换——"替换官方渲染器"的正确姿势是
 连接悬挂；幽灵队列清理（/bubble/clean-ghost）防陈旧轮询堆积。
 
 ### 11.154 pending entry = FAILED PROFILE（agy）
-静态 inject 的服务永不出现 → entry 永久 pending，而 **loader 把 pending entry 当 FAILED
-PROFILE 而非跳过**（真实 TUI 实测 "1 entry did not activate"）。web 面拆分必须用
+静态 inject 的服务永不出现 → entry 永久 pending（设计内等待状态，不阻塞 root boot）；插件 TUI 实测 loader 把 pending entry 当 FAILED PROFILE（"1 entry did not activate"）——未从打包产物证实，以实测为准。web 面拆分必须用
 `ctx.inject(['webServer'])` 懒取，缺席时 ACTIVE 但能力不发（ctx.get 探测降级；注意 inject 缺席是纤维 PENDING 不是 active-inert）——管理面走受保护 RPC 通道，
 OAuth 回调才裸路由，loopback-only 注册栅栏。
 
@@ -1036,7 +1035,7 @@ link: 安装缺 node_modules 时动态 import 守卫降级 inert（不崩整树�
 否则模型输入里出现未注册变量会崩。
 
 ### 11.163 createRequire 锚 ctx.baseUrl 是插件侧姿势（profiles/node_modules 扁平兜底需引擎显式挂 resolve.paths）（宿主自身用 new URL(path, ctx.baseUrl) + loader.import；createRequire 只锚 import.meta.url） + 扁平兜底解析（memsearch）
-out-of-tree 包解析：createRequire 锚 `ctx.baseUrl`（profile 目录）+ `$DSH_HOME/profiles/node_modules`
+out-of-tree 包解析：createRequire 锚 `ctx.baseUrl`（profile 目录）+ `profile.dir/node_modules（默认 $DSH_HOME/profiles/<name>/node_modules，扁平挂包名）`
 扁平兜底——开发包不经 npm 装也能被 loader 解析。
 
 ### 11.164 动作执行器只接受结构化动作、绝不接受命令字符串（gating-hub）
@@ -1060,4 +1059,4 @@ PROTECTED_MODULE_PATTERNS：基础设施行大名单 + 原因链（timer→HMR �
 - `ctx.tools.guard(ToolGuard)` 形如 `(execution) => string | undefined`，在 pre-execute 瀑布之后单调求值——**任何 guard 都不能 force-allow**（allow 分支仍跑 guardReason）。
 - `PreToolDecision = allow | deny(reason,info) | cancel | ask(reason,displayReason)`。
 - `approval.request({agent, toolName, callId?, reason?, signal?})` 非 `allowed-once` 即 deny；无 approval 服务时 fail-closed deny。
-- ToolSchema.parameters 必须是**普通 JSON Schema** object——schemastery 实例过不了 lossless 快照。
+- defineTool 入参是 DSL spec（ParameterSchemaSpec/ValueSchemaSpec），运行时转 JSON Schema（z.object 被拒）；转发子集应经 assertSupportedJsonSchema。

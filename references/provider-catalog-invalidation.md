@@ -50,7 +50,7 @@ ctx.on('skills/change', () => {
 // ❌ 错误：工厂返回值被丢弃，providerInstance 永远是 null
 let providerInstance: Provider | null = null
 ctx.skills.registerProvider((control) => new MyProvider(ctx, control, opts))  // 没赋回
-// 后面 invalidateSkills() 的 if (providerInstance) 恒为 false → 空操作
+// 后面某外部函数调 invalidate() 时，if (providerInstance) 恒为 false → 空操作（示例名；官方 API 是 control.invalidate() / registry.invalidateCache()）
 ```
 
 `registerProvider(create)` 的 `create(control)` 是**同步工厂**，返回值就是 provider。**需要在 provider 外部触发失效时，必须在工厂内把它存进闭包变量（provider 内部变更点直接持 control 即可）**：

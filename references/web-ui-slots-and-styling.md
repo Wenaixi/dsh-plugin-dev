@@ -209,6 +209,34 @@ export function apply(ctx) {
 }
 ```
 
+### 2. 语言边界：静态文案进词典，内容数据保持单语
+
+客户端面板的文案分两层，语义不同、通道不同：
+
+| 层 | 例子 | 处理 |
+|---|---|---|
+| 界面静态文案 | 标题、按钮、提示、占位、标签、空态 | 进 `zh`/`en` 词典，经 `t()` 取词，随宿主界面语言切换 |
+| 内容数据 | 列表条目的名称与描述（技能/插件/记录，可能来自磁盘目录或远端） | 固定单一语言，不进词典，不做条目级翻译 |
+
+把列表内容塞进词典是常见的过度设计：内容由业务方维护，与界面语言是两套变更周期；面板只负责展示，`t()` 不应承担翻译业务数据的职责。界面换语言时条目文字原样保留，这符合「界面 UI 双语、内容数据单语」的默认取舍。
+
+### 3. 声明 `locale:` 让渲染器注入 t 席位
+
+`ctx.slots.register` 的 options 里声明 `locale: NS` 后，渲染器会把该命名空间的类型化 `t` 作为标准席位注入组件 props——组件里 `const t = props.t` 直接用，**不需要**自己在 apply 里 `ctx.locale.bind(NS)` 再手动把 t 传进 inject 面：
+
+```js
+ctx.slots.register({ name: "xxx", key: "my-plugin", locale: NS, inject: () => ({ ... }) }, Panel)
+// Panel(props) 里 props.t 已就绪：t("modelInvocable")、label: t("xxx") + " " + item.name
+```
+
+未声明 `locale:` 的条目拿不到 t 席位；声明了却缺失 locale 服务（宿主未装配 locale 插件）是装配失败。
+
+### 4. 缺词是静默失效：t() 找不到键返回 key 字符串
+
+官方 `LocaleRuntime` 的查词链：入口词典 -> common 词典 -> **原样返回 key 字符串**。新增或改名一个 key，漏同步 `zh`/`en` 任一册，界面上直接显示裸 key（如 `modelInvocable`），零报错、零控制台告警。双语对称是硬要求：`register(ns, { zh, en })` 一次注册两册，两册 key 集必须完全一致。
+
+手写 CJS factory（无 `LocaleNamespaceMap` 类型合并）没有类型检查兜底，双语对称只能靠静态门禁：断言渲染路径不存在裸字符串字面量、每个 key 在源码中至少出现两次字典声明（双语各一）。这类断言同样必须做破坏实测——见 silent-failure-and-gate-design.md。
+
 ---
 
 ## 四、官方主题设计系统与 CSS 样式安全规范

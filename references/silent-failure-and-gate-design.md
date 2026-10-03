@@ -58,6 +58,7 @@ DSH 大量契约校验失败后只写 `meta.error` 或直接 `return undefined`�
 | 官方 provider 脚本「找不到模块」 | isolated 布局下那个包不在 profile 直连依赖里，只在 dsh 本体依赖树中 | 按 profile 入口、pnpm store `.pnpm`、全局本体三档找 |
 | `dsh <app> headless "..."` 报「too many arguments」 | web app 的参数解析器收 0 个位置参数 | headless 要走 headless app；纯 web app 只吃 `--port` 与 `--no-open` |
 | 某能力在 `ctx.get()` 里是 undefined | 契约包装了但没有实现方 | 契约包与实现包成对安装 |
+| 界面文案变裸 key / 单语孤岛 | 面板词典缺词（漏同步任一册）或渲染路径有未走 `t()` 的硬编码字符串 | 查字典 key 集双语对称；门禁正则扫渲染路径裸字面量并断言每个 key 双语声明 |
 
 ---
 

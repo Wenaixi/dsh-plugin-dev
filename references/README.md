@@ -37,7 +37,10 @@
 - **[settings-and-plugin-ui.md](./settings-and-plugin-ui.md)**：
   全局设置窗口 (Settings) 与插件管理中心 UI 深度指南——`settings.section` 与 `plugins.bundle.config` 插槽机制、源码级解密三大明星插件（终端输入、侧边卡片、壁纸引擎）的真实注入代码、导航图标 (Nav Glyph) 替换技法、React 设置面板的本地 vs 补丁持久化、左侧“插件”管理中心卡片呈现、**`readPluginMeta` 的 exports 白名单契约（卡片空白根因与修法）**、图标 256 KiB 上限与路径约束、**改完必跑的两道验证（`npm pack --dry-run` + 直接调 `readPluginMeta`）**与开发决策树。
 - **[web-ui-slots-and-styling.md](./web-ui-slots-and-styling.md)**：
-  Web GUI 全量插槽树实战——右侧边栏（`sidebar.right.pane.tab`）、会话顶部工具栏（`conversation.session.header.utilities`）、输入框挂件（`conversation.input.right`）、消息流拦截（`conversation.chat.node`）、全局外壳（`shell.*`）；官方主题 CSS 变量（415 个 `--dsw-*`，含四组常见误写对照）；样式安全注入与 HMR 回收铁律；**官方 primitives 组件族优先策略**（SegmentedControl / Switch / StateDot / Tag / Button）与「客户端产物单一来源」纪律；多语言国际化（i18n: `ctx.locale`）。
+  Web GUI 全量插槽树实战——右侧边栏（`sidebar.right.pane.tab`）、会话顶部工具栏（`conversation.session.header.utilities`）、输入框挂件（`conversation.input.right`）、消息流拦截（`conversation.chat.node`）、全局外壳（`shell.*`）；官方主题 CSS 变量（415 个 `--dsw-*`，含四组常见误写对照）；样式安全注入与 HMR 回收铁律；**官方 primitives 组件族优先策略**（SegmentedControl / Switch / StateDot / Tag / Button）与「客户端产物单一来源」纪律；多语言国际化（`ctx.locale` 双语注册、声明 `locale:` 注入 t 席位、缺词静默返回 key）；语言边界契约（静态文案进词典、内容数据保持单语）。
+
+- **[client-ui-placement-and-verification.md](./client-ui-placement-and-verification.md)**：
+  客户端 UI **落点选择与真机取证**——「界面语义 → 插槽」完整映射表（设置窗口各级 Tab / 插件页分组条目 / 卡片内联配置区 / 右侧栏 Tab / 侧边栏底部 / 全局浮层）；**铁律「一个功能一个入口」**（多落点冗余 = UI 污染，实测需回滚）；插槽三个必知机制（spec 由父条目 `children` 表声明、四种 kind 与注册参数对应关系、**`slots.inject` 在 spec 不存在时静默不执行且零报错**）；`plugins.bundle.config` 的 **`configured` 渲染门（匹配键是包名）**；「UI 不显示」三分法（模块没进图 / apply 没跑 / 落点或渲染门不匹配）；客户端产物 **`immutable` 长缓存与「版本号先于界面更新」的假象**（桌面端必须完全重启）；**无浏览器验证法（Node 直跑 CJS factory 探针）**；CDP / browser-harness 真机取证的环境坑；**解析 Electron `app.asar` 做桌面版与 CLI 版差异比对**。
 
 ### 六、跨端通信与三角色物理隔离 (IPC & Remote)
 - **[remote-rpc-guide.md](./remote-rpc-guide.md)**：
@@ -66,6 +69,10 @@
 ### 九之二、静默失效防线与可失败门禁 (Silent Failures & Verifiable Gates)
 - **[silent-failure-and-gate-design.md](./silent-failure-and-gate-design.md)**：
   把「代码写全了、门禁全绿、运行时毫无作用」这类零报错缺陷归纳成三类根因（代码从未被执行、契约被吞掉、解析到了别的东西），每类配可执行的判定动作；并给出**门禁设计方法论**——先按「错了会不会报错」分类，再决定写运行时回读、源码形态正则还是产物断言，**每条新断言必须做破坏实测证明它会红**；另含真机浏览器验收的环境坑速查（遮罩吞点击、导航等待超时、写入期间控件禁用）、收敛判定的「两帧相同加目标谓词」纪律、发布前后的双重复验与 manifest 自动规范化坑。
+
+### 九之三、跨运行时差异与迁移 (Desktop vs CLI Runtime)
+- **[desktop-vs-cli-runtime.md](./desktop-vs-cli-runtime.md)**：
+  桌面版 (Electron) 与 CLI Web 两种运行时的**差异、共性与跨运行时工程实践**——物理形态对照（本体在 `resources/app.asar` vs npm 全局包、profile 目录一致、依赖布局 isolated vs hoisted）；**桌面版 profile 被 Electron 独占管理**的边界与仍可用的 CLI 操作（`plugin list/add/remove`）、两个 `dsh` 命令的 PATH 冲突与参数形式坑；**客户端产物长缓存导致桌面版必须完全重启**与「版本号先于界面更新」的假象；**官方包由运行时提供、profile 不应重复安装**（但官方插件的配置仍必须写在 `cordis.patch.yml`）；配置迁移方法论（追加不覆盖、保留更完整实现、分界注释、双重复验）；**凭据全局共享**（`.credentials.yaml` / `.env`）与"配置引用的 key 是否存在"的前置检查；**解析 `app.asar` 做桌面版与 CLI 版逐字对比**；**装了 ≠ 挂载**（`dependencies` vs `dsh.profile.bundles`）；**pnpm 不检测文件缺失**导致的"目录在、文件没了"故障与三条修复路径。
 
 ### 十、多模态附件、人机交互与最终交付物呈递 (Multimodal & Deliverables)
 - **[multimodal-and-deliverables.md](./multimodal-and-deliverables.md)**：

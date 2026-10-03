@@ -301,7 +301,7 @@ CSS 变量未定义时不会报错，只会用兜底值——**所以别给 `var
 | **状态色命名反直觉** | 信息色叫 `state-business-primary` 而不是 info；错误色叫 `state-error-primary` 而不是 danger |
 | **别名可能只在官方组件的局部作用域里存在** | 某些名字官方 CSS 引用了却没在 `body` 上定义，写上去等于写空值。判定办法：在 DevTools 里选中该元素看 Computed Style，值为空即不存在 |
 
-**排版统一走字阶令牌**（形如 `--dsw-font-xxxs-11`、`--dsw-font-xxs-12`、`--dsw-font-xs-13`、`--dsw-font-s-14`、`--dsw-font-base-16`），名字末段是字号。写成 `font-size: 13px` 而不带 line-height 会丢掉官方行高节奏。
+**排版统一走字阶令牌**（形如 `--dsw-font-xxxs-11`、`--dsw-font-xxs-12`、`--dsw-font-xs-13`、`--dsw-font-s-14`、`--dsw-font-base-16`），名字末段基本是字号；例外 `--dsw-font-m-18` 实为 `500 16px/28px`（末段 18 与字号不符，用前先在 DevTools 确认）。写成 `font-size: 13px` 而不带 line-height 会丢掉官方行高节奏。
 
 **行分隔用相邻兄弟选择器**：官方（ui-conversation）是 `.row + .row { box-shadow: inset 0 1px 0 var(--dsw-alias-border-l1) }`；0.5px solid + border-l2 组合官方未使用，不是每行自带 border-bottom，后者会在末行多出一条线。
 

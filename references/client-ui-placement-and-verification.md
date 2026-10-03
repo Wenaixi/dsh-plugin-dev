@@ -75,6 +75,8 @@ const spec = this._core.specDynamic(key);
 if (spec === void 0) return;   // spec 不存在时【直接返回】
 `
 
+注意：该「静默」指宿主永不声明该 slot 时 callback 永不执行（零日志、零 console）；若声明出现而 callback 抛错，错误会经 queueMicrotask 重新抛到全局。
+
 它的完整行为：
 
 - spec **已存在** → 立即同步执行 callback（注册成功）。
@@ -249,6 +251,7 @@ if (extra.length > 0) { console.error('出现多余 UI 落点: ' + extra.join(',
 
 `text
 spawn(Chrome --headless=new --remote-debugging-port=<port> --user-data-dir=<tmp>)
+  注意：宿主端口非固定（web-app patch 写 `port: !!js ctx.webStartup.port ?? 3080`），应从启动日志取 URL，不要假设 3080
   ↓ 等 10~20 秒（端口监听不是立刻的，过早探测会误判「起不来」）
 fetch http://127.0.0.1:<port>/json/version      // 确认就绪
 fetch http://127.0.0.1:<port>/json/list         // 取 page 目标的 webSocketDebuggerUrl

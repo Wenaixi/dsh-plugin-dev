@@ -98,10 +98,10 @@ apply 时探测宿主版本：低于支持基线给 fallback 单元（零数据 
 - 每个 handler 先查 method，不支持就 405 + allow 头。
 
 ### 3.2 信任围栏（DNS-rebinding 防御，不是认证）
-- DSH 的 /api 网关接受 "loopback OR 已声明 authority"（`--trusted-host <name>` + 绑定 0.0.0.0 派生的 LAN 字面量）。
+- DSH 的 /api 网关接受 "loopback OR 已声明 authority"（`--trusted-host <name>` + 绑定 0.0.0.0 被拒：web-app/startup.js 对 --host 0.0.0.0 直接报错拒启动（"would expose remote code execution"）；LAN/反代部署正解是 --trusted-host <authority>（可重复、port-less 匹配任意端口），经 webStartup 服务注入 connection Config.trustedHosts
 - **血泪坑（dsh-market #729）**：exact 路由赢过 /api fence 的 prefix 匹配，永远见不到它，必须自己决定 → 只信 loopback 会让所有经域名（反代/隧道/LAN 主机名）到达的部署写路由 403 而读路由正常，表现为"安装按钮点了没反应"。
 - 正确做法：trustedHostsSource 从宿主的 connection 服务读（每次请求取 live 值），判定 = Host 头是 loopback 或属于 trustedHosts **且**浏览器跨站标记同源（Origin 与 Host 一致）。better-sidebar 把 /api 网关的 fence 逻辑整体复制过来（BSD-3 注明出处），不 import 内部模块。
-- mutating 端点：same-origin POST + curated 来源白名单（dsh-market 安装路由）；`isTrustedRequest(req, mutation)` 两级（只 loopback vs 还要 Origin 校验）。
+- mutating 端点：same-origin POST + curated 来源白名单（dsh-market 安装路由）；`isTrustedApiRequest(request, trustedHosts)（单级：loopback/trustedHosts + sec-fetch-site 非 cross-site + Origin 同源；无 mutation 级参数；/api 是 kind:'prefix' 路由 + handler 内 admit() 双级 403/401，exact 表优先——'exact-table miss 后才走 prefix'）(req, mutation)` 两级（只 loopback vs 还要 Origin 校验）。
 
 ### 3.3 长任务取消与 effect 内 throw 的坑
 - 从请求取取消信号（req 'aborted' / socket 'close'）传给运行时；插件卸载统一 AbortController。
@@ -524,7 +524,7 @@ profile；审批/提问渲染成 IM 平台原生卡片按钮。
 - 自持 disposer 防 HMR 二次调用：fiber 卸载时清空本地引用（ctx.effect(() => () => { ref = null })）。
 - 运行期配置校验失败 → 保持旧值 + SettingsConflictError（revision 冲突拒写）——审计留痕是插件自选，非宿主契约，不崩插件但可查。
 
-### 11.48 exact 路由赢过 /api 前缀 fence → 每 handler 自带 loopback 围栏（usage 独立印证）
+### 11.48 exact 路由赢过 /api 前缀 fence（isTrustedApiRequest 双级：prefix 路由 + handler 内 admit()；exact 表优先） → 每 handler 自带 loopback 围栏（usage 独立印证）
 宿主 /api fence 只保护 prefix 匹配的路由；`kind: 'exact'` 的路由赢过它，必须**每个
 handler 自带围栏**（loopback/trustedHosts/Origin 校验）。
 

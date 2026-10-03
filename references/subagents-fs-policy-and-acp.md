@@ -45,7 +45,7 @@
 
 ### 1. 核心铁律：编辑前必须先读 (Read-Before-Write)
 - 插件或模型在修改文件之前，**必须先通过合法工具（如 `read`）建立对目标文件的权威观察记录**；
-- 如果文件从未被观察过，或其版本自上次观察后发生了改变，网关会坚决阻断写入，彻底杜绝多智能体并发或外部进程修改时的“盲目覆写覆盖（Clobber）”灾难；
+- 如果文件从未被观察过，或其版本自上次观察后发生了改变，网关会坚决阻断写入，彻底杜绝多智能体并发或外部进程修改时的“盲目覆写覆盖（Clobber）”灾难。并发写防护：dsh-fs-local 的 withLock 按 targetKey 做进程内 FIFO 互斥队列（同文件串行化）+ CAS 版本校验 + 原子 rename，败者抛 FS_STALE_VERSION；锁是进程内 Map，非跨进程锁（ponytail: 跨进程写冲突升级时改文件级锁）；
 - **版本指纹是复合值** `dev:ino:size:mtimeNs:ctimeNs`（设备号、inode、大小、纳秒级 mtime 与 ctime），不是纯 mtime，因此同秒内的内容改写也能被识别；
 - **观察状态只存在内存 WeakMap**（按 owner 弱引用，owner 通常是 agent.session），进程重启或会话恢复后必须重新 `read` 才能获得写权限；
 - 未观察过的**缺失路径**允许授权创建（`writeIntent` 返回 `createIfAbsent`），已确认缺失的目标 edit 则报 `FS_NOT_FOUND`。

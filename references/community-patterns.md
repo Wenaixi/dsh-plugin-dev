@@ -360,3 +360,58 @@ session 的持久 cwd 在 `session.header.cwd`；多个项目并行时按 sessio
 ### 11.18 非阻塞捕获的背压
 LLM 摘要串行化（promise 链），捕获失败仅记日志不中断；摘要器超时 killProcessTree；
 定时维护 `setInterval` + `unref` + due-state 门（每任务每 interval 至多一次）。
+
+### 11.19 生命周期注入必须延迟到"首个持久信号"（Aegis）
+在 `agent/created`（或旧版 `agent/session-start`）时直接注入引导文本，会把它放进
+首个模型请求之前，破坏依赖"无菌首请求"基线的轨迹预设。正确做法：每个会话边界只 ARM 一次
+注入（记录 sessionId→agent 映射），等会话发出第一个**持久化**信号（`tool/call` 或
+`assistant/message`）才真正 `agent.inject(message)`；`compaction/end` 重新 ARM
+（压缩后的首个请求是"第二个首请求"）；没有稳定 session.id 的会话直接跳过。
+调度要可回收防竞态：apply 返回 dispose 清掉所有订阅与状态 Map；每个 delivery 记录 epoch，
+触发时校验 sessionId→agent 未变、epoch 未变，过期即丢弃；`agent/disposed` 时取消该会话
+所有待投递。
+
+### 11.20 注入文本必须带合法 source（会话格式 v4）
+session v4 要求 producer-owned 的 `source.kind`（如 `plugin:<name>`、`form:'instructions'`）；
+0.1.7-rc.1 弃用了 "plugin" wrapper 里的 "plugin" 字段。没有合法 source 的注入会被会话格式
+校验拒绝（以官方类型声明为准）。
+
+### 11.21 纯技能 bundle 的教科书形态（superdesign-skill/treg）
+- bundle **绝不 import 宿主 in-box 包**：`ctx.skills` 的 `registerProvider` 契约（list/get）
+  是稳定接缝，直接实现它（官方 dsh-skill-badge 同款）——零 `@deepseek-ai/*` 依赖的标准形态。
+- `list` 返回 `{ name, description, invocation:{modelInvocable,userInvocable}, provider,
+  source:'bundled', resourceBase:{kind:'directory',path}, rank, locator }`；`get` 额外带
+  `content`。`rank` 取 600（官方 bundled 源 rank），不在 rank 上跟官方内置技能打架。
+- 纯 ESM、零构建是 **git 直装的硬约束**（`dsh plugin add github:...` 抓源码不抓产物；
+  `prepare` 脚本会让每个用户先 allowlist 构建才能首装成功）。
+- SKILL.md frontmatter 描述用**正则解析**不引 YAML 依赖；load 失败返回 undefined/[] 而非抛错。
+
+### 11.22 MCP 连接器无凭据时整体禁用 + !!js 表达式不能以 ! 开头（treg）
+- 注册一个没有 token 的 connector 得到的是常开工具、每次调用都 401：`disabled: !!js
+  (process.env.X ?? '') === ''` 让 patch 行缺 token 时根本不挂载。
+- **patch 里 `!!js` 表达式不能以 `!` 开头**：YAML 会把第二个 `!` 读成又一个 tag
+  property，整文件解析失败，**整个 profile 跟着挂掉**。模板字面量写法（反引号包
+  `Bearer ${process.env.X}`）是安全的。
+- 技能与凭据解耦：SKILL.md 零成本常开当说明书，引导用户配 token；工具在 token 就绪后出现。
+
+### 11.23 外部二进制桥的防御模板（deja-vu）
+- 对缺失 peer 的宿主包必须 `await import()` + try/catch 降级（直接 throw 会带崩整个 profile）。
+- 二进制解析：用户显式环境变量 → PATH 同名命令 → npm 平台 optional 包（require.resolve），
+  每个候选跑 version（超时 5s）验证真能执行；全失败保留裸名让报错指向缺失物。
+- `execFileSync` 带 `timeout/maxBuffer`、stderr ignore，任何失败返回 "" 不抛（记忆是
+  可选能力，throw 会终结回合）；"是否已装"加载时探测一次，区分"没装"与"没匹配"两种空结果文案。
+- 用户文本拼 CLI 参数：显式命名子命令（裸首词会被当子命令）；以 `-` 开头的查询会被当 flag
+  → 需要时加 `--` 终止符，且只在需要时发（老版本不认识 `--` 的子命令仍能应答）。
+- `systemPrompt.context` **重名注册 = 整个 profile 加载失败**（不是局部错误）：所有注册用
+  guarded() 包装吞掉重名；自动召回走 context 的 assembly 回调而非 agent/pre-step
+  （pre-step 拼接会被后续 listener 重建答案时丢弃）。
+- `defineTool` 的 schema 必须是普通 JSON Schema（schemastery 实例被宿主拒绝）。
+
+### 11.24 组合包与原生二进制分发的工程细节（mnemon）
+- 组合包 = 薄 patch + `dependencies: { "pkg": "latest" }`，patch 行保留原包名
+  （"preserves its host and browser plugin identities"）；发布新插件版本无需改装配仓库。
+- Go/Rust 二进制按平台分发：npm 包只放 JS shim，真实二进制在 `@scope/pkg-<platform>-<arch>`
+  optional 包；shim 用 `require.resolve` 定位，缺失报 `Reinstall with --include=optional`。
+- Windows 驱动 npm：`.cmd` 不能直接 spawn（无 shell 时），找 `npm-cli.js` 用
+  `process.execPath` 执行；所有 spawn 显式 `windowsHide: true`。
+- CLI 自更新必须先证明"自己被 npm 管理"（realpath 等于 npm root -g 的同名包），否则引导迁移。

@@ -375,9 +375,9 @@ await pg.evaluate("""() => {
   ```
 - **豁免是最后手段**：报错说「版本不兼容」时，版本号往往是包管理器解析出来的陈旧版本，不是人选的。先确认解析版本与根因（pnpm 24 小时发布冷却期、semver 预发布排序），修版本选择优先于申请豁免。完整推导见 [install-resolution-traps.md](./references/install-resolution-traps.md)。
 
-### 3. 四条「看起来对但没生效」的经典陷阱
+### 3. 六条「看起来对但没生效」的经典陷阱
 
-这四条的共同特征：**没有任何报错**，一切看起来正常，但功能没起作用。
+这六条的共同特征：**没有任何报错**，一切看起来正常，但功能没起作用。分类、判定动作与门禁写法见 [silent-failure-and-gate-design.md](./references/silent-failure-and-gate-design.md)。
 
 | 陷阱 | 表现 | 根因 | 判定动作 |
 | :--- | :--- | :--- | :--- |
@@ -386,7 +386,12 @@ await pg.evaluate("""() => {
 | 产物有两个来源 | 改源码没生效，或改了没反应 | `tsc` 编一份同名产物，构建脚本又覆写一份 | 全仓 grep 该产物名，只应有一处生成 |
 | CSS 变量名拼错 | 元素有样式但颜色/圆角是浏览器默认 | `var(--不存在的名字, #fff)` 静默用兜底值 | DevTools Computed Style 查真实变量名 |
 
+| 样式只定义了没注入 | 类名在元素上，computed style 全是浏览器默认值 | 只在 JS 里定义了 CSS 字符串却没把 `<style>` 标签插进 `document.head` | 页面里 `document.querySelectorAll('style[data-plugin-css]')` 看自己的标签在不在，再用 `document.styleSheets` 核对规则条数 |
+| helper 改了签名只改一半 | 批量操作生效，单次操作毫无动静 | 多处调用点共用一个 helper，改签名时漏改，实参形态对不上 | 全仓 grep helper 名，逐个核对实参 |
+
 **总原则：静默失败必须靠"回读真值"发现，不能靠看界面。** 每次写操作后回读接口或磁盘，值没变就是没生效。
+
+**门禁原则：一条永远为真的断言等于没有断言。** 每条新断言都要人为破坏一次，确认它会红，再还原。
 
 ### 4. 免启动反证：宿主公开函数能直接问真值
 
@@ -410,6 +415,11 @@ DSH 导出大量纯读取函数，不必启 Web GUI、不必拿 token 就能判�
 4. 双面插件的 Client 半侧经 `ctx.slots.inject/register` 挂载，组件只接收 props；
 5. 真实启动验收：端口监听 + 首页 200；`--dump-config` 通过只代表 YAML 可解析。
 6. 打包清单核对：`npm pack --dry-run --json` 确认 `locale/`、图标、`lib/` 全部入库——`files` 写错只在发布后暴露；
-7. 卡片元数据可读：直接调 `readPluginMeta` 返回非 `undefined` 且 `error` 为空。
+7. 卡片元数据可读：直接调 `readPluginMeta` 返回非 `undefined` 且 `error` 为空；
+8. 图标是真透明底、不自带圆角，且在浅色与 `body[data-ds-dark-theme]` 下都可读；
+9. 双面插件的样式确实注入：页面里能查到自己的 `style[data-plugin-css]` 标签且规则条数大于 0；
+10. 真机浏览器点过一遍：每个控件点完都回读落盘值，写入期间先等 `aria-disabled` 解除，收敛判定要求连续两帧一致；
+11. 每条质量门禁都做过破坏实测（人为破坏后必须变红，再还原）；
+12. `repository.url` 已写成 `git+https://...` 形态，避免 npm publish 自动规范化告警。
 
 带条件导出对象的 `exports`（`{ types, default }`）是合法写法，校验时取 `default` 或 `import` 字段。

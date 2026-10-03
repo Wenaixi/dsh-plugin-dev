@@ -1,6 +1,6 @@
 # 三角色架构模型与 Client-UI 插件开发标准
 
-DeepSeek Harness (DSH 0.2.0-rc.2) 采用清晰的物理分层与进程隔离架构：**Browser 界面端**、**Host 核心宿主** 与 **Worker 沙箱隔离区**。前端 Web GUI 同样是运行在浏览器中的 Cordis 运行时，所有含界面的插件均采用"双面插件"（Dual-Face Architecture）规范。
+DeepSeek Harness (DSH 0.2.0-rc.2) 采用清晰的物理分层与进程隔离架构：**Browser 界面端**、**Host 核心宿主** 与**隔离进程沙箱区**（教学名；源码中 Worker 专指 worker_threads）。前端 Web GUI 同样是运行在浏览器中的 Cordis 运行时，所有含界面的插件均采用"双面插件"（Dual-Face Architecture）规范。
 
 ```
 ┌────────────────────────────────────────────────────────┐
@@ -21,7 +21,7 @@ DeepSeek Harness (DSH 0.2.0-rc.2) 采用清晰的物理分层与进程隔离架�
      ctx.subprocess (spawn / spawnTerminal) + 沙箱 confine
                             │
 ┌───────────────────────────▼────────────────────────────┐
-│              Worker 角色 (工作进程 / 沙箱隔离区)          │
+│              隔离进程角色 (subprocess / 沙箱隔离区)          │
 │  - 独立运行的 Subprocess / Native Runner               │
 │  - PowerShell / Bash / Python / 重计算任务沙箱          │
 └────────────────────────────────────────────────────────┘
@@ -43,7 +43,7 @@ DeepSeek Harness (DSH 0.2.0-rc.2) 采用清晰的物理分层与进程隔离架�
 | --- | --- | --- | --- |
 | **Browser** | 浏览器或桌面内嵌 Webview | 用户界面渲染、流式 Markdown 显示、输入捕获 | 零本地文件系统与系统调用权限，所有交互受浏览器安全沙箱与 Host API 约束 |
 | **Host** | 操作系统常驻 Node.js 进程 | 运行核心 Cordis 总线、调度工具执行、持久化存储、Web 服务器 | 具备完整的服务端宿主权限 |
-| **Worker** | 隔离子进程（Native Runner） | 执行高风险外部命令、计算密集型数据处理、脚本沙箱 | 受文件效果沙箱（bwrap/Landlock、Seatbelt、Windows ACL）限制 |
+| **隔离进程**（源码中 Worker 一词专指 worker_threads，勿混用） | 隔离子进程（Native Runner） | 执行高风险外部命令、计算密集型数据处理、脚本沙箱 | 受文件效果沙箱（bwrap/Landlock、Seatbelt、Windows ACL）限制 |
 
 ## 前端插件的双面架构 (Dual-Face Architecture)
 
@@ -86,7 +86,7 @@ DeepSeek Harness (DSH 0.2.0-rc.2) 采用清晰的物理分层与进程隔离架�
 }
 ```
 
-注意：官方当前 client 注入包是 `@deepseek-ai/dsh-client-ui-settings`（旧文档中的 `dsh-client-ui-slots` / `dsh-client-connection` 拆分已合并为平台运行时 + 注入式组合）。**浏览器半侧只挂在说明符恰为裸包名的那一行上**；子路径导出挂载的行永远不带半侧。
+注意：client 端插槽运行时是 `dsh-client-ui-slots`（SlotCore 纯注册表）+ `dsh-client-ui-renderer`（slots 服务包装）；连接/传输由 `dsh-client-connection` 独立提供；设置 UI 是 `dsh-client-ui-settings`（注入 remote.settings）。三包在 0.2.0-rc.2 均独立存在，未合并。**浏览器半侧只挂在说明符恰为裸包名的那一行上**；子路径导出挂载的行永远不带半侧。
 
 **真实契约（0.2.0-rc.2 全库实测，`dsh.bundle.id` 与 `dsh.client.module` 均不存在）**：双面包声明 `dsh.client.platform: "web"`（+ 可选 `inject`/`external`/`immediately`），客户端入口由 `exports["./client"]` 子路径导出（该路径必须真实存在）；组合补丁用 `dsh.bundle.patch`（路径或有序数组）。peerDependencies 以 `@deepseek-ai/cordis ~4.0.4` 为准 文件）。`exports` 也可以写成带条件导出对象的形式（`{ "types": ..., "default": "./lib/client.js" }`）。
 
@@ -157,19 +157,19 @@ root
 | `sidebar.*` | `sidebar.brand.mark` / `sidebar.brand.name` | single | root | 侧边栏品牌标记与名称（无独立的 `sidebar.brand` 槽） |
 | | `sidebar.workspaces` | single | root | 工作区列表项 |
 | | `sidebar.settings` | single | root | 侧边栏底部设置入口 |
-| | `sidebar.panellist` / `sidebar.footer.action` | keyed / list | root | 面板列表与底部动作（不存在 `sidebar.files`/`sidebar.terminal`） |
+| | `sidebar.panellist` / `sidebar.footer.action` | list / list | root | 面板列表与底部动作（不存在 `sidebar.files`/`sidebar.terminal`） |
 | `main.*` | `main` | keyed | root | 主导航面板（`main.conversation` 为 single/session-maybe；不存在 `main.chat`） |
 | | `conversation.session` | single | session | 会话状态外壳 |
 | | `conversation.view` | list | session | 消息流呈现视口 |
 | | `conversation.chat.node` | keyed | session | 消息节点渲染点（客户端 `renderSlot(..., { entryKey: routedNode.kind })` 逐节点渲染，不是 chain 包裹） |
-| | `conversation.composer` | list | session | 输入框下方功能区 |
-| | `conversation.input.attachments` | list | session | 输入框附加能力条 |
+| | `conversation.composer` | chain | session | 输入框下方功能区（select 首个非 null 胜） |
+| | `conversation.input.attachments` | single | session-maybe | 输入框附加能力条 |
 | `rightbar.*` | `sidebar.right.pane.tab` | keyed | session | 右侧抽屉栏扩展 Tab（其父级 `rightbar.session` 仍然存在，是声明方，并未被重命名） |
-| `shell.*` | `shell.leading` | list | root | 顶部全局横幅通知 |
+| `shell.*` | `shell.leading` | single | root | 侧栏收起时的窗口顶栏席位 |
 | | `shell.overlay` | list | root | 全局模态框 / 浮层 |
 | `settings.*` | `settings.general.item` | list | root | 常规设置条目 |
-| | `settings.models.provider-card` | list | root | 模型提供方卡片 |
-| | `settings.plugins.tab` | keyed | root | 插件管理 Tab 面板 |
+| | `settings.models.provider-card` | keyed | root | 模型提供方卡片（按 settingsNs 定址） |
+| | `settings.plugins.tab` | list | root | 插件管理 Tab 面板 |
 | | `settings.section` | list | root | 扩展设置区块 |
 
 Cardinality 选错会导致重复渲染或完全不渲染；调试实时插槽树用 `cordis_inspect_list` 列出平台/提供方/方法，再 `cordis_inspect_query {platform:'client', provider:...}` 查询（不存在 `what:"client"` 语法）。

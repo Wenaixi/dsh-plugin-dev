@@ -21,7 +21,7 @@
 
 ---
 
-本项目是开发、审查、调试 **DeepSeek Harness (DSH 0.2.0-rc.2)** 插件与生态扩展的标准与权威参考知识库（Agent Skill）。内容依据 DSH 官方文档站 44 页逐页核对，凡与旧版记忆冲突处一律以官方原文为准。
+本项目是开发、审查、调试 **DeepSeek Harness (DSH 0.2.0-rc.2)** 插件与生态扩展的标准与权威参考知识库（Agent Skill）。内容依据 DSH 官方文档站、官方包源码与本机运行时行为逐条核对（证据分级：运行时 > lib 源码与 JSDoc > 包内 README > 文档站散文），凡与旧版记忆冲突处一律以更下层的真源为准。
 
 DSH 是基于 Cordis 微内核构建的高可扩展 Agent Harness。在 DSH 架构中，**一切皆为插件 (Everything is a Plugin)**：会话日志、工具注册表、系统提示词装配、模型适配器、UI 界面以及执行循环驱动器均作为平等、可插拔的插件运行。
 
@@ -43,27 +43,27 @@ DSH 是基于 Cordis 微内核构建的高可扩展 Agent Harness。在 DSH 架�
 | --- | --- | --- | --- |
 | **Browser** | 浏览器 / Desktop Webview | React 界面、浏览器端 Cordis 运行时、Slots 插槽、本地多语言 | 零本地文件系统与系统调用权限，经 Typert Remote（HTTP + Remote 流）交互 |
 | **Host** | 常驻 Node.js 进程 | 核心 Cordis 大动脉服务、工具执行管线、会话日志持久化、Web 服务 | 具备宿主系统权限，管理敏感凭据与单调守卫 |
-| **Worker** | 独立子进程 (Native Runner) | 执行高风险外部命令、隔离沙箱脚本与重计算任务 | 文件效果沙箱（bwrap/Landlock、Seatbelt、Windows ACL），崩溃不影响 Host |
+| **隔离进程**（源码中 Worker 专指 worker_threads） | 独立子进程 (Native Runner) | 执行高风险外部命令、隔离沙箱脚本与重计算任务 | 文件效果沙箱（bwrap/Landlock、Seatbelt、Windows ACL），崩溃不影响 Host |
 
-UI 插件必须遵循**双面插件 (Dual-Face)** 规范：Node 端 `lib/index.js`，Browser 端 `lib/client.js`（经 `dsh.client` 声明、Slots 挂载；浏览器半侧只挂在裸包名行上）。
+UI 插件必须遵循**双面插件 (Dual-Face)** 规范：Node 端 `lib/index.js`，Browser 端 `lib/client.js`（经 `dsh.client` 声明、Slots 挂载；loader 行解析到其 package.json 后按该包名判定半侧，子路径行同样适用）。
 
 ---
 
 ## 三、技术参考文档索引 (References)
 
-完整参考目录（23 篇，按 15 个主题分类）见 [references/README.md](./references/README.md)，其中包含本项目全部专题文档的导航与一句话概述：插件解剖学、核心服务矩阵、配置与补丁、事件与工具流水线、Web 插槽与主题、设置与插件中心 UI、跨端 Remote RPC、MCP 工具桥接、系统提示词与状态投影、多模态交付物、Webhook 与无头运行、内置中间件、领域存储与伪终端、斜杠命令与输入触发器、沙箱内核与网络代理、子智能体与文件锁、安装解析陷阱、官方上游核验与本地调试排毒。
+完整参考目录（33 篇，按 15 个主题分类）见 [references/README.md](./references/README.md)，其中包含本项目全部专题文档的导航与一句话概述：插件解剖学、核心服务矩阵、配置与补丁、事件与工具流水线、Web 插槽与主题、设置与插件中心 UI、跨端 Remote RPC、MCP 工具桥接、系统提示词与状态投影、多模态交付物、Webhook 与无头运行、内置中间件、领域存储与伪终端、斜杠命令与输入触发器、沙箱内核与网络代理、子智能体与文件锁、安装解析陷阱、官方上游核验与本地调试排毒。
 
 ---
 
 ## 四、交付前自检
 
-本技能是**纯文本规范集**，不含任何脚本、脚手架或示例工程。按 [SKILL.md](./SKILL.md) 第九节的清单逐项自检：`package.json` 的 `dsh.bundle.id` 与 `dsh.client.module`、`cordis.patch.yml` 的 `- insert:` 与 id/name 一致性、入口 `apply` 导出、双面插件的 `ctx.slots` 挂载方式。
+本技能是**纯文本规范集**，不含任何脚本、脚手架或示例工程。按 [SKILL.md](./SKILL.md) 第九节的清单逐项自检：`package.json` 的 `dsh.bundle.patch` 与 `dsh.client`（platform/inject/external/immediately；不存在 `dsh.bundle.id`/`dsh.client.module`）、`cordis.patch.yml` 的 `- id:` 与 name 一致性、入口 `apply` 导出、双面插件的 `ctx.slots` 挂载方式。
 
 ## 五、快速开始
 
 ```bash
-# 1. 向默认 web profile 添加插件组合包
-dsh plugin add ./path/to/my-plugin
+# 1. 向 web profile 添加插件组合包（plugin 子命令必须带 --profile）
+dsh plugin --profile web add ./path/to/my-plugin
 
 # 2. 导出并验证合并后的完整配置树
 dsh --profile web --dump-config

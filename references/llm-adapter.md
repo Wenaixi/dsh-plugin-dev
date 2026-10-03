@@ -97,7 +97,7 @@ export function apply(ctx: Context, config: Config) {
   const handle = ctx.llm.registerAdapter(config.providers, new CustomLlmAdapter(config))
 
   // 句柄是可调用函数：handle() 卸载（随 fiber 自动注销）；handle.replace(providers) 做原子路由替换
-  // ctx.effect(() => handle, 'my-custom-llm.registration')
+  // 无需再包 ctx.effect：registerAdapter 已自行经 ctx.effect 注册副作用，handle 随 fiber 自动注销（再包会二次注册）
 }
 ```
 

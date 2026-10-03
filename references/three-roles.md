@@ -112,7 +112,8 @@ const MyFeatureChip: React.FC = () => <div className="my-feature-chip">Extra Act
 export function apply(ctx: ClientContext) {
   ctx.slots.inject('conversation.input.right', () =>
     ctx.slots.register(
-      { name: 'conversation.input.right', id: 'my-feature-chip', order: 50 },
+      // list 槽的 id 必须全局唯一：用自己的命名空间前缀，避免与真实注册冲突
+      { name: 'conversation.input.right', id: 'my-plugin:feature-chip', order: 50 },
       MyFeatureChip
     )
   )

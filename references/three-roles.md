@@ -161,7 +161,7 @@ root
 | `main.*` | `main` | keyed | root | 主导航面板（`main.conversation` 为 single/session-maybe；不存在 `main.chat`） |
 | | `conversation.session` | single | session | 会话状态外壳 |
 | | `conversation.view` | list | session | 消息流呈现视口 |
-| | `conversation.chat.node` | chain | session | 消息节点流水线包裹/拦截 |
+| | `conversation.chat.node` | keyed | session | 消息节点渲染点（客户端 `renderSlot(..., { entryKey: routedNode.kind })` 逐节点渲染，不是 chain 包裹） |
 | | `conversation.composer` | list | session | 输入框下方功能区 |
 | | `conversation.input.attachments` | list | session | 输入框附加能力条 |
 | `rightbar.*` | `sidebar.right.pane.tab` | keyed | session | 右侧抽屉栏扩展 Tab（其父级 `rightbar.session` 仍然存在，是声明方，并未被重命名） |

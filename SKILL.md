@@ -37,7 +37,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
    - 补丁中的 `config` **整体替换，不做深合并**；
    - **绝对严禁教导用户修改 `settings.yaml`**（已彻底废弃，启动时自动重命名为 `settings.yaml.imported`）。
    落点路径、`- insert:` 语法、`- id:` 覆盖、`!!js` 动态求值与两种写入语义见 [config.md](./references/config.md)。
-5. **官方工具执行 16 阶段流水线**（此处列出跨阶段关键环节，完整 16 阶段逐条与源码行号见 [tools.md](./references/tools.md)）：
+5. **官方工具执行流水线**（讲解拆为 16 个编号环节 = 13 个调度器环节 + 3 个非调度器环节；完整逐条与源码行号见 [tools.md](./references/tools.md)）：
    `tool/call` 记录 -> `presentCall` -> `pre-execute` -> **`approval` (serviceAsk 审批裁决)** -> **单调 guard (终极一票否决权)** -> `execute`(环绕分派) -> 工具 `execute`(主体) -> FS Gate -> 工具自有事件 -> **`projectContent` (denied 依然触发)** -> `post-execute` -> 规范化 -> `finalizeContent` -> `tools/result` (同步) -> `tool/result` (持久化) -> `presentResult`。
    **审批先于守卫**：用户点了「允许」之后，单调 guard 仍可否决，详见 tools.md 第 4、5 阶段。
 6. **反例与误诊**：以上铁律都有一批「看起来合理但不存在」的 API 和「听起来顺理成章但方向错」的归因（改 `settings.yaml`、`registerTool`、`registerTab`、`did not activate` 等），逐条附可执行判定动作，见 [debugging-and-troubleshooting.md](./references/debugging-and-troubleshooting.md) 的「伪 API 与伪归因黑名单」。
@@ -63,7 +63,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
    - **输出**：包含规范 `package.json`、`cordis.patch.yml`、入口 `index.js` 的工程骨架。
 3. **步骤 3：编写核心业务逻辑与生命周期**
    - **输入**：业务逻辑与 API 接口；
-   - **执行**：编写功能代码。遵循核心铁律：所有副作用进入 `ctx.effect`、工具执行经 16 阶段流水线、React 组件绝不传 `ctx`、敏感密钥使用 `ctx.credentials` 引用模式；
+   - **执行**：编写功能代码。遵循核心铁律：所有副作用进入 `ctx.effect`、工具执行经官方固定管线（13 调度器 + 3 非调度器环节）、React 组件绝不传 `ctx`、敏感密钥使用 `ctx.credentials` 引用模式；
    - **输出**：完整实现的业务代码。
 4. **步骤 4：本地极速联调与排错验证**
    - **输入**：未发布的本地插件代码；

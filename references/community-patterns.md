@@ -1055,3 +1055,9 @@ Symbol.for('dsh.tool.scheduler') 已存在则复用，避免重复实例化。
 ### 11.167 供应链保护名单带原因链（gating-hub）
 PROTECTED_MODULE_PATTERNS：基础设施行大名单 + 原因链（timer→HMR 失效、webserver→失联）——
 保护名单不只是名单，每条都有"禁用会导致什么"的因果注释。
+
+### 11.168 guard 单调求值与普通 JSON Schema 工具参数（host 契约）
+- `ctx.tools.guard(ToolGuard)` 形如 `(execution) => string | undefined`，在 pre-execute 瀑布之后单调求值——**任何 guard 都不能 force-allow**（allow 分支仍跑 guardReason）。
+- `PreToolDecision = allow | deny(reason,info) | cancel | ask(reason,displayReason)`。
+- `approval.request({agent, toolName, callId?, reason?, signal?})` 非 `allowed-once` 即 deny；无 approval 服务时 fail-closed deny。
+- ToolSchema.parameters 必须是**普通 JSON Schema** object——schemastery 实例过不了 lossless 快照。

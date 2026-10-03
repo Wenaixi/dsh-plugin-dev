@@ -131,10 +131,10 @@ dsh --profile web web           # 等价 dsh web web：web 成为 app-args；与
 Cache-Control: public, max-age=31536000, immutable
 `
 
-URL 形如 `/plugins/??<包id>/client.js&rev=<内容哈希>`——**rev 变内容才变**。由此：
+URL 形如 `/plugins/??<包id>/client.js&rev=<framedHash>`——**rev 由产物 mtime/ctime/size 派生，非内容哈希**（artifactRevision），内容变则哈希变。由此：
 
 - 浏览器刷新、重开面板、重开设置窗口**都不够**；桌面版（Electron）必须**完全退出应用再启动**。
-- CLI Web 开发期可借助 HMR 通道热重建，桌面版不走同一条路。
+- 开发期由 dev:web 重建 client bundle，client-hmr（/plugins/events SSE）自动热替换插件条目；桌面版（desktop profile 未挂 client-hmr）只能重启。
 
 **更隐蔽的是版本时序**：插件卡片显示的版本号来自宿主读 `package.json`，而界面来自 client bundle，**两者更新不同步**，会出现「卡片已显示新版本、界面还是旧版」的假象，极易误判成"改了没生效"。
 

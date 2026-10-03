@@ -691,3 +691,187 @@ Host 命中 loopback（127/8、localhost、[::1]）+ sec-fetch-site cross-site �
 ### 11.85 跨宿主桥的 CLI 自管理安装 + 版本钉扎（plugin-cc）
 桥插件自管 CLI 安装（resolveDshBinary / installPinnedDshFromNpm / writeDshWrapper）双份兼容面；
 broker 会话续接必须活体验证；权限透传多档；作业台账 + 进程树终止。
+
+### 11.86 知识库型插件 = 把 SKILL.md 注册成技能（plugin-guide）
+用 ctx.skills 注册 provider，skill body 是仓库自己的 SKILL.md，相对引用经 directory
+resourceBase 解析——agent 需要时才加载（渐进披露）；frontmatter 剥离要大声失败/回退全文本。
+零宿主依赖：只消费 skills 服务（inject: ['skills']）。
+
+### 11.87 durable 自动化调度的配置面（dsh-automation）
+maxConcurrentRuns / runTimeoutMinutes / misfireGraceMinutes / catchUpMissedRuns /
+archiveRunSessions——并发上限、run 超时、misfire 宽限（宿主 resume 后跳过 vs 补跑）、
+错过运行追赶策略全部可配；任务在全新 Agent Session 运行（隔离 + 可归档）。
+
+### 11.88 插件控制台的启停机制（gating-hub / dsh-market 独立印证）
+插件启停 = 用户补丁层追加 `- id: X` + `disabled: true`（停用任意行），移除即恢复；HMR
+自动重组合无需重启。写 patch 文件要串行化（queuedWrite 排队）防 read-modify-write 交错。
+管理路由面：state/toggle/search/repo/install 五端点；loopback-only + 写 Origin 校验 +
+输出脱敏（maskUrl）+ 安装目录垃圾回收。
+
+### 11.89 webserver/index-inject 是"比 shell 更早的绘制面"（550c-boot）
+启动卡片类需求必须用 index-inject 的同步 style/head script 行，而不是 client bundle
+（bundle 求值必晚于 shell 卡片）。首帧契约：`window.__xxxFirstFrame.end()` + watcher +
+超时三重兜底防黑屏；"只声明 dsh.client 不可安装"是门禁。
+
+### 11.90 情感/人格化插件的安全契约模板（jingling）
+身份透明 + 不制造依赖 + 导入素材不可信 + 工具白名单隔离工作面（ALLOWED_COMPANION_TOOLS）+
+记忆写入权（仅 user-confirmed / proposal-confirmed / legacy 三种来源）。
+
+### 11.91 IM/网关类插件 = 高危多实例模板（im-gateway）
+DSH_HOME 实例锁（effect 绑 release，拿锁失败释放再 throw）+ 环形日志缓冲 + 状态分文件
+store（每个 JSON 独立 try/catch）+ 未授权待授权队列（设置面板一键批准）+ 调度全走 effect
+（unref + clearInterval 防双 tick）+ jobs.attachController 长任务前台视图 + 60s 心跳。
+
+### 11.92 settings 命名空间 = ctx.fiber.entry.options.id（0.1.7+）
+多个仓库独立印证（codex/jingyun/theme-endfield）：设置命名空间取插件行的 entry id
+（`ctx.fiber.entry.options.id`），不是包名；0.1.7+ 的 settings.describe 按此寻址。
+
+### 11.93 LLM 预算估算分族计价（deepread）
+CJK 0.6 / 拉丁 0.25 / 其他 0.5 token 每字符分族计价，比"每字符固定下限"更精细；
+模型速率默认表 + storage-domain 实时校准（defineDomain + domainTable + zod）持久化实测值。
+
+### 11.94 live(ref) volatile 配置统一解包函数
+0.1.7+ volatile 配置值是 { ref } 包装：写一个统一 `unwrapLive(ref)` 解包函数（有 .ref/.get
+就取值，否则原样返回），所有读配置处复用——避免散落解包逻辑。
+
+### 11.95 双通道设置（RPC channel + config）
+设置面两条路并存：RPC channel（客户端实时读写）+ config 直写（无 RPC 时的降级）；
+0.2.0 可选注入 settings 拿不到时靠 JSON 配置跑。
+
+### 11.96 受限 LLM 适配器（nonce 签发制）
+对"自由调用必须受限"的适配器：nonce + connection + request 三重匹配才放行，不匹配抛
+UNSUPPORTED_OPTION；请求先校验再落账；Service.init 异步 + disposing 短路。
+
+### 11.97 Read 侧多真源合并 + managed-block 可逆写入
+管理面板读侧合并四源（loader 树 / manifest / deps / patch insert）；写侧只动托管块
+（managed-block 标记），**永不重写用户内容**；安装卸载派官方 CLI。
+
+### 11.98 sidecar 内核 + 薄插件（scholar）
+重逻辑放 sidecar 内核（独立进程/独立包），插件只做薄映射；patch 只 ADD 不碰宿主
+sandbox/approval/web_fetch 行；按角色 ACL 工具注册；技能随包分发。
+
+### 11.99 编辑 = 追加版本效果事件 + 显式 inverse（message-edit）
+消息/文档编辑用事件溯源：编辑 = 追加带 schemaVersion 的效果事件 + 显式 inverse（可重放
+可撤销）；消息不可变语义（Object.freeze）；closedTurns 只折闭合回合；Timeline order 显式。
+
+### 11.100 主题插件两层 CSS 变量都接管（bloom-theme）
+`--dsw-alias-*`（语义层）+ `--dsw-specific-*`（组件特定层）都要覆盖——只接一层就是
+"换了色还是丑"；`body[data-variant]` 切换变体；纯 client 主题 node 半空 apply 合法，
+样式顶层立即注入（lazy CJS factory 不调用）。
+
+### 11.101 纯函数协议模块被多入口双实例化是重型插件状态分裂源（knowledge）
+RAG/重型插件把状态放进"纯函数协议模块"会被多入口静默复制成双实例——状态必须走
+globalThis Symbol 注册表或服务；证据带 source-span 可追溯。
+
+### 11.102 认证插件 gate 必须覆盖未认证 WebSocket upgrade（dsh-remote）
+HTTP + WS upgrade + SPA fallback 全路由门；scrypt 哈希 0600 落盘；HMAC 签名 cookie；
+登录限速 per-IP + username；首启 bootstrap loopback-only；enforceRoles 方法级门。
+
+### 11.103 timingSafeEqual 前先比长度（notifier）
+timingSafeEqual 长度不等会抛——先比 length 再比较；admin token 决策：SHA-256 哈希落盘 +
+首启只打印一次 + 先比长度再 timingSafeEqual。
+
+### 11.104 apiProxy 桥 wire 协议逐字段对齐（gov-portal）
+自定义 WebUI 的最短路径：unary / events.mux / respond / export 四种信封逐字段对齐宿主
+apiProxy 协议，独立端口 + 零依赖（node:http）复用宿主会话/权限；inject 由 patch 行声明。
+
+### 11.105 TOOL_WRAPPER_PROTOCOL 版本矩阵（sandbox-escalation-fix）
+包装宿主工具前先枚举支持版本矩阵（19 个）+ DSH_PACKAGES 清单 + 窄包装白名单
+（TARGET_NAMES：bash/pwsh/write/edit）+ ESCALATION_FIELDS 协议字段。
+
+### 11.106 PTY relay 的 Electron node 解析（wsl-workspace）
+Desktop 宿主下 `process.execPath` 是打包的 Electron 可执行——必须显式解析真实 node
+（resolveRelayNode）+ rejected 候选回退。
+
+### 11.107 更新执行器 detached 独立进程（prompt-enhancer）
+安装/重启类操作移出主进程（detached 执行器，宿主重启不丢更新）；RPC 版本协商
+（probeEnv / executorEnsure {port, version, pid}）；动态安装与 bundle 安装双路径共存。
+
+### 11.108 patch 内 !!js 读 installAnchor 版本条件禁用（llm-workbuddy）
+patch 里 `!!js` 读 `installAnchor` 的版本做阈值判断，条件禁用旧行（0.1.7 阈值）——与
+persona→personaPrefix 同族：同一份 patch 兼容新旧宿主。
+
+### 11.109 apply 同步段必须同步载配置（auto-memory）
+apply 的同步段若不同步载配置，注册闸门会"结构性恒假"（异步配置还没到，闸门已判过）。
+启动预热防首轮竞态；写路径锁 + retryRename 防 Windows EPERM。
+
+### 11.110 uncaughtException 护栏双刃剑（auto-memory）
+抑制致命退出必须配计数诊断 + 全局旗标防重复挂——只抑制不诊断会让故障静默。
+
+### 11.111 可选 UI 依赖 ctx.get() 探测不 inject（sidebar-qa）
+可选 UI 服务用 `ctx.get()` 探测（防 PENDING），不写进 inject；context 三策略
+（inherit/compressed/trim）失败降级 degraded:true。
+
+### 11.112 技能注入 = 包内资产复制进用户技能目录（stock-watch）
+安装时把包内 skills 复制进用户技能目录（已存在跳过 / env 覆盖 / 禁用）；MODULE_DIR
+锚定包内资源；技能安装状态 ≠ 插件树存在（扫约定根目录）。
+
+### 11.113 双 entry 拆分 web 面（agy）
+主插件（llm 注册）+ web entry（等 ctx.webServer 激活后注册 RPC/OAuth）；headless 下
+主插件照常；无 Config 合法（env 逃生口 DSH_AGY_DISABLE）；registerAdapter 包 ctx.effect。
+
+### 11.114 零运行时 @deepseek-ai 依赖 = 全 type-only import
+多个仓库独立印证（taskboard/with-chatgpt/cloader）：零运行时依赖的插件全用 type-only
+import（9 个类型增强包），协议段进 systemPrompt 带 order，执行走 fresh 会话 + pinned 模型。
+
+### 11.115 审批 answerer 完整模板（三方印证）
+approval/request 瀑布接入：不匹配预设即 `next()`；转人工 `await next()` 并回记终态；
+parseReason 解析 escalate 语义；callId 回溯 tool/call 取结构化路径；LLM 判定 fail-safe
+超时；裁决学习沉淀规则；数据落 `$DSH_HOME`（env 优先回退 homedir，不拼 node_modules——
+可能只读）。
+
+### 11.116 settings 双轨兼容 + FEATURE DETECTION（catppuccin 印证）
+<=0.1.6 用 installSection / >=0.1.7 用 Config.volatile + configForms——用**特性探测**
+不解析版本号；可选 settings 用 ctx.inject 降级 localStorage（只做首帧种子）。
+
+### 11.117 patch CRUD append-only 安全模板（mcp-panel）
+loader 方言**无 set/remove**（- set: 静默跳过）——"禁用即删除"（disabled:true）；绝不
+合成 !!js；env/header 值永不进快照；写 patch 前审批 + 备份；callTool 走官方
+`ctx.tools.execute` 流水线。
+
+### 11.118 headless persona 禁 ask_user_question 纪律
+headless/无人值守组合里 `ask_user_question` 会卡死——persona 层禁用；stdio 帧协议
+（PROTOCOL_VERSION + 帧类型判别 + capabilities 位图）+ MAX_COMMAND_BYTES/MAX_TOOL_OUTPUT
+流控；resume 活性校验。
+
+### 11.119 确定性研究的克制抓取（fund-research）
+PoliteFetcher 克制抓取（限频/超时/礼貌头）；密封快照验证每个关键数字（claim ↔ 快照）；
+溯源表可追溯；"研究不做交易"（只读域）。
+
+### 11.120 只读审计插件的纪律（secure-audit）
+严格只读（唯一写 = opt-in append-only JSONL）；宿主探测 fail-open 降级 n/a；报告先脱敏
+（secret → redacted、大对象 sha256 指纹）；可选技能 ctx.get 探测。
+
+### 11.86 bundle 行设计：裸包名行 = 客户端行，子路径行 = 宿主行（yolo）
+client module registry 通过解析每个 LOADER ENTRY 名到 `<entry>/package.json`
+读 dsh.client 声明——**裸包名解析到包根 → web client 行；子路径行解析不到 package.json →
+故意不是 client 行**。没有裸包名行，`dsh web` 永远不挂浏览器 UI（零报错静默失效）。
+
+### 11.87 persona 局部阴影而非替换（agency-agents）
+summoned 子代理只覆盖自己的 `deployment:persona` 段（spawn/fork provider 的 persona
+capability），带专家身份 + 普通工具集——不替换父 persona、不放开沙箱/审批。
+
+### 11.88 动态插件不能扩展冻结的 presets 表（approval-gate patch 注释）
+自定义权限预设必须在安装期间手动写进 profile 的 cordis.patch.yml（patch 注释明说：
+"dynamic plugins cannot extend the frozen presets table"）——"装插件就有预设"不可行，
+预设表是宿主编译期冻结的。
+
+### 11.89 settings seam 换代特性探测双轨（catppuccin issue #15）
+<=0.1.6 用 `ctx.settings.installSection` 注册命名空间 + `ctx.settingsScope`；
+>=0.1.7 不注册，用 Config schema 的 `.volatile()` 字段投影成以 profile entry id
+命名的表单，Client 读 `ctx.configForms`。**选择用特性探测（installSection 存在即旧 seam）
+不用版本解析**。
+
+### 11.90 webServer 信任校验的 canonicalAuthority（skills-manager）
+Host 只接受纯净规范 host[:port]（拒绝路径/userinfo/空白/非规范端口）；loopback 判定含
+localhost/[::1]/127/8；带端口 trustedHosts 精确匹配、不带端口匹配同主机任意端口；
+**端口归一化（隐式 80/443 派生）后再比较 Origin 同源**；写接口加自定义标记头
+（迫使跨站 fetch 预检，且不回 CORS）。
+
+### 11.91 IM 通道的 denyTools 与二维码 onboarding 过期重发（lark）
+IM 场景无人类对话框：`denyTools: [ask_user_question, exit_plan_mode]`（unanswerable
+here）；设备码过期重发是常态（操作者稍后回来）而非报错，但被拒授权必须停止。
+
+### 11.92 可选服务依赖行不进默认 patch（lark invariant）
+宿主默认组合没有 invariants 服务——放进默认 patch 会让整棵树启动失败（row 等缺席服务）；
+可选服务依赖行按组合条件挂载（diagnostic 组合才加）。

@@ -922,3 +922,32 @@ close 挂 ctx.effect。
 ### 11.138 cordis.yml 构建期占位符替换（wenshan）
 用 `____PLUGIN_NAME__` 占位符在构建期替换真实包名（发布前注入）——同一模板仓库发多个
 产品；!!js 跨平台工具链选择；agent preset 隔离业务。
+
+### 11.139 协作扫描预算 + fail-open 措辞纪律（secure-audit）
+长文本扫描用 `scanTimeoutMs` 毫秒预算限制运行期成本；预算耗尽按 `onTimeout` 显式降级
+（allow/review/block）。fail-open 默认时输出必须显式标注"未命中规则 ≠ 确认安全"——启发式
+漏检与安全保证要分开措辞。所有工具输出 schema 过 `assertObjectJsonSchema` 加载期闸。
+
+### 11.140 零配置上手（admin-zero-config-onboarding）
+空配置绝不弄崩启动：渠道为空只订阅不动作、解析问题只 warn + 跳过；新安装默认开启本机
+管理台（终端打印链接），零 YAML 配置即用。patch 行默认值与编程式 resolveConfig 默认可以
+不同（同一代码两套生效默认：patch 形态开 admin，程序化形态关）。
+
+### 11.141 礼貌限频抓取（PoliteFetcher）
+公开数据源（无 key 无登录）必须自带限频/重试/超时；数据源地址可配镜像。研究型插件输出
+每个关键数字与密封源快照比对（可选服务 ctx.get + 内置回退双轨），版本化报告 + 溯源表。
+
+### 11.142 MCP/管理面板的硬边界纪律（mcp-panel）
+官方客户端保持唯一桥（每服务器一实例），面板只做体验层；工具试用走 `ctx.tools.execute`
+（权限与审批保持生效）；写 profile patch 过审批门 + 自动备份 + append-only；**生成的
+patch 不含 `!!js` 表达式**；**绝不编造连接状态**；配置 env/header 值永不进快照；
+面板不注入提示词段。
+
+### 11.143 纯 client 主题空 apply + 假数据事故
+`function apply() {}` + named export 是零业务/纯 client 插件的合法形态（官方 trajectory
+插件同款）。假数据事故复盘：浏览器端读不到宿主数据时**别用硬编码示例兜底**（顶栏卡片
+永远显示仓库示例数字）——要么搭 client↔node 桥，要么删功能。
+
+### 11.144 工具输出 schema 对齐语义（quant）
+数组类输出的对齐语义（前 window-1 位为 null）写进 output schema：`oneOf: [number, null]`——
+模型不会误解 null 前缀；description 写公式与对齐规则（模型正确使用所需全部信息）。

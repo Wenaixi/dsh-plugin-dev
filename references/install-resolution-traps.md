@@ -120,7 +120,7 @@ dsh-plugin-manager 在安装前后各做一次 peer 兼容性评估（实现见 
 dsh plugin --profile <profile> allow-version <pkg>@<exact-version> --dsh-version <exact-dsh> --accept-risk
 ```
 
-豁免是**精确到版本对**的（包版本 + DSH 版本都必须精确匹配），落在 profile 的 `compatibility.json`。默认内容为 `{}`，即未设置任何豁免。豁免的对象是 **peer 兼容性检查**（DSH 侧闸门），与 pnpm 的发布冷却期无关——冷却期没有豁免入口，只有精确版本与 `--config.minimum-release-age=0` 两条路。
+豁免是**精确到版本对**的（包版本 + DSH 版本都必须精确匹配），落在 profile 的 `compatibility.json`。该文件**默认不存在**：读取端把 ENOENT 当作「无豁免」并标记可写（`readProfileCompatibility`），首次执行豁免才创建。豁免的对象是 **peer 兼容性检查**（DSH 侧闸门），与 pnpm 的发布冷却期无关——冷却期没有豁免入口，只有精确版本与 `--config.minimum-release-age=0` 两条路。
 
 **豁免只应作为最后手段**：它绕过的正是防止崩溃与数据丢失的那道闸门。优先修版本选择，不要用豁免掩盖解析错误。
 
@@ -137,7 +137,7 @@ dsh plugin --profile <profile> allow-version <pkg>@<exact-version> --dsh-version
   pnpm-workspace.yaml    # pnpm 工作区配置（nodeLinker / autoInstallPeers / minimumReleaseAge）
   cordis.patch.yml       # 该 profile 的配置补丁层
   cordis.yml             # 空根 entry list（Loader Include 锚点，每次启动被重写为空 []，勿手改）；看组合用 `dsh --profile <name> --dump-config`
-  compatibility.json     # 精确版本豁免表，默认 {}
+  compatibility.json     # 精确版本豁免表（默认不存在，首次 allow-version 后生成）
   cfg.log / cfg.err      # 启动黑匣子日志
   .plugin-manager/logs/operation-*/pnpm.log   # 每次插件安装的完整 pnpm 输出
 ```

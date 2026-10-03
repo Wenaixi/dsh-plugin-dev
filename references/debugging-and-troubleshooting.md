@@ -235,8 +235,8 @@ DSH 的宿主包大量导出**纯读取、不需要启动 Web GUI** 的公开函
 | --- | --- | --- |
 | `readPluginMeta(spec, parentURL)` | `@deepseek-ai/dsh-app-boot` | 卡片标题 / 描述 / 图标能不能读到 |
 | `resolveBundleDir(bin, name, installAnchor, profileDir)` | `@deepseek-ai/dsh-app-boot` | 某个 bundle 从哪个目录解析 |
-| `bundleManifest(name, dir, anchor)` | `@deepseek-ai/dsh-plugin-manager/operations`（不在 dsh-app-boot） | 该 bundle 的 manifest 与 `dsh.bundle` 声明 |
-| `resolveDshHome()` | 同上（`dsh-home-paths` 同语义） | 当前配置数据根算出来是哪个 |
+| `bundleManifest(location, name)` | `@deepseek-ai/dsh-app-boot` 与 `@deepseek-ai/dsh-plugin-manager/operations` 均有导出 | 该 bundle 的 manifest 与 `dsh.bundle` 声明 |
+| `resolveDshHome()` | `@deepseek-ai/dsh-home-paths`（`dsh-plugin-manager` 等使用方） | 当前配置数据根算出来是哪个 |
 
 ### 2. 跨平台调用的两个坑
 
@@ -292,8 +292,8 @@ npm pack --dry-run --json    # 逐条断言 locale/、icon、lib/ 都在 files �
   cordis.patch.yml       # 该 profile 的配置补丁层
   cordis.yml             # 组合后配置
   compatibility.json     # 精确版本豁免表，默认 {}
-  cfg.log / cfg.err      # 启动黑匣子日志
-  .plugin-manager/logs/  # 每次安装/卸载的 pnpm 原始输出
+  .plugin-manager/logs/  # 每次安装/卸载的 pnpm 原始输出（operation-*/ 子目录）；启动黑匣子日志在宿主日志目录（logs/），cfg.log/cfg.err 并非每个 profile 都有
+  compatibility.json     # 精确版本豁免表（**首次执行 allow-version 后才生成**，默认不存在；本机 desktop 无此文件）
 ```
 
 完整目录语义、`minimumReleaseAge: 0` 配置片段、BOM/CRLF 写入陷阱与排障决策表见 [install-resolution-traps.md](./install-resolution-traps.md)。

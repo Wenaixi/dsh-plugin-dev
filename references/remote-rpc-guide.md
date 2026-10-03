@@ -32,8 +32,8 @@
 
 在 Host 宿主端，只有通过特定装饰器或描述符导出的方法，才会被 API 网关扫描并挂载到前端可访问的白名单路由中。
 
-### 1. 方法签名四大硬性 AST 约束 (反模式拦截)
-DSH 的 Typert 协议对远程暴露的方法签名有严格的静态语法检查，**违背以下规则会导致网关直接拒绝注册**：
+### 1. 方法签名四大硬约束 (反模式拦截)
+DSH 的 Typert 协议对远程暴露的方法签名有严格约束，由网关的 SRC 回退模式在**派生描述符时**用函数源码解析参数列表执行（解构/默认值/rest/重名参数抛 `gateway/signature-invalid`，不是注册期静态 AST 拒绝）：
 
 1. **【禁止参数解构】**：必须使用单一名命对象参数。
    - ❌ 错误：`async readFile({ path, encoding })`
@@ -60,8 +60,8 @@ import os from 'node:os';
 export const name = 'dsh-system-info';
 
 // 继承 TypertRemoteService 并注册为命名空间 systemInfo
-// （Service 基类构造只有 (ctx, name) 两参，且本身不暴露 Remote 方法；
-//   TypertRemoteService 自动建立 typertRemote 绑定，方法仍需逐个 @Remote 标记）
+// （Service 基类构造只有 (ctx, name) 两参；TypertRemoteService 构造为 (ctx, serviceKey, options?)，
+//   第三参可选 { namespace } 自定义 wire 命名空间；自动建立 typertRemote 绑定，方法仍需逐个 @Remote 标记）
 export class SystemInfoService extends TypertRemoteService {
   constructor(ctx) {
     // 挂载在 Context 上的服务名为 systemInfo
@@ -191,7 +191,7 @@ if (result.ok) { /* 使用 result.value */ } else { /* 按 result.error.code 判
 ### 1. 通信机制
 - 在服务方法上声明 `@Remote({ mode: 'stream' })`；
 - 通道严格经由 WebSocket 路径 **`/api/remote.mux`**（长连接多路复用信道）；
-- Host 端通过 `ctx.invocation.uplink()` 建立管道，Client 得到 `ClientStreamHandle`（0.2.0-rc.2 中不存在 `RemoteStreamHandle` 这个名字），通过异步迭代器（`for await (const chunk of handle)`）消费流。
+- Host 端通过 `ctx.invocation.uplink()` 建立管道，运行时句柄类为 dsh-api-gateway 的 `ClientStreamHandle`；`RemoteStreamHandle` 只作为文档/类型层名字存在于 protocol 与 gateway 的 README，lib 运行时中不存在，通过异步迭代器（`for await (const chunk of handle)`）消费流。
 
 ### 2. 错误与中断处理
 - 客户端传递 `signal: controller.signal`，调用 `controller.abort()` 会同步断开该路流式链接，并在 Host 端触发管道终止，绝不泄漏句柄。

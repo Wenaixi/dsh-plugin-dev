@@ -4,7 +4,7 @@
 
 ## 核心概念：Bundle vs Profile（互斥）
 
-Bundle 与 Profile 职责截然不同，在 `package.json` 中携带互斥的 `dsh` 声明。官方原文："**没有东西同时是两者**"：
+Bundle 与 Profile 职责截然不同，在 `package.json` 中携带互斥的 `dsh` 声明。官方模型读写域互斥（无读取器同时消费两类字段）：
 
 | 实体 | 物理形态 | 清单声明 | 核心回答的问题 | 典型用法 |
 | --- | --- | --- | --- | --- |
@@ -53,7 +53,7 @@ my-feature-plugin/
 
 - `private: true`、version 与根一致、`type: module`。
 - `main: "lib/index.js"`、`types: "lib/types/index.d.ts"`、`exports["."]` 同构（types + default）。
-- `@deepseek-ai/cordis` **同时**出现在 peerDependencies 与 devDependencies（同版本范围）；每个 dsh peer 在 dev 镜像；`@deepseek-ai/schemastery` 放 dependencies（运行时校验器）。
+- `@deepseek-ai/cordis` **同时**出现在 peerDependencies 与 devDependencies（同版本范围）；每个 dsh peer 在 dev 镜像；用 schemastery 做 Config 校验的包（如 dsh-plugin-manager）放 dependencies；其余包（如 dsh-app-boot）只把它放 devDependencies。
 - `files` 精确列表（lib/index.js + lib/types/**/*.d.ts；不发布 src/声明映射/JS map）；带 bin 的包在 files 中紧跟 lib/bin.js。
 - 源码内相对导入用显式 `.ts` 后缀（JS 输出重写为 `.js`，声明保留 `.ts`）。
 
@@ -134,7 +134,7 @@ dsh plugin --profile web version-exemptions     # 列出当前豁免
 ```
 
 - 豁免键是精确的 `package@version`，`--dsh-version` 必须是含预发布与构建元数据的精确 SemVer；`allow-version` 需要 `--accept-risk` 显式确认。
-- 豁免只影响门禁判定，不卸载、也不自动重载已运行的实例。
+- CLI 豁免命令不卸载也不重载；从运行中的 GUI 管理器豁免时，若启用了 HMR 会热重载。
 
 ### 表层组合包自持 CLI
 
@@ -189,7 +189,7 @@ pnpm link --global dsh-plugin-foo
 }
 ```
 
-- **服务端 Node 插件**：`@deepseek-ai/dsh-hmr` 的 `base` 默认 `root: []`（只监听 profile 配置层），要让源码热更，需在 profile patch 给 `hmr` 行配 `root: ["."]` 使其监听模块根；`cordis.patch.yml` 变更始终触发配置重载（HMR = 卸载旧实例 → 加载新实例，注册皆 effect 自动清理）。
+- **服务端 Node 插件**：`root: []`（只监听 profile 配置层）是 dsh-base 的 hmr 行显式配置；`dsh-hmr` 插件自身默认 `root: ["."]`。要让源码热更，需在 profile patch 给 `hmr` 行配 `root: ["."]` 使其监听模块根；`cordis.patch.yml` 变更始终触发配置重载（HMR = 卸载旧实例 → 加载新实例，注册皆 effect 自动清理）。
 - **客户端 UI 插件**：`@deepseek-ai/dsh-client-hmr` 对每个 graph 行的 client bundle 做 stat 轮询（默认 `pollIntervalMs: 500`，设计上就是轮询，网络挂载不产生 inotify 事件），变更后经 SSE `/plugins/events`（graph/rebuilt 帧）推送热替换；开发期另有 dev watcher 先重建 bundle。不刷新页面完成组件与样式更新。
 
 ### 多包发布最佳实践

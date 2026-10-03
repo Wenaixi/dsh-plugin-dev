@@ -22,7 +22,7 @@
   插件注册的命令执行器 (CommandExecution)
                │ 验证权限、读取会话上下文
                ▼
-  返回 CommandResult (向会话注入指令或直接执行运维操作)
+  返回 CommandResult（{kind:'success'|'error', text?, sourceEventSeq?}；执行经 execute() 记入会话日志 command/run、command/done 生命周期事件，不创建模型消息）
 ```
 
 ---
@@ -37,25 +37,14 @@ export const inject = ['commands'];
 export function apply(ctx) {
   // 注册斜杠命令
   ctx.commands.register({
-    id: 'git-sync', // 命令标识符，用户输入 /git-sync 触发
+    name: 'git-sync', // /^[a-z][a-z0-9_-]*$/（无 id/placeholder/required 字段）
     description: '拉取最新代码并执行工作区状态自检',
-    // 定义参数输入形态（可选）
-    input: {
-      placeholder: '可选：指定远程分支名 (默认 main)',
-      required: false
-    },
-    // 命令执行逻辑
-    async execute(execution) {
-      const branch = execution.text?.trim() || 'main';
-      const sessionId = execution.sessionId;
-
-      ctx.logger('git-sync').info(`用户在会话 ${sessionId} 中触发了分支同步: ${branch}`);
-
-      // 返回执行结果
-      return {
-        ok: true,
-        message: `已成功为会话 ${sessionId} 触发 ${branch} 分支同步检测`
-      };
+    input: { hint: '[<branch>]' }, // hint 必须非空字符串；可选 attachments: true
+    handler: ({ agent, rawInput }) => {
+      const branch = rawInput.trim() || 'main';
+      ctx.logger('git-sync').info(`用户会话 ${agent.session.id} 触发分支同步: ${branch}`);
+      // 必须返回 { kind: 'success' | 'error', text? }
+      return { kind: 'success', text: `已为会话 ${agent.session.id} 触发 ${branch} 分支同步检测` };
     }
   });
 }
@@ -70,15 +59,15 @@ export function apply(ctx) {
 官方核心包 `@deepseek-ai/dsh-client-ui-input-trigger` 采用了精巧的**纯前端双面插件范式 (Pure-UI Dual-Face Pattern)**：
 
 ### 1. 架构设计规范
-- **Node 宿主端 (`index.js`)**：导出完全空的 `apply()` 函数。这是为了让 Cordis Loader 在静态解析 `cordis.patch.yml` 时能成功装载该条目；
+- **Node 宿主端 (`index.js`)**：导出空的 `apply()` 函数，使插件条目出现在宿主 cordis.yml / Loader 中（源码注释原文，无 cordis.patch.yml 静态解析依据）；
 - **浏览器客户端 (`lib/client.js`)**：在 `package.json` 的 `dsh.client` 中声明，打包为懒加载 CJS bundle；
-- 客户端在输入框挂载监听器，当检测到首字符为 `/` 时，通过 Typert Remote 异步拉取当前所有已注册的命令描述符（`CommandDescriptor`），在输入框正上方弹出高对比度的 Command Picker 列表面板供用户选择。
+- dsh-client-ui-commands 把 `/` 命令 source 注册进 input-trigger 流水线（trigger: "/"）；候选来自按 session 预热的命令目录（经 `ctx.remote.commands.list` 异步拉取，带 generation/AbortSignal 竞态把关），按命中 fetchCandidates 后在输入框上方弹出 Command Picker 列表面板。客户端没有名为 `CommandDescriptor` 的类型，只有 descriptor（name/description/input{hint,attachments?}，可带 definitionId）。
 
 ---
 
 ## 四、快捷键系统与命令联动 (`dsh-client-shortcuts`)
 
 双面插件还可以在浏览器端直接监听快捷键：
-- 官方核心包 `@deepseek-ai/dsh-client-shortcuts` 提供了跨平台的按键时序检测（Sequence Timing）；
+- 官方核心包 `@deepseek-ai/dsh-client-shortcuts` 提供快捷键服务（ShortcutsService，`ctx.shortcuts`）；`stopSequenceMs`（默认 500ms）是 ui-conversation 停止快捷键的连续两次 Esc 最大间隔（StopSequence.press 按 performance.now 计算 deadline），属固定输入序列而非通用按键时序 API；
 - 支持在不同操作系统下自动适配 `Cmd` (macOS) 与 `Ctrl` (Windows/Linux)；
-- 插件通过标准 DOM 快捷键绑定，可以一键唤出自己的斜杠命令输入框或专属设置面板。
+- 功能插件通过 `ctx.shortcuts.register({id,label,aliases,defaults,regions,modals,resolve})`（defaults 按 desktop/web×macos/windows/linux 六 profile 声明物理 code+modifiers，'primary' 按设备展开为 meta/control）注册命令，固定序列用 `registerFixed({id,keys,bindings,group})`，观察输入用 `observeFixedInput`。输入框唤出由 ui-conversation 的 fixed.slash（物理 Slash 键）承担，Mod+/（Slash+primary）由 dsh-client-ui-shortcuts 打开快捷键参考面板。

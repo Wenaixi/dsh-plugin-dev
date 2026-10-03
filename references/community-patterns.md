@@ -842,36 +842,83 @@ PoliteFetcher 克制抓取（限频/超时/礼貌头）；密封快照验证每�
 严格只读（唯一写 = opt-in append-only JSONL）；宿主探测 fail-open 降级 n/a；报告先脱敏
 （secret → redacted、大对象 sha256 指纹）；可选技能 ctx.get 探测。
 
-### 11.86 bundle 行设计：裸包名行 = 客户端行，子路径行 = 宿主行（yolo）
+### 11.121 bundle 行设计：裸包名行 = 客户端行，子路径行 = 宿主行（yolo）
 client module registry 通过解析每个 LOADER ENTRY 名到 `<entry>/package.json`
 读 dsh.client 声明——**裸包名解析到包根 → web client 行；子路径行解析不到 package.json →
 故意不是 client 行**。没有裸包名行，`dsh web` 永远不挂浏览器 UI（零报错静默失效）。
 
-### 11.87 persona 局部阴影而非替换（agency-agents）
+### 11.122 persona 局部阴影而非替换（agency-agents）
 summoned 子代理只覆盖自己的 `deployment:persona` 段（spawn/fork provider 的 persona
 capability），带专家身份 + 普通工具集——不替换父 persona、不放开沙箱/审批。
 
-### 11.88 动态插件不能扩展冻结的 presets 表（approval-gate patch 注释）
+### 11.123 动态插件不能扩展冻结的 presets 表（approval-gate patch 注释）
 自定义权限预设必须在安装期间手动写进 profile 的 cordis.patch.yml（patch 注释明说：
 "dynamic plugins cannot extend the frozen presets table"）——"装插件就有预设"不可行，
 预设表是宿主编译期冻结的。
 
-### 11.89 settings seam 换代特性探测双轨（catppuccin issue #15）
+### 11.124 settings seam 换代特性探测双轨（catppuccin issue #15）
 <=0.1.6 用 `ctx.settings.installSection` 注册命名空间 + `ctx.settingsScope`；
 >=0.1.7 不注册，用 Config schema 的 `.volatile()` 字段投影成以 profile entry id
 命名的表单，Client 读 `ctx.configForms`。**选择用特性探测（installSection 存在即旧 seam）
 不用版本解析**。
 
-### 11.90 webServer 信任校验的 canonicalAuthority（skills-manager）
+### 11.125 webServer 信任校验的 canonicalAuthority（skills-manager）
 Host 只接受纯净规范 host[:port]（拒绝路径/userinfo/空白/非规范端口）；loopback 判定含
 localhost/[::1]/127/8；带端口 trustedHosts 精确匹配、不带端口匹配同主机任意端口；
 **端口归一化（隐式 80/443 派生）后再比较 Origin 同源**；写接口加自定义标记头
 （迫使跨站 fetch 预检，且不回 CORS）。
 
-### 11.91 IM 通道的 denyTools 与二维码 onboarding 过期重发（lark）
+### 11.126 IM 通道的 denyTools 与二维码 onboarding 过期重发（lark）
 IM 场景无人类对话框：`denyTools: [ask_user_question, exit_plan_mode]`（unanswerable
 here）；设备码过期重发是常态（操作者稍后回来）而非报错，但被拒授权必须停止。
 
-### 11.92 可选服务依赖行不进默认 patch（lark invariant）
+### 11.127 可选服务依赖行不进默认 patch（lark invariant）
 宿主默认组合没有 invariants 服务——放进默认 patch 会让整棵树启动失败（row 等缺席服务）；
 可选服务依赖行按组合条件挂载（diagnostic 组合才加）。
+
+### 11.128 patch 版本门控的唯一宿主信息源 = ctx.get('profileContext')?.installAnchor（llm-workbuddy）
+patch 求值环境里唯一可用的宿主信息源是 `ctx.get('profileContext')?.installAnchor`——
+读它做版本阈值判断（<0.1.7 禁用某行）；engines 用多段区间声明。
+
+### 11.129 侧边栏/可选 UI 槽用 ctx.get 探测而非 inject（sidebar-qa）
+可选 UI 槽（侧边栏）用 `ctx.get()` 探测，**inject 会在无原生侧边栏宿主 park fiber
+导致 web boot 失败**；历史上下文三策略（inherit/compressed/trim）失败降级 degraded:true；
+压缩超时硬上限 8s；locale 由客户端显式传。
+
+### 11.130 外部 CLI 桥 dormant-safe（agy-link）
+缺二进制不崩 profile = 休眠 + 状态报告（dormant-safe 探测）；bin/version 缓存 +
+Semaphore 限并发；子进程 env 显式构造（透传 + 禁遥测 + 代理）；输出解析兼容多形态；
+账号池 + 配额。
+
+### 11.131 记忆注入五刷新点 + 自动沉淀分级（auto-memory）
+记忆注入刷新点：启动 / session-start / turn-stopping / 工具写入 / TTL；自动沉淀分级 +
+按 turn 去重 + 寒暄跳过；反思要明确触发条件；独立配置文件 + API 形态；路由 loopback-only。
+
+### 11.132 缓存版本键 + 启动清理旧格式（web-search-pro）
+缓存 key 带 schema 版本（变更即淘汰）；启动时清理旧格式；volatile 热加载 dynamic 闭包
+（所有操作读同一闭包）；可选 provider 注册 ctx.get 探测 + effect-scoped 幂等；store
+close 挂 ctx.effect。
+
+### 11.133 技能注入幂等（stock-watch）
+安装时把包内技能复制进用户技能目录：幂等 + 已存在跳过 + 尊重用户版本；env 覆盖配置；
+"插件树存在 ≠ 已安装"（技能扫约定根目录 .dsh/skills / .agents/skills，绝不展开 HOME）。
+
+### 11.134 协议桥插件（ACP）的 drain tail 串行化（acp-interactive）
+宿主拥有会话、桥只投影：drain tail 输出串行化；子代理事件经父卡片转发；静默期结算；
+**invariant 伴生注册**（"模型可见 = 已记录"）；协议层错误码用封闭联合（只能在协议层转义）。
+
+### 11.135 市场类插件安装计划强校验（plugins-store）
+安装计划强校验：executable/source/args 形状断言 + 精确 args 段数；GitHub 命令钉 SHA；
+验证状态同步。
+
+### 11.136 皮肤：走变量覆盖，不打宿主源码补丁（beauty-skins 反面教材）
+宿主源码 patch 型皮肤（直接改官方 client 文件 + install.sh 打补丁）不走 bundle 机制，
+**宿主升级即碎**。正确做法：--dsw-alias-* 变量覆盖 / 主题 slot。
+
+### 11.137 插件活目录的每日 compat 实测 + gzip 裁剪缓存（dsh-suite）
+活目录每日跑 compat 实测（非静态声明）；目录 gzip 裁剪缓存 1h；更新检查分批并发（≤4）+
+缓存 6h；score 与实测结果给用户排序。
+
+### 11.138 cordis.yml 构建期占位符替换（wenshan）
+用 `____PLUGIN_NAME__` 占位符在构建期替换真实包名（发布前注入）——同一模板仓库发多个
+产品；!!js 跨平台工具链选择；agent preset 隔离业务。

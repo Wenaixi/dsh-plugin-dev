@@ -59,7 +59,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
    - **输出**：确定的插件形态、所需服务清单、包名（如 `dsh-my-plugin`）。
 2. **步骤 2：生成工程骨架与依赖声明**
    - **输入**：目标目录路径；
-   - **执行**：按 [three-roles.md](./references/three-roles.md) 的 `package.json` 声明规范与 [config.md](./references/config.md) 的补丁语法，手工建立四件套：`package.json`（含 `dsh.bundle.id` 与 `dsh.client.module`）、`cordis.patch.yml`、Host 半侧入口、Client 半侧入口（如需 UI）；
+   - **执行**：按 [three-roles.md](./references/three-roles.md) 的 `package.json` 声明规范与 [config.md](./references/config.md) 的补丁语法，手工建立四件套：`package.json`（含 `dsh.bundle.patch` 与 `dsh.client.platform`/`exports["./client"]`）、`cordis.patch.yml`、Host 半侧入口、Client 半侧入口（如需 UI）；
    - **输出**：包含规范 `package.json`、`cordis.patch.yml`、入口 `index.js` 的工程骨架。
 3. **步骤 3：编写核心业务逻辑与生命周期**
    - **输入**：业务逻辑与 API 接口；
@@ -150,6 +150,8 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 │ 轻量生命周期、事件监听、日志？ ─────────────────────► 场景 A: 基础函数插件 (ctx.effect) │
 │ 打包发布、Profile 组合配置？ ───────────────────────► 场景 F: 组合包工程 (Bundle/Patch) │
 │ 想要把自研资源变成原生技能，或自定义技能发现？ ───────────────► 场景 W: 技能发现 (Skill) │
+│ 界面注册了却不出现/改完没效果/疑似旧缓存？ ───────────► 场景 Y: UI 落点与取证 (Placement)│
+│ 桌面版与 CLI 行为不一致/要跨运行时迁移插件与配置？ ────► 场景 Z: 跨运行时差异 (Runtime)  │
 └───────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -173,7 +175,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 | **O** | 呈递最终文件交付物卡片、向用户交互式提问 | 多模态与人机交互：调用 `present` 生成文件卡片、调用 `ask_user_question` 挂起提问 | [multimodal-and-deliverables.md](./references/multimodal-and-deliverables.md) |
 | **P** | 外部 Webhook 触发、CI/CD 纯命令行无头批处理 | 外部集成与无头驱动：注册 `webhookRuntime` 规则、以 `dsh-headless` 运行自动化测试 | [webhook-headless-and-workflows.md](./references/webhook-headless-and-workflows.md) |
 | **Q** | 防范模型工具调用死循环、注入动态时间戳与用户反馈 | 内置增强与中间件：接入 `repeat-tool-reminder` 劝告破局、注入 `time-context` 时钟事实 | [builtin-enhancements-and-middleware.md](./references/builtin-enhancements-and-middleware.md) |
-| **R** | 服务端强模式持久化业务数据、管理长任务持续伪终端 | 存储与终端原语：使用 `ctx.storage.domain` 读写强类型表、使用 `ctx.terminal` 管理 PTY | [storage-terminals-and-checkpoints.md](./references/storage-terminals-and-checkpoints.md) |
+| **R** | 服务端强模式持久化业务数据、管理长任务持续伪终端 | 存储与终端原语：使用 `ctx.storageDomain`/`ctx.storage.domain` 读写强类型表、使用 `ctx.terminals`（复数）管理 PTY | [storage-terminals-and-checkpoints.md](./references/storage-terminals-and-checkpoints.md) |
 | **S** | 注册人类斜杠命令、输入框光标补全浮层与快捷键 | 命令与输入触发：使用 `ctx.commands` 注册 `/command`、双面插件注入 input-trigger | [slash-commands-and-input-triggers.md](./references/slash-commands-and-input-triggers.md) |
 | **T** | 沙箱内核级隔离、多模态图片压缩转储与网络代理 | 底层安全与基础设施：理解 Windows ACL/Landlock 原理、image-offload 恢复、undici 代理 | [sandbox-internals-and-proxy.md](./references/sandbox-internals-and-proxy.md) |
 | **U** | 子智能体持续多轮交互、文件系统防覆盖锁与 ACP 协议 | 委派与文件安全：使用 `ctx.subagents.startContinuable`、理解 fs-observation 读后写规则 | [subagents-fs-policy-and-acp.md](./references/subagents-fs-policy-and-acp.md) |
@@ -184,6 +186,8 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 > （patch 整块替换、版本兼容层、信任围栏、客户端纪律、事件词汇表等）已按专题蒸馏完毕。
 | **W** | 想把自研资源（打包资源、远端、动态裁剪）变成原生技能，或替换技能发现逻辑 | 自定义技能发现：实现 `SkillProvider` 的 `list`/`get`，经 `ctx.skills.registerProvider` 接入，取 `rank` 裁决重名，用 `complete: false` 表达发现未完成 | [skill-provider.md](./references/skill-provider.md) |
 | **X** | 代码与门禁都写完了，运行时功能却不生效且无任何报错 | 静默失效排查：按「代码从未执行 / 契约被吞 / 解析到别的东西」三类定位；给每条新断言做破坏实测；真机浏览器验收并逐次回读真值 | [silent-failure-and-gate-design.md](./references/silent-failure-and-gate-design.md) |
+| **Y** | 界面注册了却不出现、改完看不出效果、分不清「没渲染 / 渲染在别处 / 用的旧缓存」 | 客户端 UI 落点与取证：先查「界面语义 → 插槽」映射表，坚持**一个功能一个入口**；记住 `slots.inject` 在插槽 spec 不存在时**静默不执行**；改完桌面端必须完全重启；用 Node 直跑 factory 与 CDP 真机取证 | [client-ui-placement-and-verification.md](./references/client-ui-placement-and-verification.md) |
+| **Z** | 同一插件在桌面版与 CLI Web 上表现不一致；要把插件与配置从一个 profile/运行时迁到另一个 | 跨运行时差异与迁移：桌面版本体在 `app.asar`、profile 被 Electron 独占（部分 CLI 操作仍可用）、依赖多为 hoisted；**官方包由运行时提供不必装**；**装了 ≠ 挂载**（`dependencies` vs `dsh.profile.bundles`）；pnpm **不检测文件缺失**；配置迁移要追加不覆盖 | [desktop-vs-cli-runtime.md](./references/desktop-vs-cli-runtime.md) |
 
 ---
 
@@ -409,8 +413,8 @@ DSH 导出大量纯读取函数，不必启 Web GUI、不必拿 token 就能判�
 
 本技能只提供纯文本规范，不含任何脚本或示例工程。交付前逐项确认：
 
-1. `package.json`：`name`/`version`/`type: module` 齐备；`dsh.bundle.id` 非空；双面插件声明 `dsh.client.platform` + `dsh.client.module` + `exports["./client"]`；**只要声明了 `exports`，就必须同时放行 `"./package.json"` 与 `"./locale/*.json"`，否则插件卡片只剩包名**；有 `icon` 则须为包内相对路径且 <= 256 KiB；
-2. `cordis.patch.yml`：含真实 `- insert:` 声明（非注释）；条目的 `id` 与 `dsh.bundle.id` 一致、`name` 与 `package.json` 的 `name` 一致；
+1. `package.json`：`name`/`version`/`type: module` 齐备；组合包声明 `dsh.bundle.patch`（路径或数组）；双面插件声明 `dsh.client.platform` + `exports["./client"]`（**不存在 `dsh.bundle.id`/`dsh.client.module` 字段**）；**只要声明了 `exports`，就必须同时放行 `"./package.json"` 与 `"./locale/*.json"`，否则插件卡片只剩包名**；有 `icon` 则须为包内相对路径且 <= 256 KiB；
+2. `cordis.patch.yml`：含真实 `- insert:` 声明（非注释）；条目的 `id` 为插件补丁行 id、`name` 与 `package.json` 的 `name` 一致；
 3. 入口文件存在且导出 `apply`：`node --check index.js`（双面再加 `node --check lib/client.js`）无报错；
 4. 双面插件的 Client 半侧经 `ctx.slots.inject/register` 挂载，组件只接收 props；
 5. 真实启动验收：端口监听 + 首页 200；`--dump-config` 通过只代表 YAML 可解析。

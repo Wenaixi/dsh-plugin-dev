@@ -38,11 +38,12 @@ my-feature-plugin/
   "main": "lib/index.js",
   "files": ["lib", "cordis.patch.yml"],
   "dsh": { "bundle": { "patch": "./cordis.patch.yml" } },
-  "peerDependencies": { "@deepseek-ai/dsh": ">=0.2.0-rc.1" }
+  "peerDependencies": { "@deepseek-ai/dsh": ">=0.2.0-rc.1", "@deepseek-ai/cordis": ">=4.0.0" },
+  "devDependencies": { "react": "^18.2.0", "@deepseek-ai/cordis": ">=4.0.0" }
 }
 ```
 
-- `dsh.client`：声明双面插件的前端半侧（`platform: "web"`）。Host 侧 `clientModules` 服务扫描到此字段时，将其加入 `window.__DSH_BOOT__` 并开放 Combo 路由。
+- `dsh.client`：声明双面插件的前端半侧，字段为 `dsh.client.{platform, inject, external, immediately}`（无 `dsh.client.module` 之类的字段）。Host 侧 `clientModules` 服务扫描到此声明时，将其加入 `window.__DSH_BOOT__` 并开放 Combo 路由。
 - `dsh.bundle.patch` 支持字符串路径（`"./cordis.patch.yml"`），也支持**有序文件数组**（`["./base.patch.yml", "./web.patch.yml"]`），按序作为同一层应用。
 - patch 行按**包名**引用（`- insert: - { id: hello, name: 'dsh-hello-plugin' }`），不是文件路径。
 
@@ -96,8 +97,8 @@ Bundle 携带的补丁文件用于在装配树中挂载插件实例：
 ## 安装与卸载命令 (dsh plugin CLI)
 
 ```bash
-# 向默认 web profile 添加已发布的 npm 插件包
-dsh plugin add dsh-my-feature
+# 向 web profile 添加已发布的 npm 插件包（--profile 必填，宿主 CLI 无"默认 profile"概念）
+dsh plugin --profile web add dsh-my-feature
 
 # 向特定 profile 添加
 dsh plugin --profile demo add ./hello-plugin
@@ -109,7 +110,7 @@ dsh --profile demo --dump-config
 dsh plugin --profile demo remove dsh-hello-plugin
 
 # 从本地 tarball 安装
-dsh plugin add ./hello-plugin-0.1.0.tgz
+dsh plugin --profile web add ./hello-plugin-0.1.0.tgz
 ```
 
 ### git 安装与构建授权
@@ -117,8 +118,23 @@ dsh plugin add ./hello-plugin-0.1.0.tgz
 `dsh plugin --profile demo add github:you/hello-plugin` 拉取的是**源码而非构建产物**：
 
 - 作者需提供**自包含的 `prepare` 脚本**（从源码构建）。
-- pnpm >= 10 的用户须在 profile 的 `pnpm-workspace.yaml` 配置 `allowBuilds: { dsh-hello-plugin: true }` 授权（视为安装时执行代码，建议锁 commit `#<sha>`）。
+- 在 profile 的 `pnpm-workspace.yaml` 配置 `allowBuilds: { dsh-hello-plugin: true }` 授权 pnpm 11 执行依赖构建脚本（构建脚本被默认忽略时报 `ERR_PNPM_IGNORED_BUILDS`；键必须是精确包名、拒绝通配），否则安装被拦（视为安装时执行代码，建议锁 commit `#<sha>`）。
 - 不想授权则发 npm（publish 时构建 lib/）或 tarball。
+
+### 兼容门禁与精确版本豁免（allow-version 命令族）
+
+插件对 `@deepseek-ai/dsh` 与 `@deepseek-ai/dsh-*` 的 peer 声明是**兼容门禁**：启动时对每个 bundle 做 peer 预检（`workspace:*` 等协议按当前运行时解析；其余范围用 semver 含预发布版本判断），不兼容且未豁免的 bundle **启动时跳过**；安装时（`dsh plugin` 转发的 add/update）在 pnpm 运行**之前**预检清单，不兼容直接拒绝安装、一个都不装。
+
+豁免用精确版本命令族管理，豁免记录独立存于 profile 的 `compatibility.json`（与 package manifest、patch 无关）：
+
+```bash
+dsh plugin --profile web allow-version dsh-my-feature@0.1.0 --dsh-version 0.2.0-rc.2 --accept-risk
+dsh plugin --profile web revoke-version dsh-my-feature@0.1.0 --dsh-version 0.2.0-rc.2
+dsh plugin --profile web version-exemptions     # 列出当前豁免
+```
+
+- 豁免键是精确的 `package@version`，`--dsh-version` 必须是含预发布与构建元数据的精确 SemVer；`allow-version` 需要 `--accept-risk` 显式确认。
+- 豁免只影响门禁判定，不卸载、也不自动重载已运行的实例。
 
 ### 表层组合包自持 CLI
 
@@ -173,13 +189,13 @@ pnpm link --global dsh-plugin-foo
 }
 ```
 
-- **服务端 Node 插件**：在 `web` profile 中经 `cordis.patch.yml` 变更触发配置重载（HMR = 卸载旧实例 → 加载新实例，注册皆 effect 自动清理）。
-- **客户端 UI 插件**：`@deepseek-ai/dsh-client-hmr` 监听到 `lib/client.js` 变更后经 SSE 推送热替换，不刷新页面完成组件与样式更新。
+- **服务端 Node 插件**：`@deepseek-ai/dsh-hmr` 的 `base` 默认 `root: []`（只监听 profile 配置层），要让源码热更，需在 profile patch 给 `hmr` 行配 `root: ["."]` 使其监听模块根；`cordis.patch.yml` 变更始终触发配置重载（HMR = 卸载旧实例 → 加载新实例，注册皆 effect 自动清理）。
+- **客户端 UI 插件**：`@deepseek-ai/dsh-client-hmr` 对每个 graph 行的 client bundle 做 stat 轮询（默认 `pollIntervalMs: 500`，设计上就是轮询，网络挂载不产生 inotify 事件），变更后经 SSE `/plugins/events`（graph/rebuilt 帧）推送热替换；开发期另有 dev watcher 先重建 bundle。不刷新页面完成组件与样式更新。
 
 ### 多包发布最佳实践
 
 1. **统一类型定义**：共享类型抽离至纯类型包或根模块导出，避免跨包循环依赖。
-2. **peerDependencies 严格解耦**：`@deepseek-ai/cordis`、`@deepseek-ai/dsh`、`react` 声明为 peerDependencies，确保运行时加载宿主统一实例。
+2. **peerDependencies 严格解耦**：只把 `@deepseek-ai/cordis` 与 `@deepseek-ai/dsh-*` 系列声明为 peerDependencies；`react` 一律放 devDependencies——官方包全部如此（57 个含 react 的包 peer 计数为 0），浏览器模块表 `PLATFORM_MODULES` 提供运行时 react，不复用宿主实例。
 3. **发布前校验**：`files` 显式包含编译后的 `lib/` 与 `cordis.patch.yml`，避免遗漏关键补丁。
 4. **client 半侧挂载规则**：浏览器半侧**只挂在说明符恰为裸包名的那一行上**；子路径导出挂载的行永远不带半侧。拆成多行的组合包，其半侧留在根行，注册的每个页面随根行关闭而消失；需在其他行关闭时仍保留页面的子插件应作为**独立包**发布。`./client` 必须是客户端模块系统的 lazy-CJS factory 格式；生成它的 tsdown 预设只在仓库 `packages/client/tsdown.client.ts`，仓库之外需自行复刻。
 
@@ -187,28 +203,23 @@ pnpm link --global dsh-plugin-foo
 
 在安装 DSH 插件或进行多包联调时，由于 DSH 的微内核多包架构与严格单例设计，极易触发以下两大包管理器陷阱：
 
-### 1. npm install --legacy-peer-deps 陷阱与根因
+### 1. peer 依赖冲突（官方处理链路是 pnpm）
 
-- **现象**：直接运行 `npm install` 安装插件或依赖时，频繁抛出 `npm ERR! ERESOLVE unable to resolve dependency tree` 并阻断安装。
-- **根本原因**：
-  - DSH 规范强制将 `@deepseek-ai/cordis`、`@deepseek-ai/dsh` 以及 `react` 声明为 `peerDependencies`，以保证全局运行时仅存在单一实例。
-  - npm 7+ 默认开启了严格的 peerDependencies 自动安装与深层依赖图推导。当多个插件或间接依赖声明的 peer 版本范围存在微小的边界不重合，或者与全局安装树形成菱形依赖时，npm 会拒绝安装。
-- **规避与应对指南**：
-  1. **使用 `--legacy-peer-deps` 参数**：`npm install <plugin-package> --legacy-peer-deps`（回退到跳过严格 peer 冲突校验的经典行为）。
-  2. **在项目或 Profile 根目录配置 `.npmrc`**：写入 `legacy-peer-deps=true`。
-  3. **优先使用 DSH 官方 CLI 安装**：`dsh plugin add <package-name>`（官方 CLI 内部会安全调度包管理器并自动维护 Profile 的 cordis 补丁层）。
+- 官方包管理链路是 **pnpm**：`dsh plugin` 只负责解析参数并把其余命令转发给 pnpm，profile 本身就是一个 pnpm workspace。全库不依赖 `npm --legacy-peer-deps` 或 `.npmrc` 的 `legacy-peer-deps=true`（官方包内零处出现该配置）。
+- profile 初始化的 `pnpm-workspace.yaml` 模板显式设置 `autoInstallPeers: false`，peer 不自动安装。
+- peer 冲突的官方处理是**兼容门禁 + 精确版本豁免**：安装前预检拒绝、启动时跳过（见下文"兼容门禁与精确版本豁免"），而不是放宽解析器。
 
 ### 2. pnpm 内存溢出 (OOM) 陷阱与性能优化
 
 - **现象**：在 Profile 目录或大型 monorepo 中执行 `pnpm install` 或 `pnpm run build` 时，Node.js 进程卡死并崩溃，报错：`FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory`。
 - **根本原因**：
-  - **超深依赖拓扑**：DSH 核心生态包含 260+ 个细粒度包，深层依赖符号链接图极其庞大复杂。
+  - **超深依赖拓扑**：DSH 核心生态包含 289 个细粒度包（0.2.0-rc.2 实测），深层依赖符号链接图极其庞大复杂。
   - **V8 默认堆内存限制**：Node.js 默认分配给 V8 的最大堆内存通常仅 1.4GB ~ 2GB。pnpm 在全量计算符号链接图、跨包校验依赖一致性、或 tsc 同时编译数十个包的双面 bundle 时，内存极易被打爆。
 - **避坑与解决实操**：
   1. **临时/全局提高 Node.js 内存上限**：设置环境变量 `NODE_OPTIONS="--max-old-space-size=8192"`（提升至 8GB 堆内存）。
   2. **避免盲目全局 pnpm link**：优先采用基于 `pnpm-workspace.yaml` 的 Monorepo 相对路径安装或 `pnpm add ./packages/<pkg>`，利用 pnpm 的硬链接与虚拟 store 机制节省内存。
   3. **定向过滤构建 (Filtered Build)**：使用 `pnpm --filter <pkg> run build` 精准针对目标包构建，严禁在根目录无脑并发打包整个 monorepo。
-  4. **pnpm >= 10 构建脚本授权**：在 Profile 目录的 `pnpm-workspace.yaml` 中显式配置 `allowBuilds: { "<package-name>": true }`。
+  4. **pnpm 11 构建脚本授权**：依赖构建脚本被 pnpm 默认忽略时报 `ERR_PNPM_IGNORED_BUILDS`（这是构建授权问题，**不是 OOM 对策**），需在 Profile 的 `pnpm-workspace.yaml` 显式配置 `allowBuilds: { "<package-name>": true }`；键必须是精确包名、拒绝通配符。
 
 ## 常见误解
 

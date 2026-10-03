@@ -8,12 +8,12 @@ DSH 提供了三种标准的沙箱模式（`read-only`、`workspace-write`、`da
 ### 1. Windows 平台黑科技：WRITE_RESTRICTED 令牌与 ACL 交集检查
 官方核心包 `@deepseek-ai/dsh-sandbox-windows-acl` 直接调用 Windows NT 内核安全原语：
 1. **限制性令牌 (Restricted Token)**：为运行命令的子进程创建一个剥离了写权限的 `WRITE_RESTRICTED` 令牌；
-2. **受限 SID (Restricting SIDs)**：为当前工作区目录和系统的 Temp 目录分配特定的限制性 SID；
-3. **动态 DACL 交集检查 (Intersection Check)**：沙箱在当前工作区的访问控制列表（DACL）中动态追加对应的 Write ACE。Windows 内核在执行文件写入时，**当且仅当进程同时具备普通写入权限与限制性 SID 写入权限时才放行**！
-- **核心收益**：除了允许写入的工作区和临时目录外，系统盘、用户主目录、系统关键文件的写入全部被内核底层直接拒绝，开销几乎为 0，零启动延迟！
+2. **受限 SID (Restricting SIDs)**：为当前工作区目录和每个会话/工作区各自随机的私有临时子目录（`mkdtempSync(join(tmp,'dsh-'))`，**不是系统的 Temp 根**）分配特定的限制性 SID；
+3. **DACL 交集检查 (Intersection Check)**：沙箱通过 `SetEntriesInAclW` 一次写入 Write ACE（能力 SID 允许 + world SID `FILE_DELETE_CHILD` 拒绝 + Low 完整性标签 no-write-up）。Windows 内核在执行文件写入时，**当且仅当进程同时具备普通写入权限与限制性 SID 写入权限时才放行**！
+- **核心收益**：除了允许写入的工作区和临时目录外，系统盘、用户主目录、系统关键文件的写入全部被内核底层直接拒绝。注意机制事实：工作区 ACE 是**常驻**的（复用缓存、绝不撤销），临时 ACE 可回收；首次授权是**急切的全树传播**（大目录上可达数十秒），不是零开销。
 
 ### 2. Linux 平台：Landlock 原生内核沙箱
-在 Linux 5.13+ 环境下，`@deepseek-ai/dsh-bash-sandbox` 优先使用 Linux 内核原生的 **Landlock LSM**，对子进程的文件系统访问树（Path-based Access Rights）进行细粒度封锁；在不支持的环境下回退至 `bwrap` (Bubblewrap) 命名空间隔离。
+Linux 平台采用**探测制链**：`PLATFORM_CHAINS.linux = ["bwrap", "landlock"]`，**bwrap 优先**，Landlock 是第二候选（经 node-addon-system 的 landlock-run 探测，旧 ABI 报告 partial）；不支持时 fail-closed，不是回退。Landlock 对子进程的文件系统访问树（Path-based Access Rights）进行细粒度封锁；文档中的「Linux 5.13+」无官方出处，已删。 (Bubblewrap) 命名空间隔离。
 
 ---
 

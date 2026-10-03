@@ -1,6 +1,6 @@
 # LLM 适配器与流式协议
 
-DeepSeek Harness (DSH) 采用提供方无关（Provider-neutral）的模型调用抽象。所有具体模型 API 均通过继承 `LlmAdapter` 并向 `ctx.llm` 注册实现接入。官方文档口径：`ctx.llm` 的角色是 **seam（可替换能力缝）**，契约在 `@deepseek-ai/dsh-llm`，实现由 `llm-deepseek`、`llm-pi-ai`、`llm-replay` 等包提供；消费方是 `agent-loop` 与 `compaction-basic`，它们只依赖与提供方无关的流服务。
+DeepSeek Harness (DSH) 采用提供方无关（Provider-neutral）的模型调用抽象。所有具体模型 API 均通过继承 `LlmAdapter` 并向 `ctx.llm` 注册实现接入。官方文档口径：`ctx.llm` 的角色是 **seam（可替换能力缝）**，契约在 `@deepseek-ai/dsh-llm`，实现由 `dsh-llm-deepseek-api-key`（deepseek-official）、`dsh-llm-deepseek-account`（deepseek-account）、`dsh-llm-pi-ai` 等包提供（`dsh-llm-retry` 是重试执行器不是适配器）；消费方包括 `agent-loop`、`compaction-basic`、会话标题生成（`dsh-session-title-first-prompt-llm` / `dsh-session-title-llm`）与 `token-meter`，它们只依赖与提供方无关的流服务。
 
 ## 职责划分
 
@@ -27,7 +27,7 @@ export abstract class LlmAdapter {
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
-import { LlmAdapter, type GenerateOptions, type StreamChunk } from '@deepseek-ai/dsh-llm'
+import { LlmAdapter, attributionHeaders, type GenerateOptions, type StreamChunk } from '@deepseek-ai/dsh-llm'
 
 export class CustomLlmAdapter extends LlmAdapter {
   constructor(private config: Config) {
@@ -42,16 +42,16 @@ export class CustomLlmAdapter extends LlmAdapter {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${this.config.apiKey}`,
-        // 每个 HTTP 请求都必须合并归因头（映射 User-Agent）
-        ...this.attributionHeaders(),
+        // 每个 HTTP 请求都必须合并归因头（包级导出函数，映射 User-Agent）
+        ...attributionHeaders(),
       },
       body: JSON.stringify({ model, messages, tools, stream: true }),
       signal, // 必须遵守调用方 signal
     })
 
-    // 错误路径一：传输/协议故障直接抛出带稳定 code 的 LlmError
+    // 错误路径一：传输/协议故障直接抛出带稳定 code 的 LlmError（兜底映射为 HTTP_<status>）
     if (!response.ok) {
-      throw new LlmError(`Provider HTTP ${response.status}`, 'PROVIDER_ERROR')
+      throw new LlmError(`Provider HTTP ${response.status}`, `HTTP_${response.status}`)
     }
 
     // 块 index 按首次出现的流顺序分配，从 0 递增
@@ -64,10 +64,10 @@ export class CustomLlmAdapter extends LlmAdapter {
     yield {
       type: 'usage',
       usage: {
-        inputTokens: 120,    // 仅未命中缓存的输入
-        cacheRead: 400,      // 命中缓存的输入（单独报告）
-        cacheWrite: 0,       // 写入缓存的开销
-        outputTokens: 50,    // 已含 reasoningTokens
+        inputTokens: 120,        // 仅未命中缓存的输入
+        cacheReadTokens: 400,   // 命中缓存的输入（单独报告）
+        cacheWriteTokens: 0,    // 写入缓存的开销
+        outputTokens: 50,       // 已含 reasoningTokens
         reasoningTokens: 30,
       },
     }
@@ -89,14 +89,15 @@ export interface Config {
 export const Config: Schema<Config> = Schema.object({
   apiKey: Schema.string().role('secret').required().description('API 认证密钥'),
   endpoint: Schema.string().default('https://api.custom.com/v1').description('接口基地址'),
-  providers: Schema.array(Schema.string()).default(['custom-provider']).description('绑定的提供方路由'),
+  providers: Schema.array(Schema.string()).default(['custom-provider']).description('绑定的提供方路由（不可为空数组，空数组抛 INVALID_ADAPTER）'),
 })
 
 export function apply(ctx: Context, config: Config) {
   // 注意参数顺序：第一个参数是提供方路由列表，第二个是适配器实例
   const handle = ctx.llm.registerAdapter(config.providers, new CustomLlmAdapter(config))
 
-  // 卸载由 handle.dispose() 释放；也可用 handle.replace(providers) 做原子路由替换
+  // 句柄是可调用函数：handle() 卸载（随 fiber 自动注销）；handle.replace(providers) 做原子路由替换
+  // ctx.effect(() => handle, 'my-custom-llm.registration')
 }
 ```
 
@@ -106,15 +107,16 @@ export function apply(ctx: Context, config: Config) {
 // @deepseek-ai/dsh-llm
 ctx.llm.registerAdapter(providers: string[], adapter: LlmAdapter): AdapterRegistrationHandle
 
-interface AdapterRegistrationHandle {
-  dispose(): void
-  replace(providers: string[]): void  // 原子替换路由绑定
-}
+// 句柄不是带 dispose() 方法的对象，而是可调用函数：
+// handle() 卸载注册（等价于 dispose）；handle.replace(providers) 原子替换路由绑定
+type AdapterRegistrationHandle = ((() => void) & {
+  replace(providers: string[]): void
+})
 ```
 
 - **注册基于副作用**：随所属 fiber 卸载自动注销，天然支持 HMR。
 - **每个提供方路由同一时刻只能对应一个适配器**：重复注册同一路由抛出 `DUPLICATE_ADAPTER`，且**多路由注册要么全部成功、要么全部失败**（原子性）。
-- 传入空路由数组合法（等价于不声明任何路由）。
+- 传入空路由数组会抛错：`providers.length === 0` 时 `registerAdapter` 抛 `LlmError('an adapter must register at least one provider', 'INVALID_ADAPTER')`，不是合法的"不声明路由"。
 - `options.provider` 用于选择适配器；`options.model` 是提供方自己的模型 ID，**无需在启动时注册**。动态模型目录不需要重新配置生命周期。
 - 模型选项通过覆写 `listModels()` 公布。
 
@@ -124,7 +126,7 @@ interface AdapterRegistrationHandle {
 
 | Chunk 类型 | 字段载荷 | 语义 |
 | --- | --- | --- |
-| `block-start` | `index: number, blockType: 'text' \| 'tool-call'` | 块开始；每个 `block-start` 必须有配对的 `block-end` |
+| `block-start` | `index: number, blockType: ContentBlockType` | 块开始；每个 `block-start` 必须有配对的 `block-end` |
 | `text-delta` | `index: number, text: string` | 可见文本增量 |
 | `reasoning-delta` | `index: number, text: string` | 深度思考过程增量 |
 | `tool-call-delta` | `index, id: ToolCallId, name?: string, argumentsDelta: string` | 工具调用参数增量 |
@@ -138,7 +140,7 @@ export type StreamChunk =
   | {
       type: 'block-start'
       index: number
-      blockType: ContentBlockType // 'text' | 'tool-call'
+      blockType: ContentBlockType // 7 键：text/reasoning/image/file/tool-call/tool-addition/tool-removal
     }
   | {
       type: 'text-delta'
@@ -179,7 +181,7 @@ type FinishReason =
   | { kind: 'tool-calls' }
   | { kind: 'max-tokens' }
   | { kind: 'error'; failure: LlmFailure }
-  | { kind: 'aborted'; failure?: LlmFailure }
+  | { kind: 'aborted'; failure: LlmFailure }
 ```
 
 ## 适配器契约清单
@@ -189,24 +191,25 @@ type FinishReason =
 3. **index 分配**：按首次出现的流顺序分配，从 0 递增；同一个块的后续 delta 复用该 index。容忍 delta-only 协议；已 `block-end` 关闭的 index 再收到 delta 时忽略。
 4. **禁止库级重试**：适配器绝不自行重试。agent 层恢复会开启新的持久编号轮次；直接调用 `ctx.llm.stream()` 的调用方仍然只尝试一次。`providerRetryAfterMs` 是校验过的正延迟提示，不是重试决策。
 5. **遵守 `options.signal`**：`resolveModel(provider, model, signal?)` 等异步查询也必须响应中止。
-6. **不支持的能力显式拒绝**：必须抛 `LlmError(..., 'UNSUPPORTED_OPTION')`，**绝不允许静默丢弃**请求参数。
+6. **不支持的能力显式拒绝**：按能力类型抛对应 code——请求了不支持的字段用 `UNSUPPORTED_OPTION`（pi-ai 用它拒绝 `GenerateOptions.stop`）、不支持的推理强度用 `UNSUPPORTED_REASONING_EFFORT`、无法表示的内容用 `UNSUPPORTED_CONTENT`，**绝不允许静默丢弃**。
 7. **归因头**：每个 HTTP 请求合并 `attributionHeaders()`（映射 User-Agent；AppIdentity 不含 secret、路径、session id 或逐请求信息）。
-8. **密钥从配置读取**：通过 Schemastery Config（可带环境变量回退）在 `cordis.yml` 用 `!!js process.env.MY_API_KEY` 注入。**切勿在代码中读取自行约定的密钥文件**。
+8. **密钥注入**：首选机制是 Config 字段 `apiKeyEnv`（credential-ref，如 dsh-llm-deepseek-api-key 默认 `DEEPSEEK_API_KEY`）经 credentials 服务解析；环境变量是回退层（读取不到时归 `MISSING_CREDENTIAL`/`INVALID_CREDENTIAL`）。**切勿在代码中读取自行约定的密钥文件**。
 9. **流空闲看门狗**：只在 `next()` 未完成时启动，超时映射 `TIMEOUT`；调用方中止保留 `ABORTED`。`streamIdleTimeoutMs` 默认五分钟。
 
 ## Token 计量（互不重叠）
 
 ```ts
 interface TokenUsage {
-  inputTokens: number      // 仅未命中缓存的输入
-  cacheRead?: number       // 命中缓存的输入
-  cacheWrite?: number      // 写入缓存的开销
-  outputTokens: number     // 输出，已包含 reasoningTokens
-  reasoningTokens?: number // 信息性字段，不得重复相加
+  inputTokens: number        // 仅未命中缓存的输入
+  cacheReadTokens?: number   // 命中缓存的输入
+  cacheWriteTokens?: number  // 写入缓存的开销
+  outputTokens: number       // 输出，已包含 reasoningTokens
+  totalTokens?: number       // 提供方给出的总数（可选）
+  reasoningTokens?: number   // 信息性字段，不得重复相加
 }
 ```
 
-计费输入 = `inputTokens + cacheRead + cacheWrite`。`reasoningTokens` 已含于 `outputTokens`，汇总时严禁叠加。
+计费输入 = `inputTokens + cacheReadTokens + cacheWriteTokens`。`reasoningTokens` 已含于 `outputTokens`，汇总时严禁叠加。
 
 ## 两条合法错误路径
 
@@ -214,7 +217,7 @@ interface TokenUsage {
 
 1. **`stream()` 抛出**：传输层或协议层故障，抛出带稳定 code 的 `LlmError`。
    ```ts
-   throw new LlmError('Provider HTTP 500', 'PROVIDER_ERROR')
+   throw new LlmError('Provider HTTP 500', 'HTTP_500')
    ```
 2. **`finish` 带内终结**：提供方带内故障（内容安全拦截、配额耗尽等）。
    ```ts
@@ -232,9 +235,11 @@ interface TokenUsage {
 | `EMPTY_RESPONSE` | 空 completion，属可重试错误，`dsh-llm-retry` 默认重试 |
 | `TIMEOUT` | 流空闲看门狗超时 |
 | `ABORTED` | 调用方中止 |
-| `UNSUPPORTED_OPTION` | 请求了适配器不支持的字段 |
+| `UNSUPPORTED_OPTION` | 请求了适配器不支持的字段（仅 pi-ai 用于拒绝 `GenerateOptions.stop`） |
+| `UNSUPPORTED_REASONING_EFFORT` | 模型不支持请求的推理强度（核心的推理强度拒绝码） |
+| `UNSUPPORTED_CONTENT` | 请求或响应包含适配器无法表示的内容块（内容能力拒绝码） |
 | `REQUEST_EXTENSION` | `deepseekLlmApiExtensions` 认领字段失败 |
-| `PROVIDER_ERROR` | 提供方返回的其他错误 |
+| `SERVER` / `TRANSPORT` / `HTTP_<status>` | 提供方兜底错误——其他错误没有专门 code，落在 `SERVER`（5xx/无状态）、`TRANSPORT` 或按状态码映射的 `HTTP_<status>`（如 `AUTH`/`QUOTA`/`RATE_LIMIT` 分类之外） |
 
 ## 状态回放（ReplayEnvelope）与 BlockAssembler
 
@@ -267,4 +272,4 @@ interface TokenUsage {
 - 认为 `GenerateOptions.system` 承载系统提示词——loop 请求没有该字段。
 - 认为 `replayState` 只要 provider/model 名称对得上就会传递——必须先满足"同一适配器实例"条件。
 - 把 `reasoningTokens` 加进总输出——它已包含在 `outputTokens` 内。
-- 静默忽略不支持的请求字段——必须抛 `LlmError(..., 'UNSUPPORTED_OPTION')`。
+- 静默忽略不支持的请求字段——必须显式拒绝：字段用 `UNSUPPORTED_OPTION`、推理强度用 `UNSUPPORTED_REASONING_EFFORT`、内容用 `UNSUPPORTED_CONTENT`。

@@ -1,6 +1,8 @@
 # DSH 模型工具体系与 ToolRuntime 权威指南 (DSH 0.2.0-rc.2)
 
-本文件是 DeepSeek Harness (DSH 0.2.0-rc.2) 工具定义规范、16 阶段执行拦截流水线、单调守卫法则与官方工具归属全貌的技术规范。
+本文件是 DeepSeek Harness (DSH 0.2.0-rc.2) 工具定义规范、工具执行时序、单调守卫法则与官方工具归属全貌的技术规范。
+
+> 术语说明：官方 README 把执行路径描述为固定管线（pre-execute → 单调 guards → execute → post-execute → finalizeContent → result）。下文「16 环节」是本文档为讲解方便展开的编号，**不是源码里的枚举**；其中阶段 2（`presentCall`）与阶段 16 的 `presentResult` 半边并非调度器环节，阶段 8（FS Gate）是 `dsh-tool-fs` 工具内部行为。
 
 ---
 
@@ -8,22 +10,22 @@
 
 `ctx.tools`（所属包 `@deepseek-ai/dsh-tools`）是面向大模型暴露能力的中央运行时：
 1. **单一入口 PTC 模式与原生 Function Calling**：支持原生模式、PTC (Program-Tool-Calling) 模式（`tools.presentAs`）；
-2. **多模态卡片投影**：支持在 Web GUI 呈现自定义参数与结果卡片；
+2. **卡片渲染描述符**：工具可声明纯渲染描述符供 Host-local 消费者使用；内置 Web GUI 不消费 `presentCall`/`presentResult`，卡片由客户端推导；
 3. **单调安全保证**：执行单调守卫，确保权限阻断不可逆；
 4. **统一错误规范化**：工具抛出的异常被优雅捕获并规范化为 `isError` 结构，永不导致 Agent 轮次意外中断。
 
 ---
 
-## 二、官方 16 阶段工具执行流水线 (Tool Execution Pipeline)
+## 二、官方工具执行时序 (Tool Execution Pipeline)
 
-基于 `@deepseek-ai/dsh-tools` 与 `@deepseek-ai/dsh-agent-loop` 的源码实测，工具调用在宿主运行时的严格 16 阶段时序如下：
+基于 `@deepseek-ai/dsh-tools` 与 `@deepseek-ai/dsh-agent-loop` 的源码实测，工具调用在宿主运行时的时序如下（13 个调度器/循环环节 + 3 个非调度器环节）：
 
 ```
 [阶段 1] tool/call 持久化记录
          └─ agent-loop 在调用启动时先 append 至 SessionEvent，产生分配的 callSeq
    ↓
-[阶段 2] presentCall 调用卡片投影
-         └─ Host-local 纯函数，产生 ToolCallView 卡片供前端展示
+[阶段 2] presentCall 调用卡片投影（非调度器环节）
+         └─ 工具可选声明的纯渲染描述符，供 Host-local 消费者使用；官方内置 Web Client 不消费它，卡片由客户端依 tool.call.toolview 与原始参数/元数据推导
    ↓
 [阶段 3] tools/pre-execute (waterfall) 策略前处理
          └─ 返回 allow / ask / deny / cancel 决策；严禁改写 arguments
@@ -35,13 +37,13 @@
          └─ ctx.tools.guard 仅对 allow 调用执行；返回 string 立即拒绝，返回 undefined 弃权。审批通过仍可被 guard 否决！
    ↓
 [阶段 6] tools/execute (waterfall) 环绕分派
-         └─ 包裹超时、重试与性能指标监控；仅允许替换并融合 exec.signal
+         └─ 官方超时包裹由 dsh-tool-call-timeout-policy 注册（错误码 TOOL_TIMEOUT）；仅允许替换并融合 exec.signal。重试与性能指标无官方实现，该事件只是扩展点
    ↓
 [阶段 7] execute 主体业务执行
          └─ 工具定义中的 execute(args, exec) 执行核心逻辑，返回类型化规范输出
    ↓
-[阶段 8] FS Gate 文件写网关
-         └─ 针对 tool-fs 可写操作，在写/改磁盘前触发 fs/write-intent、fs/edit-intent 拦截
+[阶段 8] FS Gate 文件写网关（非调度器环节，属 dsh-tool-fs 工具内部）
+         └─ 针对 tool-fs 可写操作，在写/改磁盘前触发 fs/write-intent、fs/edit-intent 拦截，随后 emit fs/observed
    ↓
 [阶段 9] 工具自有内部事件派发
          └─ 工具派发专属领域事件（如 todo/write、fs/observed、tool/ptc-dispatch-start）
@@ -65,7 +67,7 @@
          └─ agent-loop 按模型顺序 commit 至 SessionEvent，附带 surfaceOp: 'append' 与 sourceEventSeqs: [callSeq]
    ↓
 [阶段 16] presentResult 结果卡片展示投影与上下文注入
-         └─ 派生 ToolResultView，批次 additionalContexts 按 FIFO 排队注入下一轮历史
+         └─ presentResult 同样无调度器消费（非调度器环节）；additionalContexts 按 commit 顺序 FIFO 注入下一轮历史
 ```
 
 ### 关键架构时序辨析
@@ -79,7 +81,7 @@
 注册单调守卫示例：
 ```js
 ctx.tools.guard((exec) => {
-  if (exec.toolName === 'bash' && exec.args.command.includes('rm -rf /')) {
+  if (exec.name === 'bash' && exec.arguments.command.includes('rm -rf /')) {
     return '绝对禁止高危毁灭性根目录删除命令'
   }
   // 返回 undefined 表示弃权，不阻断
@@ -99,7 +101,7 @@ ctx.tools.guard((exec) => {
 | `read`, `read_image`, `edit`, `write` | `@deepseek-ai/dsh-tool-fs` | 文本文件读取、图像多模态读取、文本精准替换、全量写入 |
 | `glob`, `grep` | `@deepseek-ai/dsh-tool-fs-search` | 路径模式匹配与基于 ripgrep 的文件内容正则检索 |
 | `skill` | `@deepseek-ai/dsh-tool-skill` | 载入技能指令规范（支持六级 rank 100-600 注入） |
-| `subagent`, `subagent_fork` | `@deepseek-ai/dsh-tool-subagent` | 委派全新独立子代理或继承当前上下文的分叉子代理 |
+| `subagent` | `@deepseek-ai/dsh-tool-subagent` | 委派子代理；单个可配置工具（toolName 默认 `subagent`），「继承当前上下文」的 fork 语义由所选 provider 的 `inheritsParentContext` 能力决定，不存在独立的 `subagent_fork` 工具 |
 | `list_agents`, `send_message`, `interrupt_agent` | `@deepseek-ai/dsh-tool-subagent-control` | 查看智能体列表、向智能体发送信件、中断执行 |
 | `job_output`, `job_kill`, `job_list` | `@deepseek-ai/dsh-tool-jobs` | 异步长耗时后台任务结果读取、终止与任务列表查询 |
 | `create_goal`, `get_goal`, `update_goal` | `@deepseek-ai/dsh-tool-goal` | 会话持久化目标管理与多轮次自驱推进 |
@@ -107,7 +109,7 @@ ctx.tools.guard((exec) => {
 | `ask_user_question` | `@deepseek-ai/dsh-tool-ask-user` | 向用户发起结构化提问卡片 |
 | `todo_write` | `@deepseek-ai/dsh-tool-todo` | 记录并更新任务看板列表 |
 | `present` | `@deepseek-ai/dsh-tool-present` | 将本地现有文件声明为最终交付物卡片 |
-| `web_search`, `web_fetch` | `@deepseek-ai/dsh-tool-web` / `@liustack/modsearch` | 网络搜索引擎检索与网页全文内容提取 |
+| `web_search`, `web_fetch` | `@deepseek-ai/dsh-tool-web`（执行经 `ctx.web` seam，官方引擎包 `dsh-web-search-deepseek` / `dsh-web-fetch-http`） | 网络搜索引擎检索与网页全文内容提取 |
 | `schedule_create`, `schedule_list`, `schedule_delete`, `schedule_update` | `@deepseek-ai/dsh-schedule` | 宿主持久化定时任务管理四件套 |
 | `spawn_teammate`, `send_message`, `list_agents`, `wait_agent`, `interrupt_agent`, `team_task_*` | `@deepseek-ai/dsh-experimental-tool-agent-team` | Agent Teams 多智能体团队编排与共享任务看板协同工具 |
 | `ralph` | `@deepseek-ai/dsh-tool-ralph` | 代码重构与分析助手工具 |

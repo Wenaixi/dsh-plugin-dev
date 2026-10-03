@@ -54,19 +54,22 @@ DSH 的 Typert 协议对远程暴露的方法签名有严格的静态语法检�
 
 ### 1. Host 服务端实现 (`index.js`)
 ```js
-import { Service } from '@deepseek-ai/cordis';
+import { TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol';
 import os from 'node:os';
 
 export const name = 'dsh-system-info';
 
-// 继承 Service 基类并注册为命名空间 systemInfo
-export class SystemInfoService extends Service {
+// 继承 TypertRemoteService 并注册为命名空间 systemInfo
+// （Service 基类构造只有 (ctx, name) 两参，且本身不暴露 Remote 方法；
+//   TypertRemoteService 自动建立 typertRemote 绑定，方法仍需逐个 @Remote 标记）
+export class SystemInfoService extends TypertRemoteService {
   constructor(ctx) {
     // 挂载在 Context 上的服务名为 systemInfo
-    super(ctx, 'systemInfo', true);
+    super(ctx, 'systemInfo');
   }
 
-  // 必须使用标准扁平签名，最后一参为可选的 signal
+  // 真实签名是多参数扁平列表，不是单一名命对象；signal 可整体省略（SRC 模式下若写 signal 必须末位）
+  @Remote
   async getHostMetrics(payload, signal) {
     if (signal?.aborted) {
       throw new Error('请求已取消');
@@ -83,9 +86,12 @@ export class SystemInfoService extends Service {
 }
 
 export function apply(ctx) {
-  // 注册服务
+  // 注册服务（Cordis 支持类插件，构造器形态 (ctx, config)）
   ctx.plugin(SystemInfoService);
 }
+
+// 注意：双面 Typert 包的 package.json exports 必须含 "./typert"（host 面产物）与 "./remote"（client 面产物），
+// 缺 ./typert 会被 typert-loader 静默跳过，网关只能走 SRC fallback。
 ```
 
 并在 `package.json` 中声明 exports 与 typert 映射：
@@ -164,7 +170,9 @@ export function apply(ctx) {
         <SystemInfoSettingsPanel
           fetchMetrics={async () => {
             // 调用 Typert Remote RPC
-            const res = await ctx.remote.systemInfo.getHostMetrics({});
+            const result = await ctx.remote.systemInfo.getHostMetrics(payload);
+// 返回值是信封 { ok, value } 或 { ok: false, error }，不是裸数据；零参方法不要传参
+if (result.ok) { /* 使用 result.value */ } else { /* 按 result.error.code 判别 */ }
             return res;
           }}
         />
@@ -183,7 +191,7 @@ export function apply(ctx) {
 ### 1. 通信机制
 - 在服务方法上声明 `@Remote({ mode: 'stream' })`；
 - 通道严格经由 WebSocket 路径 **`/api/remote.mux`**（长连接多路复用信道）；
-- Host 端通过 `ctx.invocation.uplink()` 建立管道，Client 得到 `RemoteStreamHandle`，通过异步迭代器（`for await (const chunk of handle)`）消费流。
+- Host 端通过 `ctx.invocation.uplink()` 建立管道，Client 得到 `ClientStreamHandle`（0.2.0-rc.2 中不存在 `RemoteStreamHandle` 这个名字），通过异步迭代器（`for await (const chunk of handle)`）消费流。
 
 ### 2. 错误与中断处理
 - 客户端传递 `signal: controller.signal`，调用 `controller.abort()` 会同步断开该路流式链接，并在 Host 端触发管道终止，绝不泄漏句柄。

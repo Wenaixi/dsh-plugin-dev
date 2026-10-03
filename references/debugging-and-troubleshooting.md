@@ -10,11 +10,15 @@ DSH 里有一批「看起来非常合理、但根本不存在」的 API 和「�
 | --- | --- | --- | --- |
 | `ctx.settings.registerTab(...)`、`ctx.ui.addSettingsTab(...)` | 两者都不存在。`ctx.settings` 只把 volatile config 投影成表单描述符并委托 `ctx.configEditor` 落盘，不承担任何界面注册职责 | Client 半侧经 `ctx.slots.inject('settings.section', ...)` 挂载设置区块 | 在插件源码 grep `slots.inject`，命中 0 即说明走错了路径 |
 | `ctx.tools.registerTool(...)`、`ctx.toolRegistry` | 都不存在；容器就是 `ctx.tools`，方法名是 `register` | `ctx.tools.register(defineTool({...}))` | 运行时执行 `ctx.tools.schemas()`，按返回的名字查 |
-| 直接改 `$DSH_HOME/settings.yaml` 打开某个插件 | 该文件已彻底废弃，启动时会被自动重命名为 `settings.yaml.imported` 且不再生效（**静默失效，零错误信号**） | 一切增删改走 `cordis.patch.yml` | `ls $DSH_HOME/settings.yaml.imported`，存在即证明你改的那份早已失效 |
+| 直接改 `$DSH_HOME/settings.yaml` 打开某个插件 | 该文件已废弃（不再被直接读取）：SettingsForms 服务在 Loader 就绪后把它**导入一次**到 profile 补丁，首次写入前改名为 `settings.yaml.imported`（**静默失效，零错误信号**）；不要手工编辑它 | 用 `cordis.patch.yml` |mported` 再导入），所以不要手工编辑它 | 一切增删改走 `cordis.patch.yml` | `ls $DSH_HOME/settings.yaml.imported`，存在即证明你改的那份早已失效 |
 | 「required plugin did not activate」= 依赖没装上 | 这是 Loader **激活图**的语言：某个 required 同伴插件没有 mount。与 `peerDependencies` 是两套独立机制 | 先定位是哪一个 id 没激活，再看它自己为什么没 mount | 读 `~/.dsh/profiles/<profile>/cfg.err`，它会点名未激活的插件 id |
 | 「peer 报错」= 该版本的 peer 区间写错了 | 常常是包管理器解析到了陈旧版本（pnpm 24 小时发布冷却期 + semver 预发布排序），装到的根本不是你要的那个版本 | 先确认实际解析版本，再决定改 peer 还是改解析 | 同一安装命令隔一段时间重跑两次：版本号会随时间前移 = 冷却期指纹；恒定不变才是缓存问题 |
 | 「装上了」= 该服务已就绪 | seam 契约包与实现包分离：只装 `dsh-llm` 之类的契约包，服务存在但没有任何提供方 | 契约包 + 实现包成对安装（如 `dsh-llm` + `llm-deepseek`） | `ctx.get('<服务名>')` 返回 `undefined` 即该能力未装配 |
 | 「`mcp__<server>__<tool>` 是 DSH 的标准工具命名」 | 该前缀来自 Claude Code，不是 DSH 惯例 | DSH 工具名见 [tools.md](./tools.md) 的归属表；MCP 工具经 `dsh-mcp-client` 桥接后由宿主分配名字 | `ctx.tools.schemas()` 是唯一权威清单，静态表仅供对照 |
+| 「界面没出来 = 组件写错了 / 渲染失败」 | 头号真相是 **`slots.inject(key, cb)` 的 callback 从未执行**——当插槽 spec 不存在（父条目未挂载、名字拼错）时它 `return` 掉，**零报错零日志** | 确认目标插槽确实被某个父条目的 `children` 表声明过；注册前先核对 kind 与 key/id | 在 `apply` 开头与每个注册成功处写全局标记，把「apply 没跑」与「inject 没触发」分开；见 [client-ui-placement-and-verification.md](./client-ui-placement-and-verification.md) |
+| 「UI 落点铺得越多越保险」 | 相反——同一面板注册到多个插槽会让它在设置窗口、侧边栏、插件页**同时出现**，属 UI 污染，用户会要求全部回滚 | **一个功能，一个入口**：先按「界面语义 → 插槽」映射表选定唯一落点 | 数 `ctx.slots.inject` 的调用数；加一条反向断言把落点集合锁进白名单 |
+| 「插件装上了 = 它生效了」 | `dependencies` 只管**装进来**，`dsh.profile.bundles` 才决定**是否作为补丁层参与组合**。只在前者里的插件完全不生效，且**不报错** | 声明了 `dsh.bundle` 的包会被 `plugin add` 自动加入 bundles；未声明的会被明确警告"installed as a plain dependency" | 安装后立刻检查 `dsh.profile.bundles` 是否含该包；对"装了像没装"的插件先查这里 |
+| 「重装/删目录/清状态就能修好缺失文件」 | pnpm 的一致性判断基于 **lockfile 与状态记录**，**不校验已安装文件是否真的存在**；hoisted 布局下 `.pnpm` 只有一个 `lock.yaml`，更无从比对。`install` / `install --force` / 删 `.modules.yaml` **全都报 "Already up to date"** | 从 registry 重新拉 tarball 解包覆盖（最可控）；或整目录删除后用**该运行时自带的 pnpm** 重建 | 修完用 `plugin --profile <name> list` 验证——**报错消失**才算修好，不能只看目录回来了 |
 
 **用法**：写插件或排障时，凡是手上出现「听起来应该有这个 API」的直觉，先在本表查一遍；凡是症状为「静默失效」或「归因指向包管理器」，先按最后一列的判定动作取证，再动手改。
 

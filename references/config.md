@@ -20,7 +20,7 @@
 ## 一、配置系统重大废弃警告
 
 > **绝对严禁教导用户修改 `$DSH_HOME/settings.yaml`！**
-> 该文件在 DSH 0.1.7+ 中已彻底废弃。DSH 启动时会自动将其重命名为 `settings.yaml.imported` 并不再生效。
+> 该文件在 DSH 0.1.7+ 中已彻底废弃，不再被直接读取。改名导入不是启动路径做的：SettingsForms 服务（`@deepseek-ai/dsh-settings`）在 Loader 全部条目就绪后（`ctx.root.loader.await()` 之后）执行一次性 legacy 导入——先把文件改名为 `settings.yaml.imported`，再逐 section 按 `LEGACY_SECTION_ENTRIES` 映射 `update` 进当前 profile 的补丁（ui-developer-tools→ui-settings、ui-onboarding→ui-settings-general、shell→pwsh-sandbox/bash-sandbox）；先改名再写入，部分导入不会重复；写入失败的 section 留在改名文件里并记 `logger.warn`。
 > 所有插件的增删改查一律通过 `cordis.patch.yml` 声明！
 
 ---
@@ -37,6 +37,8 @@
    `$DSH_HOME/cordis.patch.yml`；
 4. **命令行动态 Overlay 补丁**：
    按 CLI `--patch <path>` 参数传入的顺序逐个叠加。
+5. **Telemetry 硬开关（内存追加，无对应文件）**：
+   `readProfilePatches` 组合完上述四层后，若 `DSH_TELEMETRY_DISABLED` 非空（`'0'`/`'false'` 同样算非空，隐私开关宁错关勿错开）且组合结果中含 `session-telemetry-otel` 条目，最后叠加 `{ id: session-telemetry-otel, disabled: true }`；组合中无该条目则不出补丁。
 
 ### 覆盖与合并核心语义：全量替换 (Wholesale Replacement)
 - 多个补丁层中针对相同 `id` 的插件条目，**后层按行胜出**；
@@ -95,7 +97,7 @@ DSH 允许在 YAML 中使用 `!!js` 标签执行安全的 JavaScript 表达式�
 
 ### 1. 致命教训：`--dump-config` 假阳性陷阱
 **重要结论：`--dump-config` 校验通过，绝对不等于 Web 或 TUI 能够启动成功！**
-- **根因**：`--dump-config` 仅解析 YAML 文本树与配置 Schema，**完全不加载插件物理代码，也不校验 peerDependencies**！
+- **根因**：`--dump-config`（YAML）仅组合补丁层并渲染文本树，**完全不加载插件物理代码、不 apply 插件、不 eval `!!js`**——但组合阶段仍会跑 bundle 层的 peer 兼容性检查（`loadProfileDirectory` 对每个 bundle 调 `evaluatePluginCompatibility`，不兼容且未豁免的 bundle 被跳过并由 `reportSkippedBundles` 列出）。`--dump-config-schema` 则不同：它会 import 插件模块并执行其顶层代码（懒加载的 schema 构建器同样执行），只是不 apply 插件、不 eval `!!js`。
 - 如果插件版本不兼容、缺少依赖或导出的服务冲突，`--dump-config` 返回 0 字节 stderr 且退出码为 0，但实际启动时整个系统会立刻崩溃（报 `required plugin did not activate`）。
 - **官方权威的三步真实启动验收法**：
   ```bash
@@ -119,11 +121,13 @@ DSH 允许在 YAML 中使用 `!!js` 标签执行安全的 JavaScript 表达式�
   使用 `--legacy-peer-deps` 压制非致命 ERESOLVE 警告，npm 默认采用扁平化 `node_modules` 结构，解析极速且零 OOM。
 
 ### 3. 版本兼容性豁免机制 (allow-version)
-DSH 0.1.7+ 会在启动时严格检查各插件的 `peerDependencies`。遇到第三方插件尚未适配最新 DSH 但功能完全兼容时，可通过官方豁免命令放行：
+DSH 会在启动与安装时严格检查各插件的 `peerDependencies`（组合阶段的 bundle 预检 + 装载前的条目预检，见第四节）。遇到第三方插件尚未适配最新 DSH 但功能完全兼容时，可通过官方豁免命令放行。相关命令共三个：`allow-version` / `revoke-version` / `version-exemptions`（均挂在 `dsh plugin` 下），usage 形如 `dsh plugin <command> <pkg>@<ver> --dsh-version <exact> [--accept-risk]`：
 ```bash
-dsh plugin --profile <profile> allow-version <pkg-name>@<version> --dsh-version <exact-dsh-version> --accept-risk
+dsh plugin --profile <profile> allow-version <pkg>@<ver> --dsh-version <exact-dsh-version> --accept-risk
+dsh plugin --profile <profile> revoke-version <pkg>@<ver> --dsh-version <exact-dsh-version>
+dsh plugin --profile <profile> version-exemptions
 ```
-该命令会将豁免记录写入 profile 目录下的 `compatibility.json`。
+豁免记录写入 profile 目录下的 `compatibility.json`（不是 package.json），键为 `pkg@精确版本`、值为精确 DSH 版本列表。豁免语义是「精确插件版本 + 精确 DSH 版本」的 **peer 兼容豁免**，不是发布年龄豁免；`--accept-risk` 仅在授权（allow-version）时要求，且授权的 DSH 版本必须等于当前运行时版本。
 
 ---
 
@@ -180,10 +184,17 @@ dsh plugin --profile <profile> allow-version <pkg-name>@<version> --dsh-version 
 
 ### 7.3 表单描述符与乐观版本控制
 
-- `resolvedValues`：当前生效的最终配置值（已合并默认值与用户覆盖）；
-- `inheritedValues`：由底层 Bundle 定义的基础默认配置；
-- `profileOverrides`：在当前 Profile 补丁中显式声明的覆盖字段；
-- `revision`：并发安全保护的递增版本号。前端提交时必须附带期望版本号，中途有其他进程更新文件则保存安全中止。
+`describe()` 为每个活跃条目返回一个描述符对象，真实字段如下（见 `@deepseek-ai/dsh-settings` 的 `describe()` 实现）：
+
+- `autoGenerate`：该条目默认自动生成设置页的开关；
+- `ns`：条目 id，表单的命名空间；
+- `schema`：剔除 volatile 节点后的表单 Schema；
+- `revision`：并发安全保护的递增版本号。前端提交时必须附带期望版本号，中途有其他进程更新文件则保存安全中止；
+- `applies: "live"`：修改即时生效；
+- `value`：当前生效的最终配置值（已合并默认值与用户覆盖）；
+- `base`：由底层 Bundle 定义继承层解析出的基础默认配置；
+- `user`：在当前 Profile 补丁中显式声明的覆盖字段；
+- `secrets`（可选）：redact 模式下返回的 secrets 位置清单。
 
 ### 7.4 持久化写入语义
 
@@ -191,7 +202,7 @@ dsh plugin --profile <profile> allow-version <pkg-name>@<version> --dsh-version 
 2. **全量替换规约**：写入的配置字段完整替换该条目的 `config` 块，不做深合并，语义见本文第二节。表单提交必须提交完整的已解析配置对象。
 3. **文件锁保护**：写入受文件锁保护，避免并发写入导致 YAML 语法损坏。
 4. **HMR 自动触发**：写入完成后文件监听器检测到补丁变动，执行增量重载而无需重启应用。
-5. **即时字段 (Volatile)**：`Volatile<T>` + `Schema.xxx().volatile()` 声明即时字段，运行时用 `.get()` 读取、跨字段校验用 `.check()`（Host 持久化前执行，不进表单 schema）；变更经 `loader/volatile-update` 事件推送给所属 fiber；`role('secret')` 阻止值进入表单响应，凭据域值用凭据引用。
+5. **即时字段 (Volatile)**：`Volatile<T>` + `Schema.xxx().volatile()` 声明即时字段，运行时用 `.get()` 读取——不进表单 schema。跨字段校验由 `resolveConfig` 在 volatile 提交路径完成（`cordis-plugin-loader` 的 `_commitVolatile`：校验失败记 `logger.warn` 并保留运行中的旧值，raw 配置留待下次激活）；校验通过后变更经 `loader/volatile-update` 事件推送给所属 fiber；`role('secret')` 阻止值进入表单响应，凭据域值用凭据引用。
 
 ---
 

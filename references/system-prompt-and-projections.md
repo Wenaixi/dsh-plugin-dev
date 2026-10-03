@@ -13,11 +13,11 @@ export const inject = ['systemPrompt'];
 
 export function apply(ctx) {
   // 注册有序的提示词段落
-  ctx.systemPrompt.addSection({
-    id: 'my-coding-guidelines', // 段落唯一标识
-    order: 40,                  // 排序权重：数字越小越靠前（核心原则约 10~30，业务补充约 40~80）
-    content: () => {
-      // 支持动态返回文本，例如注入当前时间或动态策略
+  ctx.systemPrompt.section({
+    name: 'my-coding-guidelines',       // 段落名（名称唯一，不是 id）
+    order: 700,                         // order 升序、数字越小越靠前；仓库核心槽位为 -1000/0/500~600/900/1000~3100/9900，业务插件宜取 > 600 避开
+    text: () => {
+      // 支持动态返回文本（text 可以是字符串或函数）
       return `## 自定义代码规范\n- 严禁硬编码测试密钥\n- 所有模块导出必须包含 JSDoc 注解`;
     }
   });
@@ -25,6 +25,8 @@ export function apply(ctx) {
 ```
 
 ### 2. 专家级环绕中间件 (`system-prompt/assemble`)
+
+> 提示：真实事件是 `system-prompt/assemble`（waterfall，签名 (assembly, context, next)）。轮次结束没有 `agent/turn-end` 事件——用 `ctx.on('session/event')` 过滤 `turn/end`（载荷 {turn, reason}），或监听 `agent/turn-stopping`。
 若需要在提示词最终交付给模型前进行全局拦截、审计或占位符替换，可以监听 `system-prompt/assemble` waterfall 环绕事件：
 
 ```js
@@ -32,13 +34,11 @@ ctx.waterfall('system-prompt/assemble', async (assembly, next) => {
   // 1. 调用 next() 执行下游收集流程
   const finalAssembly = await next();
 
-  // 2. 对最终组装出的提示词文本进行安全过滤或动态宏替换
-  if (finalAssembly.systemText.includes('{{CURRENT_WORKSPACE}}')) {
-    finalAssembly.systemText = finalAssembly.systemText.replace(
-      '{{CURRENT_WORKSPACE}}',
-      process.cwd()
-    );
-  }
+  // 2. 对最终组装出的段落做过滤或替换：assembly 是 { sections, contexts, tools, variables }，
+  //    没有 systemText 字段；{{变量}} 插值由 renderPrompt 阶段统一处理，变量名须匹配 ^[a-z][a-z0-9_]*$
+  //    （大写占位符如 {{CURRENT_WORKSPACE}} 会抛 malformed prompt variable reference，应注册小写变量）
+  const section = finalAssembly.sections.find(s => s.name === 'my-coding-guidelines');
+  if (section) section.text = section.text.replace('{{cwd}}', process.cwd());
 
   return finalAssembly;
 });

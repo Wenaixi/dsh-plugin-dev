@@ -19,7 +19,7 @@
 - **[skill-provider.md](./skill-provider.md)**：
   自定义技能发现 (SkillProvider) 权威指南——`registerProvider` 注册契约与同步工厂语义、`list`/`get` 两方法与 `locator` 往返句柄、`rank` 取值与重名裁决规则、`complete: false` 的"发现未完成"表达、AbortSignal 贯穿规范与吞 abort 造成的卡顿，以及生产侧 SKILL.md 发现器的 BOM/CRLF/闭栏/目录名四坑、frontmatter 解析的性能陷阱与失效链路。
 - **[services.md](./services.md)**：
-  The Core Spine 核心大动脉服务单复数绝对铁律（`ctx.sessions`、`ctx.agents`、`ctx.agentTeams`、`ctx.tools` 为复数；`ctx.schedule`、`ctx.planMode`、`ctx.workspaceRegistry` 为单数；`ctx.llm` 为 Seam）、Service 类定义规范与依赖注入契约。
+  The Core Spine 核心大动脉服务单复数绝对铁律（`ctx.sessions`、`ctx.agents`、`ctx.agentTeams`、`ctx.tools` 为复数；`ctx.schedule`、`ctx.planMode`、`ctx.workspaceRegistry` 为单数；`ctx.llm` 为 Seam）、终端服务挂载键是复数 `ctx.terminals`、不存在 `dsh-approval` 包（审批是 `dsh-user-approval`）、Service 类定义规范与依赖注入契约。
 - **[plugin-anatomy.md](./plugin-anatomy.md)**：
   插件解剖学——三种插件形态、Context Proxy 与 `extend`/`isolate`/`intercept`、可逆副作用生命周期管理（`ctx.effect`）、五大派发模式、四角色模型、设置表单与配置持久化契约。
 
@@ -29,9 +29,9 @@
 
 ### 四、事件总线与工具流水线 (Events & Tool Execution)
 - **[events.md](./events.md)**：
-  Cordis 五大派发模式源码剖析（`emit` 同步广播、`waterfall` 同步环绕中间件与 `next()` 拦截、`parallel` 并发与 `AggregateError`、`serial` 串行短路与 bail 判定、`bail` 同步短路）、宿主运行事件族、60 个 Persistence Catalog 事件、5 类 SurfaceEventType 与 `ignorable` 契约。
+  Cordis 五大派发模式源码剖析（`emit` 同步广播、`waterfall` 同步环绕中间件与 `next()` 拦截、`parallel` 并发与 `AggregateError`、`serial` 串行短路与 bail 判定、`bail` 同步短路）、宿主运行事件族、59 个 Persistence Catalog 事件、5 类 SurfaceEventType 与 `ignorable` 契约。
 - **[tools.md](./tools.md)**：
-  ToolRuntime 架构、官方严格 16 阶段流水线（pre-execute -> approval -> monotonic guard -> execute -> projectContent -> post-execute -> finalizeContent -> result）、单调安全守卫法则、全量官方工具归属包对照表与 `defineTool` 编写规范。
+  ToolRuntime 架构、工具执行时序（六段官方管线）、单调安全守卫法则、全量官方工具归属包对照表与 `defineTool` 编写规范。
 
 ### 五、前端双面 UI 插件与全量插槽体系 (Client UI & Slots)
 - **[settings-and-plugin-ui.md](./settings-and-plugin-ui.md)**：
@@ -64,7 +64,7 @@
 - **[debugging-and-troubleshooting.md](./debugging-and-troubleshooting.md)**：
   本地开发调试三大极速回路（`--patch` 覆盖、本地路径添加、临时沙盒）、双面插件前端排查技巧（`__DSH_BOOT__`、`__ModuleLoader__`、Combo 404）、Top 9 高频故障排查速查表（PENDING 挂起、配置冲掉、组件传 ctx 报错、安装解析到旧版本等）、安装失败排障六步路径、**免启动反证法（直接调宿主公开函数问真值，附 Windows `pathToFileURL` 坑与可跑对照探针、`npm pack --dry-run` 打包清单核对）**、插件管理器目录结构与黑匣子日志分析。
 - **[install-resolution-traps.md](./install-resolution-traps.md)**：
-  插件安装版本解析三大陷阱的权威排查手册——pnpm 发布冷却期 `minimumReleaseAge: 1440`（24 小时，只装发布满 24h 的版本，新版本被排除后解析回退到最老合格版本）、semver 预发布排序（`-tag.N` 后缀被范围解析默认排除，`maxSatisfying(vers,'*')` 返回旧正式版）、DSH 兼容性闸门两段式预检与后检语义与精确版本豁免机制、profile 目录结构与 `minimumReleaseAge: 0` 配置落点、desktop profile 的 Electron 独占守卫。附可复现的参数实验、时间指纹判定法与排障决策表；并覆盖**全新 profile 首次安装的三大坑**：`dsh plugin add` 不写 `dsh.profile.bundles` 需手动补、原生依赖的 `ERR_PNPM_IGNORED_BUILDS` 需在 `pnpm-workspace.yaml` 里加 `allowBuilds` 放行、以及从零到可跑的五步落地顺序。
+  插件安装版本解析三大陷阱的权威排查手册——pnpm 自身的发布冷却期配置（v11 起默认 `minimumReleaseAge: 1440`，属包管理器行为，非 DSH 代码实现；DSH 侧兼容闸门是 peer 预检 + allow-version 豁免）、semver 预发布排序（`-tag.N` 后缀被范围解析默认排除，`maxSatisfying(vers,'*')` 返回旧正式版）、DSH 兼容性闸门两段式预检与后检语义与精确版本豁免机制、profile 目录结构与 `minimumReleaseAge: 0` 配置落点、desktop profile 的 Electron 独占守卫。附可复现的参数实验、时间指纹判定法与排障决策表；并覆盖**全新 profile 首次安装的三大坑**：`dsh plugin add` 不写 `dsh.profile.bundles` 需手动补、原生依赖的 `ERR_PNPM_IGNORED_BUILDS` 需在 `pnpm-workspace.yaml` 里加 `allowBuilds` 放行、以及从零到可跑的五步落地顺序。
 
 ### 九之二、静默失效防线与可失败门禁 (Silent Failures & Verifiable Gates)
 - **[silent-failure-and-gate-design.md](./silent-failure-and-gate-design.md)**：
@@ -88,7 +88,7 @@
 
 ### 十三、领域数据存储、持续伪终端与检查点 (Storage, Terminal & Checkpoints)
 - **[storage-terminals-and-checkpoints.md](./storage-terminals-and-checkpoints.md)**：
-  服务端状态存储与交互式终端权威指南——领域数据存储 (`ctx.storage.domain` Zod 强校验命名空间表、拒绝乱写文件的三层存储分层)、持续交互式伪终端 (`ctx.terminal` 长任务 PTY 会话、输入流发送与 POSIX 信号打断)、以及会话语义检查点与断电自愈策略 (`session-checkpoint-policy`)。
+  服务端状态存储与交互式终端权威指南——领域数据存储 (`ctx.storage.domain` Zod 强校验命名空间表、拒绝乱写文件的三层存储分层)、持续交互式伪终端 (`ctx.terminals` 复数；长任务 PTY 会话 `spawn`/`startSend`/`read`/`signal`)、以及会话语义检查点与断电自愈策略 (`session-checkpoint-policy`)。
 
 ### 十四、人类斜杠命令、输入触发器与交互扩展 (Commands & Input Triggers)
 - **[slash-commands-and-input-triggers.md](./slash-commands-and-input-triggers.md)**：

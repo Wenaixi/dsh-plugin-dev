@@ -177,7 +177,7 @@ ctx.effect(() => {
 
 ```ts
 // 在子上下文中隔离自定义数据库服务，仅当前分支可见
-const isolatedCtx = ctx.isolate(['database'])
+const isolatedCtx = ctx.isolate('database')
 isolatedCtx.plugin(SubPlugin)
 ```
 

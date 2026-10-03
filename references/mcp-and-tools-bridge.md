@@ -49,7 +49,7 @@ mcp__<serverName>__<rawToolName>
 
 在 DSH profile 的 `cordis.patch.yml` 中，可以通过 `- insert:` 语法声明一个或多个 MCP Client 实例：
 
-### 范例 1：连接远程 HTTP/SSE MCP 服务 (以 Context7 为例)
+### 范例 1：连接远程 HTTP MCP 服务 (以 Context7 为例)
 ```yaml
 - insert:
     - id: mcp-context7
@@ -88,13 +88,13 @@ mcp__<serverName>__<rawToolName>
 
 | 配置字段 | 类型 | 必填 | 官方语义与生产防坑建议 |
 | :--- | :--- | :--- | :--- |
-| `serverName` | string | 是 | 服务的命名空间标识。**在同一个 profile 中绝对唯一**，用于构成工具名前缀。 |
-| `transport` | string | 是 | 通信传输协议：`streamable-http`（现代 HTTP 串流）、`sse`（Server-Sent Events）、或 `stdio`（本地子进程管道）。 |
-| `url` | string | 条件 | 当 transport 为 HTTP/SSE 时必填。建议配合 `!!js process.env.VAR` 从环境变量中安全注入。 |
+| `serverName` | string | 是 | 服务的命名空间标识，用于构成工具名前缀。**在同一注册作用域内唯一**（不同 Agent 作用域可复用同名；必须匹配 `^[A-Za-z0-9_-]{1,32}$`）——全局实例与同一 Agent 内重复同名互相排斥（`mcp-client.serverName` 持久保留字）。 |
+| `transport` | string | 是 | 通信传输协议，判别联合仅两种：`streamable-http`（现代 HTTP 串流）或 `stdio`（本地子进程管道）。不存在 `sse` 传输。 |
+| `url` | string | 条件 | 当 transport 为 `streamable-http` 时必填。建议配合 `!!js process.env.VAR` 从环境变量中安全注入。 |
 | `command` | string | 条件 | 当 transport 为 stdio 时必填，指定子进程可执行程序（如 `node`、`python`）。 |
 | `args` | string[] | 否 | stdio 子进程的启动参数数组。**严格零 Shell 解释**，不得拼接字符串。 |
 | `toolCallTimeoutMs` | number | 否 | 单次工具调用最大超时毫秒数，默认 `60000` (60秒)。防外部服务假死挂起。 |
-| `failOnStartupError` | boolean | 否 | **生产极力推荐设为 `false`**！若远程 MCP 临时宕机，设为 false 仅记录警告并跳过工具加载，防止整个 DSH 宿主崩溃无法启动。 |
+| `failOnStartupError` | boolean | 否 | 默认 `false`：初始连接/工具同步失败时记录错误并跳过该服务器的工具加载，插件与宿主继续运行；若为 `true`，初始失败使该插件实例激活失败（`apply` 抛错），不涉及"阻止宿主崩溃"。 |
 
 ---
 
@@ -106,9 +106,18 @@ mcp__<serverName>__<rawToolName>
 export function apply(ctx) {
   ctx.tools.guard((exec) => {
     // 匹配特定 MCP 服务下的高危工具
-    if (exec.toolName.startsWith('mcp__database__') && exec.toolName.endsWith('drop_table')) {
+    // guard 阶段 exec 只有 name / callId / agent / signal 等元数据，arguments 尚未物化
+    if (exec.name.startsWith('mcp__database__') && exec.name.endsWith('drop_table')) {
       return '安全策略阻断：禁止通过 MCP 执行删库操作';
     }
   });
 }
 ```
+
+---
+
+## 六、其他约束与已知边界
+
+- **工具公开名规范化**：公开名超过 64 字符或含非 `[A-Za-z0-9_-]` 字符时，做确定性规范化（非法字符替换为 `_`、超长截断），并追加 12 位十六进制 SHA-256 哈希（对 `serverName\0rawName` 取摘要），保证不同 MCP 身份不会塌缩成同名。
+- **reconnect 指数退避**：默认为 `enabled: true`、`initialDelayMs: 500`、`maxDelayMs: 30000`、`maxAttempts: 10`；连续失败达到上限后注销已注册工具，需重载插件或重启宿主。
+- **serverName 正则**：必须匹配 `^[A-Za-z0-9_-]{1,32}$`，超出会被配置校验拒绝。

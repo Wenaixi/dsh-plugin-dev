@@ -133,7 +133,7 @@ export function apply(ctx) {
 ### 4. 消息流链式拦截与自定义渲染 (`conversation.chat.node`)
 适用于在聊天对话流中，对特定类型的消息卡片进行自定义包装或替换（例如高亮渲染代码、增加气泡水印、拦截显示特殊结果）。
 
-- **Slot 属性**：`kind: "chain"`（链式中间件模式，组件接收 `{ node, next }`，调用 `next()` 渲染下一层默认节点）。
+- **Slot 属性**：`kind: "keyed"`、scope `session`（**不是 chain**；0.2.0-rc.2 中本槽按 key 注册，客户端用 `useChatNode(key)`/`useChatNodeProcess(key)` 渲染；chain 槽真实存在的是 `conversation.composer` 与 `shell.quota-notice`，chain 注册必须提供 `select`，缺失即抛错）。
 - **实战注册范例**：
 ```jsx
 export function apply(ctx) {
@@ -141,20 +141,20 @@ export function apply(ctx) {
     ctx.slots.register(
       {
         name: "conversation.chat.node",
-        id: "my-plugin:bubble-decorator"
+        key: "my-plugin:bubble-decorator", // keyed 槽必须提供 key（不是 id）
+        order: 50
       },
-      ({ node, next }) => {
-        // 如果是特定消息，包裹自定义边框或徽标
+      ({ node, hookContext }) => {
+        // keyed 渲染函数按 key 命中；没有 next()，按需返回包装
         if (node.type === 'assistant' && node.text?.includes('【特批】')) {
           return (
             <div className="special-badge-wrapper">
-              <span className="badge">⭐ 官方特批回复</span>
-              {next()}
+              <span className="badge">官方特批回复</span>
+              {node.content}
             </div>
           );
         }
-        // 默认放行至下游渲染
-        return next();
+        return null; // 不命中则交还默认渲染
       }
     )
   );
@@ -246,7 +246,7 @@ DSH 前端提供了一套标准的主题 CSS 变量，支持自动跟随深色�
 ### 1. 官方核心颜色变量矩阵
 开发插件 UI 时，**严禁硬编码 `#ffffff` 或 `#000000`**，必须优先使用官方设计令牌（Tokens）。
 
-下表每一行都经本地官方包源码全量扫描核实（`dsh-client-ui-primitives` 与各 `dsh-client-ui-*` 的 `lib/client.js` 合计实际出现 415 个 `--dsw-*` 变量），**照抄即可生效**：
+下表每一行都经本地官方包源码全量扫描核实。数量口径：全官方包 `lib/client.js` 提及 `--dsw-*` 去重 415 个；按 js+css 全口径为 417 个；其中真正由 `dsh-client-ui-theme` 定义在 `body/:root` 上、**照抄即可生效**的是 403 个（其余约 240 个名只是组件 css 的局部引用，宿主 body 未定义）——**下表只列 403 个已定义变量中的常用项**：
 
 | CSS 变量名 | 语义作用 |
 | :--- | :--- |

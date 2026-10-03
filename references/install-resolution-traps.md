@@ -30,9 +30,9 @@ dsh: restored package.json, pnpm-lock.yaml, and node_modules.
 
 ### 2.1 机制
 
-pnpm 从 v11 起默认启用 `minimumReleaseAge: 1440`（分钟，即 24 小时）：一个新版本发布后必须满 24 小时才允许被解析安装。这是防供应链攻击的「冷却期」——公开资料显示近年多数被投毒的包在发布一周内被发现并撤下，冷却期能自动挡住大部分。
+发布冷却期是 **pnpm 自身的配置项**（pnpm v11 起默认 `minimumReleaseAge: 1440` 分钟，即 24 小时）：一个新版本发布后必须满 24 小时才允许被解析安装。这是 pnpm 防供应链攻击的「冷却期」——公开资料显示近年多数被投毒的包在发布一周内被发现并撤下，冷却期能自动挡住大部分。**该机制由包管理器实现，不由 DSH 代码实现**（本机 DSH 0.2.0-rc.2 全部 289 个 @deepseek-ai 包与 dsh/lib 源码中 `minimumReleaseAge` 零命中）；可在 profile 的 `pnpm-workspace.yaml` 里调整（见 5.1）。
 
-关键点：**方向与直觉相反**。不是「新版本太新不能装」，而是**只有发布满 24 小时的版本才被考虑**，于是新版本全被排除后，解析会一路回退到最老的合格版本。
+关键点：**方向与直觉相反**。不是「新版本太新不能装」，而是**只有发布满 24 小时的版本才被考虑**，于是新版本全被排除后，解析会一路回退到最老的合格版本。DSH 侧真正的兼容闸门是 **peer 兼容性预检 + allow-version 精确版本豁免**（写入 profile 的 `compatibility.json`，见第四节），与冷却期是两条独立机制。
 
 ### 2.2 时间指纹（判定冷却期的决定性证据）
 
@@ -120,7 +120,7 @@ dsh-plugin-manager 在安装前后各做一次 peer 兼容性评估（实现见 
 dsh plugin --profile <profile> allow-version <pkg>@<exact-version> --dsh-version <exact-dsh> --accept-risk
 ```
 
-豁免是**精确到版本对**的（包版本 + DSH 版本都必须精确匹配），落在 profile 的 `compatibility.json`。默认内容为 `{}`，即未设置任何豁免。
+豁免是**精确到版本对**的（包版本 + DSH 版本都必须精确匹配），落在 profile 的 `compatibility.json`。默认内容为 `{}`，即未设置任何豁免。豁免的对象是 **peer 兼容性检查**（DSH 侧闸门），与 pnpm 的发布冷却期无关——冷却期没有豁免入口，只有精确版本与 `--config.minimum-release-age=0` 两条路。
 
 **豁免只应作为最后手段**：它绕过的正是防止崩溃与数据丢失的那道闸门。优先修版本选择，不要用豁免掩盖解析错误。
 
@@ -232,6 +232,7 @@ allowBuilds:
 首次 `dsh plugin --profile <new> add <pkg>` 会自动脚手架出 profile 目录（`package.json` / `cordis.patch.yml` / `pnpm-workspace.yaml` / `.plugin-manager`），并把包写进 `dependencies`——但 **`dsh.profile.bundles` 数组不会自动加入新包**，仍是初始的 `["@deepseek-ai/dsh-base", ...]`。
 
 后果：`package.json` 里明明有依赖，`dsh <profile>` 启动时却看不到它（Loader 只装载 bundles 里列出的包）。
+（注：本条未在本机源码复核，属经验结论。）
 
 判定动作：
 

@@ -88,7 +88,7 @@ DeepSeek Harness (DSH 0.2.0-rc.2) 采用清晰的物理分层与进程隔离架�
 
 注意：官方当前 client 注入包是 `@deepseek-ai/dsh-client-ui-settings`（旧文档中的 `dsh-client-ui-slots` / `dsh-client-connection` 拆分已合并为平台运行时 + 注入式组合）。**浏览器半侧只挂在说明符恰为裸包名的那一行上**；子路径导出挂载的行永远不带半侧。
 
-**三个必填字段缺一不可**：`dsh.bundle.id`（组合包标识，`cordis.patch.yml` 里的 `id` 必须与之一致）、`dsh.client.module`（客户端入口相对路径，必须真实存在）、`exports["./client"]`（子路径导出，指向同一个 client 文件）。`exports` 也可以写成带条件导出对象的形式（`{ "types": ..., "default": "./lib/client.js" }`）。
+**真实契约（0.2.0-rc.2 全库实测，`dsh.bundle.id` 与 `dsh.client.module` 均不存在）**：双面包声明 `dsh.client.platform: "web"`（+ 可选 `inject`/`external`/`immediately`），客户端入口由 `exports["./client"]` 子路径导出（该路径必须真实存在）；组合补丁用 `dsh.bundle.patch`（路径或有序数组）。peerDependencies 以 `@deepseek-ai/cordis ~4.0.4` 为准 文件）。`exports` 也可以写成带条件导出对象的形式（`{ "types": ..., "default": "./lib/client.js" }`）。
 
 ## 浏览器端插件加载、Slots 插槽与样式管理
 
@@ -110,9 +110,9 @@ import React from 'react'
 const MyFeatureChip: React.FC = () => <div className="my-feature-chip">Extra Action</div>
 
 export function apply(ctx: ClientContext) {
-  ctx.slots.inject('conversation.input.actions', () =>
+  ctx.slots.inject('conversation.input.right', () =>
     ctx.slots.register(
-      { name: 'conversation.input.actions', id: 'my-feature-chip', order: 50 },
+      { name: 'conversation.input.right', id: 'my-feature-chip', order: 50 },
       MyFeatureChip
     )
   )
@@ -154,18 +154,17 @@ root
 
 | 层级 | Slot 标识 | Cardinality | Scope | 典型用途 |
 | --- | --- | --- | --- | --- |
-| `sidebar.*` | `sidebar.brand` | single | root | 侧边栏品牌区域 |
-| | `sidebar.workspaces` | list | root | 工作区列表项 |
-| | `sidebar.settings` | list | root | 侧边栏底部设置入口 |
-| | `sidebar.files` | list | session | 会话关联的文件树视图 |
-| | `sidebar.terminal` | list | session | 侧边栏终端集成面板 |
-| `main.*` | `main.chat` | single | session | 主聊天交互区 |
+| `sidebar.*` | `sidebar.brand.mark` / `sidebar.brand.name` | single | root | 侧边栏品牌标记与名称（无独立的 `sidebar.brand` 槽） |
+| | `sidebar.workspaces` | single | root | 工作区列表项 |
+| | `sidebar.settings` | single | root | 侧边栏底部设置入口 |
+| | `sidebar.panellist` / `sidebar.footer.action` | keyed / list | root | 面板列表与底部动作（不存在 `sidebar.files`/`sidebar.terminal`） |
+| `main.*` | `main` | keyed | root | 主导航面板（`main.conversation` 为 single/session-maybe；不存在 `main.chat`） |
 | | `conversation.session` | single | session | 会话状态外壳 |
 | | `conversation.view` | list | session | 消息流呈现视口 |
 | | `conversation.chat.node` | chain | session | 消息节点流水线包裹/拦截 |
 | | `conversation.composer` | list | session | 输入框下方功能区 |
 | | `conversation.input.attachments` | list | session | 输入框附加能力条 |
-| `rightbar.*` | `sidebar.right.pane.tab` | keyed | session | 右侧抽屉栏扩展 Tab（原 `rightbar.session`） |
+| `rightbar.*` | `sidebar.right.pane.tab` | keyed | session | 右侧抽屉栏扩展 Tab（其父级 `rightbar.session` 仍然存在，是声明方，并未被重命名） |
 | `shell.*` | `shell.leading` | list | root | 顶部全局横幅通知 |
 | | `shell.overlay` | list | root | 全局模态框 / 浮层 |
 | `settings.*` | `settings.general.item` | list | root | 常规设置条目 |
@@ -173,7 +172,7 @@ root
 | | `settings.plugins.tab` | keyed | root | 插件管理 Tab 面板 |
 | | `settings.section` | list | root | 扩展设置区块 |
 
-Cardinality 选错会导致重复渲染或完全不渲染；调试实时插槽树用 `cordis_inspect what:"client"`。
+Cardinality 选错会导致重复渲染或完全不渲染；调试实时插槽树用 `cordis_inspect_list` 列出平台/提供方/方法，再 `cordis_inspect_query {platform:'client', provider:...}` 查询（不存在 `what:"client"` 语法）。
 
 **标准 hooks**：全 scope 有 `useSessions` / `useSessionStatus` / `useSessionRetainInfo` / `useWorkspaces` / `usePanelInfo`；session 系另有 `sessionId` / `useSession` / `useProjection` / `useConversation` / `useInput` / `useChat` / `useTrajectory`；store 与 locale 推导 `useStore` / `t`。
 
@@ -200,7 +199,7 @@ Cardinality 选错会导致重复渲染或完全不渲染；调试实时插槽�
 - 方法签名硬约束：公开/非静态/有具体实现、不能泛型、参数具名必填简单标识符、**禁解构/默认值/rest/可选**。
 - **协作取消**：Host 签名最后一个参数必须是 `signal: AbortSignal`（记于描述符而非 args）。
 - 一元 RPC：`connection.rpc.call('/api','<ns>/<method>',{args},signal)` → HTTP `POST /api/<ns>/<method>`。
-- **`@Remote({mode:'stream'})`**：返回 `Iterable/AsyncIterable/RemoteStream<Out,In>`，经 `/api/remote.mux` WebSocket 投递；Client 得 `RemoteStreamHandle`（send/end/dispose），上行经 `ctx.invocation.uplink<In>()` 读取。**这就是 remote.mux 的唯一合法用途（流式 Remote），不是通用多路复用总线**。
+- **`@Remote({mode:'stream'})`**：返回 `Iterable/AsyncIterable/RemoteStream<Out,In>`，经 `/api/remote.mux` WebSocket 投递；Client 得 `ClientStreamHandle`（send/end/dispose，0.2.0-rc.2 中没有 `RemoteStreamHandle` 这个名字），上行经 `ctx.invocation.uplink<In>()` 读取。**这就是 remote.mux 的唯一合法用途（流式 Remote），不是通用多路复用总线**。
 - `ctx.remote.$on()` 把 allowlist 事件交 root Context、scoped waterfall 事件交 Session Context（可返回结果 / next() / 拒绝）。
 - 依赖声明归实际调用方：业务包 `inject` 须含 `['remote','remote.<ns>']`。
 - 错误码：`gateway/lookup-unavailable`、`session/not-found`、`session/agent-busy`、未归类 → `gateway/internal`。

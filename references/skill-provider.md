@@ -47,8 +47,9 @@ registerProvider(create: (control: SkillProviderControl) => SkillProvider): () =
 
 选择规则：
 
-- 自己的技能要和官方 bundled 同名共存时，取 250 与 600 之间的值（例如 550），保证既能压过运行时注入，又不会盖过官方内置；
-- 需要完全压过官方内置时才取 < 600，且必须给出理由，因为这类技能通常在抢同一个名字；
+- 自己的技能要和官方 bundled 同名共存时，取 **600 以上**（如 700），避免盖过官方内置；
+- 需要压过运行时 `ctx.skills.register()` 注入的技能时取 **250 以下**（如 200）；两种压制都要时取 < 250；
+- **rank 数值越小优先级越高**（`compareIndexedCandidates` 升序排序取首个），旧版文档「取 250 与 600 之间」的写法会把效果做反；
 - rank 必须是**有限数字**，非法值由宿主抛错，不会静默降级。
 
 ---
@@ -177,10 +178,10 @@ candidate.invocation = { ...candidate.invocation, modelInvocable: false }
 | --- | --- |
 | provider 真的挂上了 | 运行时 `ctx.get('skills')` 非 undefined，且 `skills/change` 事件能收到 |
 | 候选没被静默丢弃 | `ctx.skills.list()` 的返回里能数到自己技能的 name |
-| rank 选得合理 | 与官方 bundled 同名时，rank < 600 且 > 250 |
+| rank 选得合理 | 与官方 bundled 同名时不盖过内置：rank > 600（如 700）；要压过运行时注入取 rank < 250 |
 | 取消不拖死 | 中断后 provider 的 promise 立即 settle，而不是等超时 |
 | 失效及时 | 改配置后不重启即可在 list 结果里看到变化，否则漏了 invalidate |
-| 正文能加载 | 走 `ctx.skills.get(candidate)` 能拿到非空 content，name 与候选一致 |
+| 正文能加载 | 走宿主接口 `ctx.skills.get(name, options)` 能拿到非空 content，name 与候选一致 |
 
 ---
 

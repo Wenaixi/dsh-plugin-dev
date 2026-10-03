@@ -17,8 +17,8 @@
 - `order: 0`：**通用设置** (`id: "general"`，来自 `@deepseek-ai/dsh-client-ui-settings-general`)
 - `order: 10`：**模型** (`id: "models"`，来自 `@deepseek-ai/dsh-client-ui-settings-models`)
 - `order: 15`：**内置插件** (`id: "plugins"`，来自 `@deepseek-ai/dsh-client-ui-settings-plugins`)
-- `order: 20`：**Agent预设** (`id: "presets"`，来自 `@deepseek-ai/dsh-client-ui-settings-agent-loop`)
-- `order: 25`：**插件市场** (`id: "market"`，来自 `dshmarket`)
+- `order: 20`：**Agent 预设** (`id: "agent-presets"`，来自 `@deepseek-ai/dsh-client-ui-agent-preset`；`dsh-client-ui-settings-agent-loop` 注册的是插件页 `plugins.item`，不是设置页)
+- 0.2.0-rc.2 无「插件市场」section（`dshmarket` 包不存在）；全部 settings.section 注册者仅 account(-10, 条件)/general(0)/models(10)/plugins(15)/agent-presets(20)
 
 ### 2. 第三方插件注入专属 Tab 的核心语法
 任何第三方双面插件（Dual-Face Plugin）只需在其客户端入口（`lib/client.js`）的 `apply(ctx)` 中，向 `settings.section` 插槽注入一个注册项：
@@ -158,8 +158,10 @@ export function MySettingsPanel() {
 // 提交补丁至宿主 cordis.patch.yml
 async function saveHostConfig(patchConfig) {
   // 通过官方 api-gateway 提供的 remote 客户端调用
-  const result = await window.__DSH_REMOTE__.configEditor.updateProfilePatch({
-    id: "my-plugin-id",
+  // 真实路径：客户端注入 ctx.remote.settings，调用 mutate/set/unset/replace（命名空间=宿主 entry id）
+  // → Host dsh-settings SettingsForms（revision 冲突抛 SETTINGS_CONFLICT）→ configEditor.edit() 落盘 profile 补丁
+  // （window.__DSH_REMOTE__.configEditor.updateProfilePatch 是伪 API，不存在）
+  const result = await ctx.remote.settings.mutate("my-plugin-id", {
     config: patchConfig // 全量替换该插件条目的 config
   });
   if (!result.ok) {
@@ -179,10 +181,10 @@ async function saveHostConfig(patchConfig) {
 
 1. **官方扩展 (8个)**：
    - 包含：**智能体团队 (实验性)**、**自动授权审查 (实验性)**、**自动化任务 (实验性)**、**语音输入 (实验性)**、**终端**、**Agent 循环**、**子智能体**、**网页搜索**；
-   - 数据源：来自官方内置包清单（`dsh-plugin-package-inventory-deepseek`），固定作为平台可插拔核心推荐展示。
+   - 数据源：`pluginManager.listBundles()` 返回的 `optional: true` 标志（源自 app-boot 的 `OPTIONAL_BUNDLES` 常量，4 个实验 bundle）+ 4 个官方 `plugins.item` 配置页（agent-loop/shell/subagent/web-search）；`dsh-plugin-package-inventory-deepseek` 是 LLM 请求元数据包，与 UI 无关。
 2. **已安装列表 (已安装 10)**：
    - 包含当前 profile 中已安装的所有第三方组合包（如 Better Sidebar、cfbridge、dsh-context、dsh-plugin-wallpaper-engine、dsh-prompt-history 等）；
-   - 数据源：Host 侧服务 `ctx.remote.pluginInventory.list()` 实时扫描当前 profile 目录下的 `package.json`（读取 `dependencies` 与 `dsh.profile.bundles`）。
+   - 数据源：`remote.pluginManager.listBundles()`（读 profile manifest 的 dependencies 与 dsh.profile.bundles，排除 6 个 BUILTIN_PROFILE_BUNDLES）；`pluginInventory.list()` 只是 Loader 只读投影（entryId/moduleName/meta/enabled/fiberPhase），不扫 package.json。
 
 ### 2. 插件卡片元数据读取规范
 

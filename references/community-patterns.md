@@ -645,3 +645,49 @@ allowed-once 即 deny；**审批摘要来自确定性预检而非模型说法**�
 `ctx.plugin(ServiceClass, {...})` 注册服务，可选服务（approval/jobs/userQuestions）用
 `ctx.get()` 探测后条件传入；工具面用 `ctx.inject(['服务'], child => installSurfaces(...))`
 延迟注册，不做硬依赖。
+
+### 11.76 设备桥的防 TOCTOU 与鉴权细节（android/ios）
+截图/文件路由：逐级 `lstat` + `O_NOFOLLOW` + `realpath` 包含校验防 TOCTOU；流路由
+loopback + Origin 鉴权。真机与模拟器 idle 回收策略分开（真机 `idleTimeoutMs = 0` 禁用回收，
+xcodebuild 重启分钟级）；npx 兜底是 60 倍性能悬崖（3.6-6.5s vs 57ms）启动时大声警告。
+
+### 11.77 进程外引擎的 MCP stdio 客户端（noema）
+自写 MCP stdio 客户端：initialize 握手 + 包络大小上限（如 8MB）+ 超时（如 15s）；
+平台二进制用 platforms.json 单源声明 + per-platform optional 包分发；启动失败降级为工具
+错误（不崩 profile）；stderr 只做诊断。
+
+### 11.78 防止递归自放大的起源链（crew）
+worker/派工类插件的递归防护：以 (backend, cwd) 做起源链标识，**只观测不信任**（env 可被
+敌意篡改，不能作为判定依据）；无人值守 worker 的提问立即拒绝（对齐 UserQuestionError
+形状），不做静默降级。
+
+### 11.79 patch insert-only 铁律 + duplicate loader entry id 崩溃（trading）
+patch 行只能 insert，同 id 后层覆盖前层（多 bundle 并存互踩）；**不能用 insert 覆盖已存在
+宿主行**——duplicate loader entry id 直接启动崩溃。顶层 YAML 数组形状强制（空层必须 []）。
+
+### 11.80 storage-domain 无版本号加字段的兼容写法（mimir）
+新增可空字段用 `.optional()`、可缺省数组用 `.default([])`——旧 v2 JSON 继续加载，
+不写会丢数据；持久化 id 拼进文件系统路径时，加载期 quarantineUnsafe 隔离 + 写路径显式校验
+（老记录不能 abort 整个域打开）。
+
+### 11.81 Service 作为 Remote 门面（thin facade）
+继承 TypertRemoteService，@Remote 方法签名保留在门面上、方法体全部转发到纯函数域模块；
+可变实例状态骑在单独 ServiceState 对象上。注册工具时不在注册时取服务、执行时懒取
+（`() => ctx.get('research')`）。
+
+### 11.82 信任围栏抄写要点（lowtide，宿主不公开导出只能复制）
+Host 命中 loopback（127/8、localhost、[::1]）+ sec-fetch-site cross-site 拒绝 +
+带 Origin 必须与 Host 同源（**null Origin 拒绝**）+ **端口归一化**（'localhost' 隐式 80 vs
+'http://localhost:3080' 比较前先 normalizedPort）。
+
+### 11.83 SSE 推送容错模板（lowtide）
+心跳先序列化 payload（可抛）→ 失败跳过帧 + 下心跳重试 + 每分钟最多一条 warn；写失败从 Set
+删除客户端（迭代前 Array.from 快照）；并发 SSE 客户端硬上限。
+
+### 11.84 第三方插件借用官方包名（voice-ai-girlfriend）
+`@deepseek-ai/dsh-client-ui-voice` 是第三方借用官方命名空间的包——判定插件归属看实际仓库
+（owner/repo + 发布者），不能只看包名。
+
+### 11.85 跨宿主桥的 CLI 自管理安装 + 版本钉扎（plugin-cc）
+桥插件自管 CLI 安装（resolveDshBinary / installPinnedDshFromNpm / writeDshWrapper）双份兼容面；
+broker 会话续接必须活体验证；权限透传多档；作业台账 + 进程树终止。

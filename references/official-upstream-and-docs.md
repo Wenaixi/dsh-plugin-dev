@@ -45,7 +45,7 @@
 | API 网关 | https://deepseek-harness.github.io/deepseek-harness/en/reference/api-gateway | remote-rpc-guide.md、three-roles.md |
 | 子系统索引 | https://deepseek-harness.github.io/deepseek-harness/en/reference/subsystems/ | 全库各专题 |
 
-**自动生成目录 (Generated reference，禁止手改)**
+**自动生成目录 (Generated reference)**：仅在 BEGIN/END GENERATED markers 之间的生成区禁手改（gen-cordis-catalog 等重写该区），文档源文件整体可编辑；
 
 | 目录 | 页面地址 | 对应本库文档 |
 | :--- | :--- | :--- |

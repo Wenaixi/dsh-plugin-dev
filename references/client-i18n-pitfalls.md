@@ -73,7 +73,7 @@ const content = `const SKILL_META = ${JSON.stringify(SKILL_META_BUILD)};`;
 
 ## 七、铁律 6：字典真源与 meta 键共存
 
-面板字典并入 `locale/*.json` 顶层键组（`panel`/`mode`/`toast`/…）时，宿主 `readPluginMeta` 只读 `meta` 键——加顶层键组不影响卡片元信息。构建脚本 import 同一份 JSON 作为唯一真源，不另起第二份。
+面板字典并入 `locale/*.json` 顶层键组（`panel`/`mode`/`toast`/…）时，宿主 `readPluginMeta` 只读 `meta` 键——加顶层键组不影响卡片元信息。构建脚本 import 同一份 JSON 作为唯一真源，不另起第二份。前提：浏览器侧 import `locale/*.json` 依赖该包 exports map 放行 `./locale/*.json`（官方如 dsh-schedule 已放行；未放行的包只能从 Node 端读）。
 
 ## 八、反向断言门禁
 

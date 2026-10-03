@@ -149,6 +149,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 │ 提供跨插件共享的有状态能力？ ───────────────────────► 场景 C: 服务提供方 (Service 继承) │
 │ 轻量生命周期、事件监听、日志？ ─────────────────────► 场景 A: 基础函数插件 (ctx.effect) │
 │ 打包发布、Profile 组合配置？ ───────────────────────► 场景 F: 组合包工程 (Bundle/Patch) │
+│ 想要把自研资源变成原生技能，或自定义技能发现？ ───────────────► 场景 W: 技能发现 (Skill) │
 └───────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -177,6 +178,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 | **T** | 沙箱内核级隔离、多模态图片压缩转储与网络代理 | 底层安全与基础设施：理解 Windows ACL/Landlock 原理、image-offload 恢复、undici 代理 | [sandbox-internals-and-proxy.md](./references/sandbox-internals-and-proxy.md) |
 | **U** | 子智能体持续多轮交互、文件系统防覆盖锁与 ACP 协议 | 委派与文件安全：使用 `ctx.subagents.startContinuable`、理解 fs-observation 读后写规则 | [subagents-fs-policy-and-acp.md](./references/subagents-fs-policy-and-acp.md) |
 | **V** | 装插件解析到过时的旧版本、被 incompatible 拒绝、版本选择与预期不符 | 安装解析排障：读 `.plugin-manager/logs/` 确认解析版本，识别 pnpm 冷却期与 semver 预发布排序，配置 `minimumReleaseAge: 0` 或改用精确版本 | [install-resolution-traps.md](./references/install-resolution-traps.md) |
+| **W** | 想把自研资源（打包资源、远端、动态裁剪）变成原生技能，或替换技能发现逻辑 | 自定义技能发现：实现 `SkillProvider` 的 `list`/`get`，经 `ctx.skills.registerProvider` 接入，取 `rank` 裁决重名，用 `complete: false` 表达发现未完成 | [skill-provider.md](./references/skill-provider.md) |
 
 ---
 
@@ -282,7 +284,7 @@ window.__ModuleLoader__.load({
 })
 ```
 
-配置面板请优先复用官方 `@deepseek-ai/dsh-client-ui-primitives` 的 `SegmentedControl` / `Switch` / `StateDot` / `Tag` / `Button`，不要手写控件；把配置面板挂到已安装插件卡片详情用 `plugins.bundle.config` 插槽。详见 [web-ui-slots-and-styling.md](./references/web-ui-slots-and-styling.md) 第四、三节与 [settings-and-plugin-ui.md](./references/settings-and-plugin-ui.md)。
+「插件 UI 要符合 DSH 风格」的可执行含义是**复用宿主组件**，不是模仿配色。动手前先查官方 `@deepseek-ai/dsh-client-ui-primitives` 的组件目录：`Button` / `Switch` / `SegmentedControl` / `Pill` / `Tag` / `StateDot` / `Input` / `Checkbox` / `Menu` / `Tooltip` / `Modal` / `Toast` / `DisclosureRow` / `SettingsForm` / `MarkdownText` / `CodeBlock` / `DiffBlock` 等全是跨插件共享的原子组件，插件之间不能互相 import 组件，这里是控件唯一的共享点。手写开关或分段控件等于制造第二份必然漂移的实现。确实必须自绘时只抄尺寸（按钮 36/28px、描边 `0.5px`、开关 36x20），颜色圆角一律走 `--dsw-*` token；文案必须由渲染方通过 label prop 提供（组件读不到 locale，省略会类型检查失败）。把配置面板挂到已安装插件卡片详情用 `plugins.bundle.config` 插槽。详见 [web-ui-slots-and-styling.md](./references/web-ui-slots-and-styling.md) 第四、五、六、七节与 [settings-and-plugin-ui.md](./references/settings-and-plugin-ui.md)。
 
 ---
 

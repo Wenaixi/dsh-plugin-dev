@@ -16,6 +16,8 @@
 ### 二、微内核与服务架构 (Microkernel & Spine)
 - **[cordis-context-internals.md](./cordis-context-internals.md)**：
   Cordis 微内核底层的三个隔离原语——`ctx.isolate(key)` 服务作用域物理隔离槽、`ctx.intercept(key, config)` 动态拦截代理、`Context.is(value)` 全局 Symbol 品牌跨 Realm 检验。
+- **[skill-provider.md](./skill-provider.md)**：
+  自定义技能发现 (SkillProvider) 权威指南——`registerProvider` 注册契约与同步工厂语义、`list`/`get` 两方法与 `locator` 往返句柄、`rank` 取值与重名裁决规则、`complete: false` 的"发现未完成"表达、AbortSignal 贯穿规范与吞 abort 造成的卡顿，以及生产侧 SKILL.md 发现器的 BOM/CRLF/闭栏/目录名四坑、frontmatter 解析的性能陷阱与失效链路。
 - **[services.md](./services.md)**：
   The Core Spine 核心大动脉服务单复数绝对铁律（`ctx.sessions`、`ctx.agents`、`ctx.agentTeams`、`ctx.tools` 为复数；`ctx.schedule`、`ctx.planMode`、`ctx.workspaceRegistry` 为单数；`ctx.llm` 为 Seam）、Service 类定义规范与依赖注入契约。
 - **[plugin-anatomy.md](./plugin-anatomy.md)**：

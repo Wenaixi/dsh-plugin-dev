@@ -85,7 +85,46 @@ Persistence Catalog 为每个事件类型自动计算 SHA-256 结构指纹：
 
 ---
 
-## 四、事件监听代码实战
+## 四、监听器的防御性隔离：永不抛，且 waterfall 必须放行
+
+派发模式决定了坏监听器的爆炸半径，而它们互不相同：
+
+| 模式 | 监听器抛异常的后果 |
+| --- | --- |
+| `emit` | 异常同步冒泡到派发方，可能打断派发方正在做的事 |
+| `waterfall` | **不调 `next()` 即短路**，抛异常等于替你决定"这条链到此为止"，下游全部不执行 |
+| `serial` | 第一个抛异常的监听器让整条链失败，后续监听器不执行 |
+| `parallel` | 全部 settle 后汇总抛 `AggregateError`，调用方拿到的是异常而非结果 |
+| `bail` | 同步冒泡，同 `emit` |
+
+由此得到两条通用写法（对外扩展类插件的硬性要求）：
+
+1. **监听器体整体包 try/catch，异常只记日志不外抛**。宿主核心生命周期事件（agent 创建、会话流转）往往走 `serial`/`parallel`，一个第三方插件抛错就足以让整次会话创建失败。catch 里用 `ctx.logger(...).warn()` 留下可检索的痕迹，不要静默 `catch {}`。
+2. **waterfall 监听器无论业务成功还是失败都必须 `return await next()`**。业务失败时也不要直接 return，那等于短路掉所有下游中间件，等于用一次异常劫持整条管线。正确形态是"记录失败 → 仍然放行 → 让下游决定后果"。
+
+```js
+// 反例：异常即短路，下游全丢
+ctx.on('some/hook', async (payload, next) => {
+  const value = await doWork(payload)   // 抛错就短路
+  return next(value)
+})
+
+// 正例：失败可见，但不劫持管线
+ctx.on('some/hook', async (payload, next) => {
+  try {
+    await doWork(payload)
+  } catch (err) {
+    ctx.logger('my-plugin').warn(`hook 处理失败（仍放行下游）: ${String(err)}`)
+  }
+  return next()
+})
+```
+
+判据：这段插件的失败**是否应该让整个宿主跟着失败**？绝大多数情况答案是否，那就必须隔离。
+
+---
+
+## 五、事件监听代码实战
 
 ```js
 export const inject = ['tools']

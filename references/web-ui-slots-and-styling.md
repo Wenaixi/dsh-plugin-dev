@@ -340,3 +340,71 @@ P.Button({ variant: "outline", size: "sm", onClick: reset }, "恢复默认")
 正确做法：选一条链。若产物必须是无法由 `tsc` 直接生成的 CJS factory 形态（DSH 客户端的硬要求），就把生成逻辑放进构建脚本，并**删掉同名 TypeScript 源文件**，让 `exports` 只指向生成物。
 
 同时检查所有静态门禁脚本里对该源文件的路径引用——删源文件后门禁会因 `ENOENT` 直接崩溃，务必同步改为指向新的唯一来源。
+### 5. 直接复用：先查组件目录，再决定自绘
+
+「UI 要符合 DSH 风格」的可执行含义不是**模仿**宿主配色，而是**复用宿主组件**。宿主把跨插件复用的原子组件沉淀在一个零 Cordis、零 slot 知识、只经 `--dsw-*` token 上色的包里；任何插件都不能 import 另一个插件的组件，所以这是控件唯一能共享的地方。
+
+**决策顺序（先查表再动手）：**
+
+| 你要画的东西 | 落点 |
+| --- | --- |
+| 按钮 | `Button`（variant：primary / ghost / outline / toolbar；size：md 36px / sm 28px） |
+| 开关 | `Switch`（36x20，`label` 必填） |
+| 几选一的模式切换 | `SegmentedControl`（互斥、带滑动指示块、自带 tab 键盘模式） |
+| 视图切换 / 筛选器（可同时激活多个） | `Pill`（独立 chip，`active` + `onClick`） |
+| 只读状态徽标 | `Tag`（8 种 tone，文字由渲染方给） |
+| 生效中 / 被覆盖 / 未设置 / 故障 | `StateDot` + `Tag` 配对 |
+| 输入框 | `Input`（ref 指向原生节点，卸载时自动清空） |
+| 复选框 | `Checkbox` |
+| 悬浮菜单 | `Menu` / `MenuItemButton` / `MenuSurface`（键盘走位与焦点归还已内建） |
+| 悬停提示 / 预览 | `Tooltip` / `HoverCard`（含视口钳制） |
+| 模态框 | `Modal`（与设置外壳共用 Esc/Tab 与焦点归还） |
+| 即时横幅 | `Toast`（顶部居中，`holdMs` 由持有方给） |
+| 折叠行 | `DisclosureRow`（固定 24px 紧凑排版） |
+| 敏感操作二次确认 | `RiskConfirmation`（显式复选框把关） |
+| 渲染模型 Markdown / 代码 / diff / 终端输出 | `MarkdownText` / `CodeBlock` / `DiffBlock` / `TerminalBlock` / `JsonTree` |
+| 文件路径展示 | `PathLabel`（目录弱化、文件名主色、溢出保留尾部） |
+| 插件卡片插画 | `PluginArtwork*`（没有自有插画就用 `PluginArtworkDefault`） |
+
+**规则**：
+
+- 复制这里的控件等于制造第二份必然漂移的实现，属于明确禁止的动作；
+- 第二个插件需要同一个控件时，正确动作是让它住进这个共享包，而不是各自造一份；
+- 只有需求确实特殊（形状、语义都不是通用控件）时才在自己包里写组件，并且**只用 token，不自定义色值**。
+
+### 6. 四组容易混淆的组件（选错就是视觉不一致）
+
+| 组合 | 判据 |
+| --- | --- |
+| `Tag` vs `Pill` | 11px 只读徽章用 `Tag`；可点选的胶囊（或必须落在 24px 文本行上）用 `Pill`。尺寸与可交互性同时是判据，不可互换 |
+| `Pill` vs `SegmentedControl` | 一排 `Pill` 是彼此独立的 chip，可同时激活多个；`SegmentedControl` 是互斥模式，带指示块与 tab 键盘语义 |
+| `DisclosureRow` vs 卡片 | 前者固定 24px 左右排列；名称叠在描述之上的卡片是另一种布局，属于功能包（例如插件管理中心的 `PluginCard`） |
+| `StateDot` 与文案 | 圆点本身 `aria-hidden`，**必须与文字配对**；`appearance="step"` 用实心勾/空心圆表达步骤态 |
+
+### 7. 文案必须由渲染方提供（不是可选项）
+
+这些原子组件**读不到 locale**，所以每一段面向用户的文案都要通过 label prop 传入。各功能包负责把带类型的 `t` 席位映射到 primitive 的 label 接口。
+
+- 省略 label 会**类型检查失败**，这不是运行时可选项；
+- 自己实现 i18n 时同样要把本地化文案显式传入，不要依赖组件内部兜底；
+- `Switch.label` 是无障碍必需项，不因为「界面上已经有一行标题」就可以省。
+
+### 8. 自绘时的几何与语义底线
+
+确实必须自绘时，从宿主的 CSS module 抄**尺寸**（不要抄颜色）：
+
+| 项 | 数值 |
+| --- | --- |
+| 按钮 md / sm | 高 36px / 28px；圆角 `--dsw-radius-md` / `--dsw-radius-sm`；sm 字号 12px、左右内边距 10px |
+| 开关 | 36x20，滑块 16px，开启态位移 16px |
+| 分段控件 | tab 高 28px，左右内边距 16px，字号 13px/行高 20px，字重 500 |
+| 状态点 | 10px 布局槽内画 6px 实心点 |
+| 描边控件 | `0.5px solid`（不是 1px） |
+
+其余一律走 token：颜色、边框、圆角、悬浮底色、阴影（`--dsw-elevation-soft`）、焦点环（`--dsw-focus-ring-width`）。禁用态统一走 `opacity: 0.4~0.5`。
+
+**焦点与动效是无障碍底线，不可省**：
+
+- 可交互元素必须有 `:focus-visible` 焦点环，用 `--dsw-focus-ring-width` + `--dsw-focus-ring-color`；
+- 任何过渡都要包 `@media (prefers-reduced-motion: reduce)` 降级，官方组件全部这么做；
+- 开关/勾选这类控件的视觉状态要绑 `aria-checked` 而不是平行 class，让「看到的」和「辅助技术读到的」不可能不一致。

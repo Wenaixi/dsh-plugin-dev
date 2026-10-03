@@ -70,7 +70,7 @@ export function apply(ctx) {
 
 ### 1. 持续终端核心原语
 1. **`spawn(owner, { type, name?, cwd? }, signal)`**：创建长寿命伪终端会话，返回 { sessionId, name?, type, pid?, status, motd? } 快照；真正的后台进程由已注册的后端（如 `dsh-terminal-bash`）承载；
-2. **`read(owner, id, { offset?, count? })`**：同步返回一段最近端 scrollback 的分页快照（offset 为相对最新内容的负偏移、count 为行数），无等待、无超时，不阻塞；
+2. **`read(owner, id, { offset?, count? })`**：同步返回一段最近端 scrollback 的分页快照（offset 为相对最新内容的**非负**偏移：0 即最新、越大越深入历史，传负值会抛错；count 为行数上限，默认 500），无等待、无超时，不阻塞；
 3. **`startSend(owner, id, { text, submit, signal? })`**：向正在运行的终端写入 `stdin`（`\x03` 代表 Ctrl+C），返回 `{ done, ... }` 等待句柄；同一会话同一时刻只允许一个活动的 send，并发调用抛 `SEND_ACTIVE`；
 4. **`signal(owner, id, signal)`**：向终端进程组发送标准 POSIX 信号（如 `SIGINT`、`SIGTERM`、`SIGKILL`），实现安全收敛与优雅停机；另有 `kill(owner, id, reason?)` 关闭会话、`list(owner)` 列出本所有者可见会话。
 

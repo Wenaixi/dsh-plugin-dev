@@ -3,3 +3,5 @@ node_modules/
 Thumbs.db
 *.log
 CLAUDE.md
+
+.cache-repos/

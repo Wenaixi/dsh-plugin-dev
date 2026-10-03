@@ -14,12 +14,12 @@
   前端弹出 Deliverables 交付卡片
   ┌────────────────────────────────────────────────────────┐
   │ 📄 output.xlsx (数据报表)                              │
-  │    [👁️ 预览]   [📂 系统原生打开]   [⬇️ 下载保存]         │
+  │    [👁️ 侧边栏预览]   [📂 默认应用打开]   [📁 文件管理器显示]     │
   └────────────────────────────────────────────────────────┘
 ```
 
 ### 1. `present` 工具核心参数契约
-- `files`: 交付文件数组，单次调用通常上限为 4 个（受 `maxFiles` 配置限制）；
+- `files`: 交付文件数组，默认 `maxFiles=8`（配置项，每次 1..maxFiles；工具描述建议单次 1-4 个）；返回 {turn, files} 并追加 deliverables/presented 会话事件；
 - `files[].path`: 目标文件的相对路径或绝对路径；
 - `files[].description`: 面向用户的简要说明文案；
 - **前端渲染效果**：调用成功后，系统会在回复下方生成独立的交付物卡片区，用户可直接点击按钮调用系统原生程序（Native Open）打开文件，体验极其丝滑。
@@ -64,9 +64,9 @@ DSH 提供了强大的多模态附件存储抽象：`@deepseek-ai/dsh-attachment
 
 ### 1. 附件规范化与安全落盘
 - 用户拖入输入框的图片文件，会自动进入本地存储池（位于 `$DSH_HOME/attachments`）；
-- 系统根据 `NormalizationPolicy` 自动校验文件大小、分辨率，并规范化转码为 Web 兼容格式（PNG/JPEG/WebP）；
+- 系统根据 `normalizationPolicy` 配置（maxPixels/maxDimension/maxBytes）自动校验文件大小、分辨率，并归一化为单帧 8-bit sRGB/sRGBA（有 alpha 走 WebP 否则 JPEG，GIF 坍单帧）；
 - 生成带类型的不可变引用标识（`ImageAttachmentRef`），并在会话事件日志中持久化；
-- 提示词拼装器（SystemPrompt）会在组装模型请求时，自动将引用解析为 LLM 原生支持的视觉图像块（`ImageContentBlock`）。
+- 请求组装时由提供方适配器调 `AttachmentStore.readImageRequest` 解析引用为 LLM 原生视觉块（块类型是 `Image`，无 `ImageContentBlock` 之名）。
 
 ---
 

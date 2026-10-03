@@ -116,7 +116,7 @@ dsh --profile web web           # 等价 dsh web web：web 成为 app-args；与
 
 | 布局 | 特征 | 易踩的坑 |
 | --- | --- | --- |
-| **isolated**（pnpm 默认） | `.pnpm` 下有真实 store，顶层是符号链接 | 改顶层文件等于改 store；缓存清理影响面大 |
+| **isolated**（pnpm 默认） | `.pnpm` 下有真实 store，顶层是符号链接（本机 web 即 isolated） | 改顶层文件等于改 store；缓存清理影响面大；注意 DSH 生成的 profile 模板默认 `nodeLinker: hoisted` |
 | **hoisted** | 顶层是真实文件，`.pnpm` 下只有 `lock.yaml` | **文件被删时 pnpm 不检测**（见 §九） |
 
 **推论**：在 hoisted 布局下"直接往 `node_modules/<pkg>` 里补文件"是**可行性较高**的应急修复手段（顶层就是真身）；但改完要自己保证与 lockfile 语义一致。
@@ -193,7 +193,7 @@ URL 形如 `/plugins/??<包id>/client.js&rev=<内容哈希>`——**rev 变内�
 | `$DSH_HOME/.credentials.yaml` | 结构化凭据存储（`refs` 段存 API key） | **全局，所有 profile 共享** |
 | `$DSH_HOME/.env` | 供配置里 `!!js process.env.XXX` 引用的环境变量 | **全局** |
 
-**推论**：迁移"模型/供应商"类配置时，只要引用的 key 名在全局凭据里已存在，**迁完即可用**，不需要在目标 profile 里重复配置密钥。反之，若配置引用了 `apiKeyEnv: XXX` 而凭据里没有 `XXX`，模型就是个空壳——**迁移前先用两处对照检查一遍**。
+**推论**：迁移"模型/供应商"类配置时，只要引用的 key 名在全局凭据里已存在，**迁完即可用**，不需要在目标 profile 里重复配置密钥。反之，若配置引用了 `apiKeyEnv: XXX` 而凭据里没有 `XXX`，模型就不可用——**迁移前先用两处对照检查一遍**。注意 resolve 分层不止凭据文件：进程环境 > `.credentials.yaml` > 项目 `.env` > 用户 `.env`（credentials-local:473-490）。
 
 ---
 

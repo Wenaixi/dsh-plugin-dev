@@ -101,7 +101,7 @@ ctx.tools.guard((exec) => {
 | `read`, `read_image`, `edit`, `write` | `@deepseek-ai/dsh-tool-fs` | 文本文件读取、图像多模态读取、文本精准替换、全量写入 |
 | `glob`, `grep` | `@deepseek-ai/dsh-tool-fs-search` | 路径模式匹配与基于 ripgrep 的文件内容正则检索 |
 | `skill` | `@deepseek-ai/dsh-tool-skill` | 载入技能指令规范（支持六级 rank 100-600 注入） |
-| `subagent` | `@deepseek-ai/dsh-tool-subagent` | 委派子代理；单个可配置工具（toolName 默认 `subagent`），「继承当前上下文」的 fork 语义由所选 provider 的 `inheritsParentContext` 能力决定，不存在独立的 `subagent_fork` 工具 |
+| `subagent`, `subagent_fork` | `@deepseek-ai/dsh-tool-subagent` | 委派子代理：同一插件按 `toolName` 实例化多个工具（本机注册 `subagent`=provider `spawn` 与 `subagent_fork`=provider `fork`）；官方包源里没有独立工具，`subagent_fork` 是装配出的 toolName |
 | `list_agents`, `send_message`, `interrupt_agent` | `@deepseek-ai/dsh-tool-subagent-control` | 查看智能体列表、向智能体发送信件、中断执行 |
 | `job_output`, `job_kill`, `job_list` | `@deepseek-ai/dsh-tool-jobs` | 异步长耗时后台任务结果读取、终止与任务列表查询 |
 | `create_goal`, `get_goal`, `update_goal` | `@deepseek-ai/dsh-tool-goal` | 会话持久化目标管理与多轮次自驱推进 |
@@ -111,8 +111,11 @@ ctx.tools.guard((exec) => {
 | `present` | `@deepseek-ai/dsh-tool-present` | 将本地现有文件声明为最终交付物卡片 |
 | `web_search`, `web_fetch` | `@deepseek-ai/dsh-tool-web`（执行经 `ctx.web` seam，官方引擎包 `dsh-web-search-deepseek` / `dsh-web-fetch-http`） | 网络搜索引擎检索与网页全文内容提取 |
 | `schedule_create`, `schedule_list`, `schedule_delete`, `schedule_update` | `@deepseek-ai/dsh-schedule` | 宿主持久化定时任务管理四件套 |
-| `spawn_teammate`, `send_message`, `list_agents`, `wait_agent`, `interrupt_agent`, `team_task_*` | `@deepseek-ai/dsh-experimental-tool-agent-team` | Agent Teams 多智能体团队编排与共享任务看板协同工具 |
-| `ralph` | `@deepseek-ai/dsh-tool-ralph` | 代码重构与分析助手工具 |
+| `spawn_teammate`, `send_message`, `list_agents`, `wait_agent`, `interrupt_agent`, `team_task_*` | `@deepseek-ai/dsh-experimental-tool-agent-team` | Agent Teams 多智能体团队编排与共享任务看板协同工具（**实验性包**，需挂载配套组合包；本机 desktop profile 已注册） |
+| `ralph` | `@deepseek-ai/dsh-tool-ralph` | 长周期目标续跑工具（本机 desktop profile 中该条目 `disabled: true`，故当前会话不可用） |
+| `list_subagent_models` | `@deepseek-ai/dsh-tool-subagent` | 列出可用的子代理 provider/model 路由（本机 `tool-subagent` 配置 `modelSelectionSettings: true` 时注册） |
+| `read_page` | `@liustack/modsearch` 桥（非 @deepseek-ai 官方包） | 读取单页网页内容（本机由运行时注入，官方发布物无此包） |
+| `x_search` | `@liustack/modsearch` 桥（非 @deepseek-ai 官方包） | 搜索 X（Twitter）帖子（同上，运行时注入） |
 
 ---
 

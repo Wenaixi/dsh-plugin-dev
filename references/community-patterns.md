@@ -632,3 +632,16 @@ revision 变更不保证旧前缀存活（rewrite/truncate）——增量系统�
 ### 11.72 SkillProvider list() 不完整就不缓存
 list() 返回 complete:false 时不要缓存（注册表会把截断目录当权威）；双层取消契约：
 `control.signal`（注册级）+ `options.signal`（查询级）。
+
+### 11.73 用户可执行代码的沙箱纪律（workflow）
+QuickJS（quickjs-emscripten）+ 静态扫描（先剥字面量再匹配 FORBIDDEN 表）+ 同步/墙钟双超时；
+产物流过 assertJsonValue（拒绝非有限数字、循环引用、稀疏数组）。
+
+### 11.74 关键动作过审批门的完整姿势（workflow）
+`needsApproval` → `approval.request({ agent, toolName, reason, signal })`，outcome 不是
+allowed-once 即 deny；**审批摘要来自确定性预检而非模型说法**。
+
+### 11.75 服务提供方 + 工具面分离（workflow/dynamicWorkflows）
+`ctx.plugin(ServiceClass, {...})` 注册服务，可选服务（approval/jobs/userQuestions）用
+`ctx.get()` 探测后条件传入；工具面用 `ctx.inject(['服务'], child => installSurfaces(...))`
+延迟注册，不做硬依赖。

@@ -71,7 +71,7 @@ clearai 用 `dsh.bundle.patch: ["./cordis.patch.yml", "./presets/clearai/clearai
 ## 二、版本兼容层：高迭代宿主下的存活术（64/86 提及，全生态共识）
 
 ### 2.1 能力探测优先于版本号分支
-- 事件名新旧并存：0.1.6 起 agent 就绪事件是 `agent/created`（payload 带 source），旧版是 `agent/session-start` → 同时挂两个，用 `'source' in payload` 判别（agent-teams）。
+- 事件名新旧并存：0.1.6 起 agent 就绪事件是 `agent/created（payload 恒带 source: 'startup'|'resume'|'clear'|'compact'，按 source 值判而非 'source' in payload）；SessionStartSource = 'startup'|'resume'|'clear'|'compact'）——agent/session/created 是旧版事件名，0.2.0 全包 0 命中
 - 方法探测：`typeof session.snapshotEvents === 'function'` 优先，回退 `session.events`；`typeof service.register === 'function'` 区分 Settings 新旧 API；`WEB_SERVER_KEYS = ['webServer', 'httpServer']` 新旧服务键并存。
 - 版本号分支只用在"补丁/配置键名"这类真的按版本变化的场景（dsh-TUI 的 persona→personaPrefix）。
 
@@ -139,7 +139,7 @@ apply 时探测宿主版本：低于支持基线给 fallback 单元（零数据 
 graph-memory + working-activity 双重印证：`session.append()` 无法标记事件可忽略；自定义 session 事件类型不在宿主的 `KNOWN_SESSION_EVENT_TYPES` 里，严格读取路径（恢复种子校验、持久化加载）会**拒绝整个会话**，导致"写进去没报错、下次打不开"。发布前必须注册到所有物理可达 dsh-session 副本的词汇表（realpath 去重）。
 
 ### 5.2 事件派发模式的坑
-- `agent/pre-step` 用 `{ prepend: true }` 注册且挂在**具体 Agent 的 context** 上；根组合拿不到每 agent 钩子，需 agent/created + agent/session-start + session/event 三路兜底 + WeakSet 去重（graph-memory）。
+- `agent/pre-step` 用 `{ prepend: true }` 注册且挂在**具体 Agent 的 context** 上；根组合拿不到每 agent 钩子，需 agent/created（payload 恒带 source: 'startup'|'resume'|'clear'|'compact'，按 source 值判而非 'source' in payload）；SessionStartSource = 'startup'|'resume'|'clear'|'compact'）——agent/session/created 是旧版事件名，0.2.0 全包 0 命中
 - serial 事件监听器**不要抛错**（一个监听器抛错会中断整条链）；waterfall 必须 `await next()` 再 `{...seed}`。
 - turnTail 插槽从 chain 形态演进到 list 形态，双形态都要兼容（dsh-ads）。
 - `ctx.effect` 的 this 是 Fiber（dsh-tauri 经验）。
@@ -362,7 +362,7 @@ LLM 摘要串行化（promise 链），捕获失败仅记日志不中断；摘�
 定时维护 `setInterval` + `unref` + due-state 门（每任务每 interval 至多一次）。
 
 ### 11.19 生命周期注入必须延迟到"首个持久信号"（Aegis）
-在 `agent/created`（或旧版 `agent/session-start`）时直接注入引导文本，会把它放进
+在 `agent/created（payload 恒带 source: 'startup'|'resume'|'clear'|'compact'，按 source 值判而非 'source' in payload）；SessionStartSource = 'startup'|'resume'|'clear'|'compact'）——agent/session/created 是旧版事件名，0.2.0 全包 0 命中
 首个模型请求之前，破坏依赖"无菌首请求"基线的轨迹预设。正确做法：每个会话边界只 ARM 一次
 注入（记录 sessionId→agent 映射），等会话发出第一个**持久化**信号（`tool/call` 或
 `assistant/message`）才真正 `agent.inject(message)`；`compaction/end` 重新 ARM
@@ -386,7 +386,7 @@ session v4 要求 producer-owned 的 `source.kind`（如 `plugin:<name>`、`form
   `prepare` 脚本会让每个用户先 allowlist 构建才能首装成功）。
 - SKILL.md frontmatter 描述用**正则解析**不引 YAML 依赖；load 失败返回 undefined/[] 而非抛错。
 
-### 11.22 MCP 连接器无凭据时整体禁用 + !!js 表达式不能以 ! 开头（treg）
+### 11.22 MCP 连接器无凭据时整体禁用 + !!js 表达式若以 ! 开头必须带引号（裸标量会被当 YAML 标签）；官方 dsh-base 原文 disabled: !!js "!ctx.get('profileContext')" 就这么写（treg）
 - 注册一个没有 token 的 connector 得到的是常开工具、每次调用都 401：`disabled: !!js
   (process.env.X ?? '') === ''` 让 patch 行缺 token 时根本不挂载。
 - **patch 里 `!!js` 表达式不能以 `!` 开头**：YAML 会把第二个 `!` 读成又一个 tag
@@ -452,7 +452,7 @@ session v4 要求 producer-owned 的 `source.kind`（如 `plugin:<name>`、`form
 ### 11.31 晚挂载服务的三种延迟注册姿势（chat-import）
 - webServer：`ctx.inject(['webServer'], ...)`（apply 时 ctx.get('webServer') 仍为空）；
 - commands：headless 不挂 → 服务可用时注册，不阻塞插件激活；
-- 核心事件（session-start 等）host 必备 → 直接 `ctx.on`。
+- 核心事件（session/created 等）host 必备 → 直接 `ctx.on`。
 
 ### 11.32 llm/stream 瀑布嵌套计费防重（cost-meter）
 包装路由适配器会多次触发下游计费监听器——用 AsyncLocalStorage 标记当前请求已计费，
@@ -522,7 +522,7 @@ profile；审批/提问渲染成 IM 平台原生卡片按钮。
 - **懒读是热生效的全部机制**：0.1.7+ Loader 把表单编辑提交进 Config 的 volatile 引用，每次读都重新解引用；把配置冻成快照会静默失效。
 - 热切换先建新再拆旧（先拆后建会在建新抛错后留下"配置说开实际没开"的半状态）；dbPath 同理先 open 新库再 close 旧库。
 - 自持 disposer 防 HMR 二次调用：fiber 卸载时清空本地引用（ctx.effect(() => () => { ref = null })）。
-- 运行期配置校验失败 → 保持旧值 + 审计留痕（settings-rejected），不崩插件但可查。
+- 运行期配置校验失败 → 保持旧值 + SettingsConflictError（revision 冲突拒写）——审计留痕是插件自选，非宿主契约，不崩插件但可查。
 
 ### 11.48 exact 路由赢过 /api 前缀 fence → 每 handler 自带 loopback 围栏（usage 独立印证）
 宿主 /api fence 只保护 prefix 匹配的路由；`kind: 'exact'` 的路由赢过它，必须**每个
@@ -533,9 +533,10 @@ capture 当前组合快照 vs composeEntries 计算结果 isDeepStrictEqual；�
 漂移）要重试/保留上一代，避免把陈旧的 loader 组合写进去。disabled 表达式内 throw 会中止
 该行应用——用 try/catch 保留上一代。
 
-### 11.50 volatile 配置值 0.1.7 是包装对象要 unwrap
-`config.apiKey` 在 0.1.7+ 可能是 `{ value }` 包装（volatile 引用），读取前必须解包；
-旧版是裸值。settings installSection 三态兼容（注册/替换/absent）。
+### 11.50 volatile 配置值 0.2.0 是 Cosmokit Volatile 包装要 unwrap
+0.2.0 的 volatile 值是 `Volatile<T> = { get(): T }`（cosmokit 类型）——不是 { value } 也不是
+{ ref }。统一解包：`isVolatile(x) ? x.get() : x`。配套的 settings 服务是 SettingsForms
+（configure/describe/update/replace/mutate/writable/documentPath/prepareDocument）。
 
 ### 11.51 generator 形态 ctx.effect
 `ctx.effect` 的工厂可以是 async generator/回调形态（yield disposer），配合
@@ -555,7 +556,7 @@ DSH 只在文本变化时重新 append——稳定的 system/history 前缀缓�
 保持同一正文双形态，避免两份拷贝漂移。
 
 ### 11.55 审批/权限类插件三件套（auto-review/permission-rules 独立印证）
-- `approval/request` answerer 短路语义：匹配本插件策略的请求自己 settle，其余 `next()` 委托人类链；fail-closed 默认（fallbackPolicy 默认 rejected）。
+- `approval/request` answerer 短路语义：匹配本插件策略的请求自己 settle，其余 `next()` 委托人类链；fail-closed 默认（approval 默认兜底（waterfall 尾 = Promise.resolve('unavailable')；OUTCOMES = ['allowed-once','rejected','cancelled','unavailable']） 默认 rejected）。
 - `tools/pre-execute` 决策语义：deny/ask 短路，**allow 永远 `next()` 委托**（不自己放行）。
 - invariant 伴生校验"模型可见 = 已记录"的审计一致性。
 
@@ -613,7 +614,7 @@ patch 可以是 JSON（cordis.patch.json），与 YAML 等价——对 YAML 块�
 零歧义替代；`disabled: { __jsExpr: ... }` 表达式形态做 entry-policy 判定。
 
 ### 11.68 !!js 表达式里解析包（没模块上下文）
-patch 求值环境无模块上下文：用 `createRequire` 锚在 `ctx.profileContext.dir` 的
+patch 求值环境无模块上下文：用 `createRequire` 锚在 `ctx.get('profileContext')?.dir（profileContext 是服务，非直读属性）` 的
 package.json 来 resolve 包路径。
 
 ### 11.69 替换默认实现类插件 = 运行时 registerProvider + 三段接管（free-search）
@@ -661,9 +662,10 @@ worker/派工类插件的递归防护：以 (backend, cwd) 做起源链标识，
 敌意篡改，不能作为判定依据）；无人值守 worker 的提问立即拒绝（对齐 UserQuestionError
 形状），不做静默降级。
 
-### 11.79 patch insert-only 铁律 + duplicate loader entry id 崩溃（trading）
-patch 行只能 insert，同 id 后层覆盖前层（多 bundle 并存互踩）；**不能用 insert 覆盖已存在
-宿主行**——duplicate loader entry id 直接启动崩溃。顶层 YAML 数组形状强制（空层必须 []）。
+### 11.79 patch insert-only 铁律 + duplicate 行为年级限定（trading）
+patch 行只能 insert，同 id 后层覆盖前层（多 bundle 并存互踩）；非 insert 行必须 id+name 匹配。duplicate entry id 行为分代：
+0.1.5 世代抛 "duplicate loader entry id"；0.2.0-rc.2 新世代 EntryGroup.update 用
+Object.fromEntries **静默塌缩为最后一条**（不崩溃）。顶层 YAML 数组形状强制（空层 []）。
 
 ### 11.80 storage-domain 无版本号加字段的兼容写法（mimir）
 新增可空字段用 `.optional()`、可缺省数组用 `.default([])`——旧 v2 JSON 继续加载，
@@ -723,16 +725,16 @@ store（每个 JSON 独立 try/catch）+ 未授权待授权队列（设置面板
 （unref + clearInterval 防双 tick）+ jobs.attachController 长任务前台视图 + 60s 心跳。
 
 ### 11.92 settings 命名空间 = ctx.fiber.entry.options.id（0.1.7+）
-多个仓库独立印证（codex/jingyun/theme-endfield）：设置命名空间取插件行的 entry id
+契约保证（SettingsForms.describe()/update(ns) 注释直说）：设置命名空间取 profile entry id；ctx.fiber.entry.options.id 是社区取法、无类型承诺
 （`ctx.fiber.entry.options.id`），不是包名；0.1.7+ 的 settings.describe 按此寻址。
 
 ### 11.93 LLM 预算估算分族计价（deepread）
 CJK 0.6 / 拉丁 0.25 / 其他 0.5 token 每字符分族计价，比"每字符固定下限"更精细；
 模型速率默认表 + storage-domain 实时校准（defineDomain + domainTable + zod）持久化实测值。
 
-### 11.94 live(ref) volatile 配置统一解包函数
-0.1.7+ volatile 配置值是 { ref } 包装：写一个统一 `unwrapLive(ref)` 解包函数（有 .ref/.get
-就取值，否则原样返回），所有读配置处复用——避免散落解包逻辑。
+### 11.94 volatile 配置统一解包函数（按 0.2.0 修正）
+写统一 `unwrapLive(x)` 解包函数：`isVolatile(x) ? x.get() : x`（Volatile<T> = { get(): T }）——
+所有读配置处复用，避免散落解包逻辑。
 
 ### 11.95 双通道设置（RPC channel + config）
 设置面两条路并存：RPC channel（客户端实时读写）+ config 直写（无 RPC 时的降级）；
@@ -825,7 +827,7 @@ parseReason 解析 escalate 语义；callId 回溯 tool/call 取结构化路径�
 不解析版本号；可选 settings 用 ctx.inject 降级 localStorage（只做首帧种子）。
 
 ### 11.117 patch CRUD append-only 安全模板（mcp-panel）
-loader 方言**无 set/remove**（- set: 静默跳过）——"禁用即删除"（disabled:true）；绝不
+loader 方言无 set/remove 动词——set/remove 作为残余键被写进 target（无效不报错，非跳过非警告）；无 id 才 warn——"禁用即删除"（disabled:true）；绝不
 合成 !!js；env/header 值永不进快照；写 patch 前审批 + 备份；callTool 走官方
 `ctx.tools.execute` 流水线。
 
@@ -859,7 +861,7 @@ capability），带专家身份 + 普通工具集——不替换父 persona、�
 ### 11.124 settings seam 换代特性探测双轨（catppuccin issue #15）
 <=0.1.6 用 `ctx.settings.installSection` 注册命名空间 + `ctx.settingsScope`；
 >=0.1.7 不注册，用 Config schema 的 `.volatile()` 字段投影成以 profile entry id
-命名的表单，Client 读 `ctx.configForms`。**选择用特性探测（installSection 存在即旧 seam）
+命名的表单，Client 读 `客户端 ConfigFormController（读 dsh-client-ui-settings 的 config-form.d.ts）；宿主 Context 只有 ctx.settings`。**选择用特性探测（installSection 在 0.2.0 已彻底移除（settingsScope 也不存在）；双轨探测应改为 SettingsForms 服务存在性检测）
 不用版本解析**。
 
 ### 11.125 webServer 信任校验的 canonicalAuthority（skills-manager）
@@ -876,8 +878,8 @@ here）；设备码过期重发是常态（操作者稍后回来）而非报错�
 宿主默认组合没有 invariants 服务——放进默认 patch 会让整棵树启动失败（row 等缺席服务）；
 可选服务依赖行按组合条件挂载（diagnostic 组合才加）。
 
-### 11.128 patch 版本门控的唯一宿主信息源 = ctx.get('profileContext')?.installAnchor（llm-workbuddy）
-patch 求值环境里唯一可用的宿主信息源是 `ctx.get('profileContext')?.installAnchor`——
+### 11.128 patch 版本门控的唯一宿主信息源 = ctx.get('profileContext')?.installAnchor —— 是安装锚点路径非版本号（ProfileContext.installAnchor: string，核心用 dirname()）；读版本须解析其 package.json；'唯一宿主信息源'措辞过绝对（process 全局可用）（llm-workbuddy）
+patch 求值环境里唯一可用的宿主信息源是 `ctx.get('profileContext')?.installAnchor —— 是安装锚点路径非版本号（ProfileContext.installAnchor: string，核心用 dirname()）；读版本须解析其 package.json；'唯一宿主信息源'措辞过绝对（process 全局可用）`——
 读它做版本阈值判断（<0.1.7 禁用某行）；engines 用多段区间声明。
 
 ### 11.129 侧边栏/可选 UI 槽用 ctx.get 探测而非 inject（sidebar-qa）
@@ -891,7 +893,7 @@ Semaphore 限并发；子进程 env 显式构造（透传 + 禁遥测 + 代理�
 账号池 + 配额。
 
 ### 11.131 记忆注入五刷新点 + 自动沉淀分级（auto-memory）
-记忆注入刷新点：启动 / session-start / turn-stopping / 工具写入 / TTL；自动沉淀分级 +
+记忆注入刷新点：启动 / session/created / turn/end（标准同族 turn/start、step/start、step/end） / 工具写入 / TTL；自动沉淀分级 +
 按 turn 去重 + 寒暄跳过；反思要明确触发条件；独立配置文件 + API 形态；路由 loopback-only。
 
 ### 11.132 缓存版本键 + 启动清理旧格式（web-search-pro）
@@ -967,9 +969,89 @@ verify:packed）。
 纯 JS 无构建最小形态：`immediately: true` 让 client 半首帧生效（不等待 lazy 加载）。
 
 ### 11.148 "patch" 三义辨析
-cordis.patch.yml（插件补丁）/ git diff（源码补丁）/ patch-package（node_modules 补丁）是
+cordis.patch.yml（profile 用户层固定名 PROFILE_PATCH_FILENAME；判定契约其实是 dsh.bundle.patch / dsh.client）/ git diff（源码补丁）/ patch-package（node_modules 补丁）是
 三个不同的东西——**判定 DSH 插件只看第一种**（cordis.patch.yml 或 dsh.bundle.patch）。
 
 ### 11.149 市场插件验证管线（plugins-store）
 固定源码 SHA（钉提交）+ 隔离沙箱验证管线（Linux 隔离跑安装/冒烟）——防供应链投毒；
 聚合数据 schema 带版本戳与来源声明（schema_version / as_of / metrics_source）。
+
+### 11.150 Slot 渲染器替换的 priority 语义（raw-html-v2）
+keyed slots 同 key 同 priority 冲突会 throw，**低 priority 胜出**：官方 AssistantNodeView
+priority=0，插件用 -10 替换——"替换官方渲染器"的正确姿势是负 priority 而非抢占注册顺序。
+错误边界防 slot abdicate：渲染器崩溃会让全部消息退回官方渲染，必须包错误边界。
+
+### 11.151 default export 禁令有版本语境（web-search-pro 反例）
+社区多个仓库"严禁 default export"（Loader 折叠丢 inject），但 web-search-pro 源码用
+`export default`——其注释说明 named export alone 在 rc.2 会丢配置表单。结论：该坑
+**分版本、分 Loader 行为**；写插件时以当前装的主机 Loader 实测为准，不要盲从任一极端的
+社区铁律。
+
+### 11.152 skill-invocation 也算 userInitiated 轮次（echocat）
+人为调用技能（source.kind === 'skill-invocation'）是 userInitiated 轮次——唯一耐用的
+"人类主动调用"追踪信号；只认 user 源会漏掉 /name 触发类入口。
+
+### 11.153 readJsonBody 超限后"停止收集继续消费 body 回 413"（easyrewrite）
+请求体超限的正确姿势：停止收集但继续消费 body（不 destroy），响应 413——destroy 会让
+连接悬挂；幽灵队列清理（/bubble/clean-ghost）防陈旧轮询堆积。
+
+### 11.154 pending entry = FAILED PROFILE（agy）
+静态 inject 的服务永不出现 → entry 永久 pending，而 **loader 把 pending entry 当 FAILED
+PROFILE 而非跳过**（真实 TUI 实测 "1 entry did not activate"）。web 面拆分必须用
+`ctx.inject(['webServer'])` 懒取，缺席时 ACTIVE 但能力不发（ctx.get 探测降级；注意 inject 缺席是纤维 PENDING 不是 active-inert）——管理面走受保护 RPC 通道，
+OAuth 回调才裸路由，loopback-only 注册栅栏。
+
+### 11.155 npm-mirror 阴影是零依赖的最硬理由（taskboard）
+从 npm-mirror 装到 shadow 的 dsh-tools 会破坏 base layer 的 agent loop——所以 sdk.ts
+**自实现** defineTool/dshHomePath 而非 import 官方包；"零运行时 @deepseek-ai 依赖"的
+动机不全是体积，是供应链隔离。
+
+### 11.156 rank 语义是"低者胜"（CloudBase 印证）
+技能/供应商注册的 rank 是"低者胜"：rank 400 用户技能覆盖 rank 600 bundled——与 slot
+priority 同族：**覆盖他人 = 给更低的值**。
+
+### 11.157 日志自激闭环 EPIPE 三纪律（auto-memory）
+stdout/stderr 读端消失 → 处理器内 console.error 抛 EPIPE 再入 uncaughtException → 无限
+自激满核空转。护栏三纪律：写前判流可用（destroyed / writableEnded / writable）、**绝不
+rethrow**、同步重入闸。
+
+### 11.158 loader 世代差异：duplicate id 行为分裂（trading）
+0.1.5 世代 loader 对重复 entry id 抛 "duplicate loader entry id"；新世代用
+Object.fromEntries **静默塌缩为最后一条**——兼容层必须测两个世代，不能只防抛错。
+
+### 11.159 宿主默认禁 skill provider 的静默失效（capability-menu）
+web 宿主默认禁用宿主技能 provider（需 `- id: skill-filesystem disabled: false` 重开）——
+"装了插件但技能不出现"的源头之一是宿主默认关，不全是插件注册失败。
+
+### 11.160 "广告不存在的动词" = 工厂产物与注册清单不对齐（ios WP57）
+工厂创建但从未注册的工具会让模型相信一个不存在的动词（377s 会话 25 次 shell 绕路）——
+注册清单必须与工厂产物对齐，未注册的工具要么不创建要么立即注册。
+
+### 11.161 动态 import 守卫 + ready.catch 防炸宿主（dafeiyu/mirage）
+link: 安装缺 node_modules 时动态 import 守卫降级 inert（不崩整树）；`ready.catch(() => undefined)`
+防 unhandled rejection 炸宿主；手写 for(;;) 循环必须显式 iterator.return() 防 socket 悬挂泄漏。
+
+### 11.162 双花括号模板变量净化（memory-evolve issue #53）
+宿主把 `{{name}}` 当模板变量解析、未注册直接 throw——记忆/外部文本内容必须净化双花括号，
+否则模型输入里出现未注册变量会崩。
+
+### 11.163 createRequire 锚 ctx.baseUrl 是插件侧姿势（宿主自身用 new URL(path, ctx.baseUrl) + loader.import；createRequire 只锚 import.meta.url） + 扁平兜底解析（memsearch）
+out-of-tree 包解析：createRequire 锚 `ctx.baseUrl`（profile 目录）+ `$DSH_HOME/profiles/node_modules`
+扁平兜底——开发包不经 npm 装也能被 loader 解析。
+
+### 11.164 动作执行器只接受结构化动作、绝不接受命令字符串（gating-hub）
+管理面板的动作接口只接受 {action, packageName, version, profile}；客户端出现
+command/cmd/argv/exec/shell/script/run/spawn/bin 任一字段即 400；profile 只作回显——
+面板能执行动作但不能注入命令的安全范本。
+
+### 11.165 webserver/index-inject 是组合事件不是服务调用（550c-boot）
+用 `ctx.on('webserver/index-inject', ...)` 挂首屏注入点（组合事件），不是调服务方法；
+只声明 dsh.client 不可安装是市场提交门禁。
+
+### 11.166 TOOL_RUNTIME_SCHEDULER 的 Symbol.for 全局注册表自愈（deepseek-flow）
+模块副本分裂（同一工具被两个拷贝注册）的第三解法：Symbol.for 全局注册表——先查
+Symbol.for('dsh.tool.scheduler') 已存在则复用，避免重复实例化。
+
+### 11.167 供应链保护名单带原因链（gating-hub）
+PROTECTED_MODULE_PATTERNS：基础设施行大名单 + 原因链（timer→HMR 失效、webserver→失联）——
+保护名单不只是名单，每条都有"禁用会导致什么"的因果注释。

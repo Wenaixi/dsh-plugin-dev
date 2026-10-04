@@ -307,7 +307,7 @@ const extract = (rel) => {
   return f ? buf.slice(BASE + Number(f.offset), BASE + Number(f.offset) + f.size).toString('utf8') : null
 }
 // 把桌面端内置的某个包源码提出来，与 CLI 版逐字对比
-console.log(extract('/app/node_modules/@<scope>/<pkg>/lib/client.js')?.length)
+console.log(extract('/dsh/node_modules/@deepseek-ai/<pkg>/lib/client.js')?.length)  // 本机 asar 顶层是 dsh/，不是 /app/
 `
 
 用途：

@@ -10,7 +10,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 > **【必须调用要求与事实核验指引】**
 > - **必须调用**：进行任何 DeepSeek Harness (DSH) 插件开发、调试、审查或配置任务时，**必须调用本 Skill**；API、服务挂载属性与配置字段一律以本技能文档与官方类型声明为准，不要凭印象推断；
 > - **权威参考路由**：进行具体插件设计与编码前，必须通过第六节【场景决策与开发导引矩阵】路由到对应的权威参考文档（[`references/*.md`](./references/README.md)），全景主题导航见 [`references/README.md`](./references/README.md)；
-> - **鼓励并要求核验真实细节**：涉及具体服务契约、参数类型、Schema 结构或版本行为时，**强烈鼓励并要求查验真实细节**（官方上游仓库 `deepseek-ai/deepseek-harness`、本地已安装官方包的 `lib/index.d.ts` / `lib/index.js` 源码与类型声明、以及运行时 `ctx.tools.schemas()` 等真源，详见 [`references/official-upstream-and-docs.md`](./references/official-upstream-and-docs.md)），拒绝盲目断言。
+> - **鼓励并要求核验真实细节**：涉及具体服务契约、参数类型、Schema 结构或版本行为时，**强烈鼓励并要求查验真实细节**（官方上游仓库 `deepseek-ai/deepseek-harness`、本地已安装官方包的 `lib/*.js` 实现（含 JSDoc）与 `package.json` 声明、以及运行时 `ctx.tools.schemas()` 等真源，详见 [`references/official-upstream-and-docs.md`](./references/official-upstream-and-docs.md)），拒绝盲目断言。
 
 ---
 
@@ -112,7 +112,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 | :--- | :--- | :--- |
 | 最弱 | 官方文档站散文 | 了解整体设计意图 |
 | 中等 | 官方仓库 `packages/<包名>/README.md` | 组合规则、配置语义、设计理由 |
-| 最强 | 本地 `lib/index.d.ts` 与 `lib/index.js` | 真实契约：`inject`、`Config`、`declare module` 挂载名 |
+| 最强 | 本地 `lib/*.js` 实现（含 JSDoc）与 `package.json` | 真实契约：`inject`、`Config`、`declare module` 挂载名（`lib/types/*.d.ts` 多数不存在，types 字段可能指向缺失文件） |
 | 运行时 | `ctx.tools.schemas()`、`ctx.get('<服务>')`、启动日志 | 最终判据，一切以宿主实际行为为准 |
 
 - 官方上游仓库：https://github.com/deepseek-ai/deepseek-harness 
@@ -165,7 +165,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 | **E** | 浏览器 UI 扩展、卡片定制、设置页面板 | 双面插件 (Dual-Face)：Host 半侧 `lib/index.js` + Client 半侧 `lib/client.js`，组件经 `ctx.slots` 注入且只接收 props | [three-roles.md](./references/three-roles.md) |
 | **F** | 打包发布、Profile 组合、依赖规整 | 组合包 (Bundle)：配置 `dsh.bundle`，携带 `cordis.patch.yml` | [packaging.md](./references/packaging.md) |
 | **G** | 定时提醒、挂钟计划任务调度 | 定时调度系统：消费 `ctx.schedule`，注册 schedule 系列工具 | [services.md](./references/services.md) |
-| **H** | 多智能体协同、分布式团队、共享任务看板 | Agent Teams 架构：消费 `ctx.agentTeams`，使用 agent_team 系列工具 | [services.md](./references/services.md) |
+| **H** | 多智能体协同、分布式团队、共享任务看板 | Agent Teams 架构：消费 `ctx.agentTeams`，使用 `spawn_teammate` / `send_message` / `team_task_*` 系列工具 | [services.md](./references/services.md) |
 | **I** | 在全局设置左侧加专属 Tab、自定义设置面板 | 双面 UI 设置扩展：注入 `settings.section`，编写纯 React 设置面板 | [settings-and-plugin-ui.md](./references/settings-and-plugin-ui.md) |
 | **J** | 右侧边栏、输入框挂件、会话工具栏、主题与 i18n | Web 核心插槽扩展：注入 `sidebar.right.*`、`conversation.input.*`、适配 CSS 变量 | [web-ui-slots-and-styling.md](./references/web-ui-slots-and-styling.md) |
 | **K** | 浏览器前端调用 Node 宿主文件/系统能力 | 跨端通信网关：编写 `@Remote` 服务，Client 调 `ctx.remote.xxx` | [remote-rpc-guide.md](./references/remote-rpc-guide.md) |
@@ -286,7 +286,7 @@ window.__ModuleLoader__.load({
 
     function apply(ctx) {
       ctx.slots.inject('sidebar.right.pane.tab', () =>
-        ctx.slots.register({ id: 'custom-panel', title: '扩展面板' }, CustomWidget)
+        ctx.slots.register({ name: 'sidebar.right.pane.tab', id: 'custom-panel', title: '扩展面板' }, CustomWidget)
       )
     }
 

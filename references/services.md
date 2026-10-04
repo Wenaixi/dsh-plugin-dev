@@ -30,7 +30,7 @@ DSH 采用微内核架构，没有特权核心，所有核心能力均以 Cordis
 
 ### 1. 定时任务系统 (ScheduleService)
 - **挂载属性**：`ctx.schedule`（单数）
-- **所属包**：`@deepseek-ai/dsh-schedule`（配套组合包：`@deepseek-ai/dsh-experimental-schedule-bundle`）
+- **所属包**：`@deepseek-ai/dsh-schedule`（0.2.0-rc.2 无独立配套组合包）
 - **职责**：宿主范围内的持久化挂钟提醒与原始会话投递。
 - **配置项**：
   - `deliveryHistoryDays`：保留交付记录的天数（默认 30）；
@@ -54,7 +54,7 @@ DSH 采用微内核架构，没有特权核心，所有核心能力均以 Cordis
 - **挂载属性**：`ctx.workspaceRegistry`（单数）
 - **所属包**：`@deepseek-ai/dsh-workspace`
 - **职责**：管理工作区实体元数据与稳定排序。
-- **注意**：不对模型直接暴露工具；删除工作区实体绝不删除底层物理会话日志文件。
+- **注意**：不对模型直接暴露工具；删除工作区实体**保留**其目录与每条会话日志（`dsh-workspace`：`Delete one workspace registration while retaining its directory and every session log.`）。
 
 ### 5. 会话压缩策略 Seam (Compaction)
 - **抽象 Seam**：`@deepseek-ai/dsh-compaction`
@@ -78,7 +78,7 @@ DSH 采用微内核架构，没有特权核心，所有核心能力均以 Cordis
 | 抽象 Seam 领域 | 契约包 | 官方默认实现包 | 挂载属性 / 备注 |
 | --- | --- | --- | --- |
 | 子进程生成 | `@deepseek-ai/dsh-subprocess` | `@deepseek-ai/dsh-subprocess-local` | `ctx.subprocess` |
-| 终端管理 | `@deepseek-ai/dsh-terminal` | `@deepseek-ai/dsh-terminal-bash` / pwsh | `ctx.terminals`（**复数**，见 `TerminalSessionService`） |
+| 终端管理 | `@deepseek-ai/dsh-terminal` | `@deepseek-ai/dsh-terminal-bash`（同一包承载 bash/pwsh 双方言，无独立 `dsh-terminal-pwsh`） | `ctx.terminals`（**复数**，见 `TerminalSessionService`） |
 | 文件系统 | `@deepseek-ai/dsh-fs` | `@deepseek-ai/dsh-fs-local` | `ctx.fs` |
 | 凭证存储 | `@deepseek-ai/dsh-credentials` | `@deepseek-ai/dsh-credentials-local` | `ctx.credentials` |
 | 会话持久化 | `@deepseek-ai/dsh-session-persistence` | `@deepseek-ai/dsh-session-persistence-jsonl` | 仅追加 JSONL 落盘 |

@@ -30,7 +30,7 @@ dsh: restored package.json, pnpm-lock.yaml, and node_modules.
 
 ### 2.1 机制
 
-发布冷却期是 **pnpm 自身的配置项**（`minimumReleaseAge`，单位分钟）：**pnpm 11 起内建默认 1440（1 天），并非「默认关闭、显式配置后才启用」**（本机捆绑 pnpm 11.7.0 与全局 12.8.1 的 dist 默认块均为 `minimum-release-age: 24*60`；`config get minimum-release-age` 返回 undefined 只说明无显式配置，不代表内建默认关闭）。启用后，一个新版本发布不满阈值分钟数就不被考虑，解析回退到更早的合格版本；显式设置了 `minimumReleaseAge` 时 `minimumReleaseAgeStrict` 才默认 true（否则宽松处理、可经 exclude 放行）。这是 pnpm 防供应链攻击的「冷却期」。**该机制由包管理器实现，不由 DSH 代码实现**（本机 DSH 0.2.0-rc.2 全部 289 个 @deepseek-ai 包与 dsh/lib 源码中 `minimumReleaseAge` 零命中）；可在 profile 的 `pnpm-workspace.yaml` 里调整（见 5.1）。
+发布冷却期是 **pnpm 自身的配置项**（`minimumReleaseAge`，单位分钟）：**pnpm 11 起内建默认 1440（1 天），并非「默认关闭、显式配置后才启用」**（本机捆绑 pnpm 11.7.0 与全局 12.8.1 的 dist 默认块均为 `minimum-release-age: 24*60`；`config get minimum-release-age` 返回 undefined 只说明无显式配置，不代表内建默认关闭）。启用后，一个新版本发布不满阈值分钟数就不被考虑，解析回退到更早的合格版本；显式设置了 `minimumReleaseAge` 时 `minimumReleaseAgeStrict` 才默认 true（否则宽松处理、可经 exclude 放行）。这是 pnpm 防供应链攻击的「冷却期」。**该机制由包管理器实现，不由 DSH 代码实现**（本机 DSH 0.2.0-rc.2 全部 285 个 @deepseek-ai 运行时包与 dsh/lib 源码中 `minimumReleaseAge` 零命中）；可在 profile 的 `pnpm-workspace.yaml` 里调整（见 5.1）。
 
 关键点：**方向与直觉相反**。不是「新版本太新不能装」，而是**只有发布满阈值的版本才被考虑**，于是新版本被排除后解析回退到上一个「已满阈值」的合格版本（不是无限跌到底：pnpm 按发布时间取最近候选，阈值过长直接报 `ERR_PNPM_NO_MATURE_MATCHING_VERSION` 拒绝）。DSH 侧真正的兼容闸门是 **peer 兼容性预检 + allow-version 精确版本豁免**（写入 profile 的 `compatibility.json`，见第四节），与冷却期是两条独立机制。
 
@@ -155,7 +155,7 @@ packages:
 nodeLinker: hoisted
 autoInstallPeers: false
 
-# 关闭发布冷却期（默认关闭；显式配置后才启用，这里是显式置 0 兜底）。
+# 关闭发布冷却期（pnpm 11+ 内建默认 1440 分钟，这里是显式置 0 兜底）。
 # 本 profile 安装自研/刚发布的插件，冷却期会让解析回退到过时版本，
 # 进而撞上 DSH 的 peer 兼容性闸门。0 表示发布即可安装。
 minimumReleaseAge: 0
@@ -192,7 +192,7 @@ error: profile "desktop" is managed exclusively by the Electron application
 
 | 现象 | 判定 | 处置 |
 | --- | --- | --- |
-| 解析版本明显过旧，且过一段时间后自动前移 | pnpm 冷却期（**显式开启后**才成立）或预发布排序 | profile 配 `minimumReleaseAge: 0`，或改用精确版本 |
+| 解析版本明显过旧，且过一段时间后自动前移 | pnpm 冷却期（内建默认 1440）或预发布排序 | profile 配 `minimumReleaseAge: 0`，或改用精确版本 |
 | 解析版本一直是同一个过旧值，清缓存也不变 | 预发布排序陷阱 | 显式写精确版本，或关闭冷却期 + 显式带预发布标记 |
 | `installation rejected` 且 pnpm 报 `Done` | 兼容性闸门后检 | 换用 peer 覆盖宿主版本的插件版本 |
 | 同一命令裸装拿不到 `-tag.N` 系列 | semver 不含 prerelease | 显式 `@<版本>` 精确安装 |

@@ -35,7 +35,7 @@ DSH 有两种主流宿主形态，它们的**插件包格式完全相同**，但
 <App>/                               ← Electron 应用根
   <Product>.exe                      ← 主程序
   resources/
-    app.asar/dsh/                    ← 【dsh 运行时打在这里】（289 个官方包；asar 顶层另有约 10 个共享主进程依赖）
+    app.asar/dsh/                    ← 【dsh 运行时打在这里】（285 个官方运行时包，sharedPackages 清单见 desktop-runtime.json；asar 顶层另有约 10 个共享主进程依赖）
     app.asar.unpacked/
     runtime/
       cli/bin/dsh.cmd                ← 桌面版自带的 CLI 入口
@@ -83,9 +83,9 @@ error: profile "desktop" is managed exclusively by the Electron application
 | `plugin --profile <desktop> remove <pkg>` | ✅ 可用 | 真正卸载 |
 | 直接用 fs 改 profile 的 `package.json` / `cordis.patch.yml` | ✅ 可行 | 但要手动维护一致性 |
 
-**前提**：用**桌面版自带的** CLI（`<App>/resources/runtime/cli/bin/dsh.cmd`），而不是 npm 全局的 `dsh`。
+**前提（仅对 plugin 子命令成立）**：桌面 profile 的插件操作需用**桌面版自带的** CLI（`<App>/resources/runtime/cli/bin/dsh.cmd`，`manageDesktopProfile=true`）；dump/boot 对 desktop 无论哪份 CLI 一律被拒。
 
-**拒绝机制**：`rejectElectronProfile` 对 desktop 一刀切拒绝所有 boot / dump 模式；只有 `plugin` 命令在 `manageDesktopProfile` 为 true 时放行 exclusive 管理（该标志只有桌面自带 CLI 传入，桌面自身调 `runDesktopCli` 时设 true）。
+**拒绝机制**：`rejectElectronProfile` 对 desktop 拒绝 CLI 侧的 dump/boot/plugin 等入口（dsh/lib/bin.js）；`plugin` 子命令在 `manageDesktopProfile` 为 true（桌面自带 CLI 经 `runDesktopCli` 传入）时放行；dump-config/boot 对任意非 desktop profile（含桌面 CLI 调 web）均可用。
 
 ### 两个 dsh 命令的路径冲突
 

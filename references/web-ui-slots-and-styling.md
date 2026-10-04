@@ -111,7 +111,7 @@ export function apply(ctx) {
 ---
 
 ### 3. 输入框挂件与附件扩展 (`conversation.input.right`)
-适用于在模型输入框右下角、发送按钮旁增加辅助按钮（如 `dsh-prompt-history` 注入的历史弹出菜单、语音输入麦克风等）。
+适用于在模型输入框右下角、发送按钮旁增加辅助按钮（如历史记录弹出菜单、语音输入麦克风等第三方注入）。
 
 - **实战注册范例**：
 ```jsx
@@ -245,7 +245,7 @@ DSH 前端提供了一套标准的主题 CSS 变量，支持自动跟随深色�
 ### 1. 官方核心颜色变量矩阵
 开发插件 UI 时，**严禁硬编码 `#ffffff` 或 `#000000`**，必须优先使用官方设计令牌（Tokens）。
 
-下表每一行都经本地官方包源码全量扫描核实。数量口径：全官方包 `lib/client.js` 提及 `--dsw-*` 去重 415 个；按 js+css 全口径为 417 个；其中真正由 `dsh-client-ui-theme` 定义在 `body/:root` 上、**照抄即可生效**的是 403 个（全库 js+css 口径与 theme 定义数之差仅 14 个（如 primitives HoverCard 的 --dsw-hovercard-bg），引用它们宿主 body 未定义）——**下表只列 403 个已定义变量中的常用项**：
+下表每一行都经本地官方包源码全量扫描核实。数量口径（统一剔伪影）：全官方包 `lib/client.js` 提及 `--dsw-*` 去重 414 个（若把 runner 里的 `--dsw-alias-` 截断残片计入为 415）；按 js+css 全口径为 417 个；其中真正由 `dsh-client-ui-theme` 定义在 `body/:root` 上、**照抄即可生效**的是 403 个（全库 js+css 口径与 theme 定义数之差仅 14 个（如 primitives HoverCard 的 --dsw-hovercard-bg），引用它们宿主 body 未定义）——**下表只列 403 个已定义变量中的常用项**：
 
 | CSS 变量名 | 语义作用 |
 | :--- | :--- |
@@ -303,7 +303,7 @@ CSS 变量未定义时不会报错，只会用兜底值——**所以别给 `var
 
 **排版统一走字阶令牌**（形如 `--dsw-font-xxxs-11`、`--dsw-font-xxs-12`、`--dsw-font-xs-13`、`--dsw-font-s-14`、`--dsw-font-base-16`），名字末段基本是字号；例外 `--dsw-font-m-18` 实为 `500 16px/28px`（末段 18 与字号不符，用前先在 DevTools 确认）。写成 `font-size: 13px` 而不带 line-height 会丢掉官方行高节奏。
 
-**行分隔用相邻兄弟选择器**：官方（ui-conversation）是 `.row + .row { box-shadow: inset 0 1px 0 var(--dsw-alias-border-l1) }`；0.5px solid + border-l2 组合官方未使用，不是每行自带 border-bottom，后者会在末行多出一条线。
+**行分隔用相邻兄弟选择器**：官方（ui-conversation）是 `.row + .row { box-shadow: inset 0 1px 0 var(--dsw-alias-border-l1) }`；`0.5px solid + var(--dsw-alias-border-l2)` 组合官方在多处做描边（ui-deliverables/jobs/schedule/settings-account/shortcuts/sidebar-browser/sidebar-documentpreview/agent-team 等 9 处），只是不用它做行分隔——不要给每行自带 border-bottom，后者会在末行多出一条线。
 
 ### 2. 样式安全注入与 HMR 自动回收铁律
 为避免插件卸载或热重载时样式残留，推荐使用标准的 **带标识 `<style>` 标签注入法**：

@@ -10,7 +10,7 @@ DSH 里有一批「看起来非常合理、但根本不存在」的 API 和「�
 | --- | --- | --- | --- |
 | `ctx.settings.registerTab(...)`、`ctx.ui.addSettingsTab(...)` | 两者都不存在。`ctx.settings` 只把 volatile config 投影成表单描述符并委托 `ctx.configEditor` 落盘，不承担任何界面注册职责 | Client 半侧经 `ctx.slots.inject('settings.section', ...)` 挂载设置区块 | 在插件源码 grep `slots.inject`，命中 0 即说明走错了路径 |
 | `ctx.tools.registerTool(...)`、`ctx.toolRegistry` | 都不存在；容器就是 `ctx.tools`，方法名是 `register` | `ctx.tools.register(defineTool({...}))` | 运行时执行 `ctx.tools.schemas()`，按返回的名字查 |
-| 直接改 `$DSH_HOME/settings.yaml` 打开某个插件 | 该文件已废弃（不再被直接读取）：SettingsForms 服务在 Loader 就绪后把它**导入一次**到 profile 补丁，首次写入前改名为 `settings.yaml.imported`（**静默失效，零错误信号**）；不要手工编辑它 | 用 `cordis.patch.yml` |mported` 再导入），所以不要手工编辑它 | 一切增删改走 `cordis.patch.yml` | `ls $DSH_HOME/settings.yaml.imported`，存在即证明你改的那份早已失效 |
+| 直接改 `$DSH_HOME/settings.yaml` 打开某个插件 | 该文件已废弃（不再被直接读取）：SettingsForms 服务在 Loader 就绪后把它**导入一次**到 profile 补丁，首次写入前改名为 `settings.yaml.imported`（**静默失效，零错误信号**）；不要手工编辑它 | 用 `cordis.patch.yml` |mported` 再导入），所以不要手工编辑它 | 一切增删改走 `cordis.patch.yml` | `ls ~/.dsh/profiles/<name>/settings.yaml.imported`（settings 的 legacy 文档在 profile 目录而非 `$DSH_HOME` 根），存在即证明你改的那份早已失效 |
 | 「required plugin did not activate」= 依赖没装上 | 这是 Loader **激活图**的语言：某个 required 同伴插件没有 mount。与 `peerDependencies` 是两套独立机制 | 先定位是哪一个 id 没激活，再看它自己为什么没 mount | 启动失败时读终端打印的 `$DSH_HOME/logs/startup-<ISO>-<uuid>.log`（完整诊断落点），它会点名未激活的插件 id |
 | 「peer 报错」= 该版本的 peer 区间写错了 | 常常是包管理器解析到了陈旧版本（pnpm 24 小时发布冷却期 + semver 预发布排序），装到的根本不是你要的那个版本 | 先确认实际解析版本，再决定改 peer 还是改解析 | 同一安装命令隔一段时间重跑两次：版本号会随时间前移 = 冷却期指纹；恒定不变才是缓存问题 |
 | 「装上了」= 该服务已就绪 | seam 契约包与实现包分离：只装 `dsh-llm` 之类的契约包，服务存在但没有任何提供方 | 契约包 + 实现包成对安装（如 `dsh-llm` + `llm-deepseek`） | `ctx.get('<服务名>')` 返回 `undefined` 即该能力未装配 |
@@ -171,7 +171,7 @@ ctx.effect(() => {
 | **3. 设置窗口左侧没有显示专属 Tab** | 1. 缺少双面导出；<br>2. 组件接收了 ctx 抛异常；<br>3. 忘记调 `slots.inject` | 1. 确保 `package.json` 有 `exports["./client"]`；<br>2. 确保在 `lib/client.js` 中调用 `ctx.slots.inject("settings.section", ...)`；<br>3. 检查控制台是否有报错。 |
 | **4. 页面报错 "Cannot read property of undefined (ctx)"** | 违背了 **“React 组件绝不能接收 ctx”** 核心铁律 | 宿主插槽容器渲染组件时不会注入 ctx。组件需要的数据与回调必须通过纯 Props 或前端自定义 Hook 传递。 |
 | **5. 运行 npm install 报 ERESOLVE 冲突** | 与 DSH 安装链无关：`dsh plugin` 全链路转发 **pnpm**（dsh/bin.js → plugin 命令 → dsh-plugin-manager），npm/ERESOLVE 不在链路内 | 官方链路只用 `dsh plugin --profile <name> add/install`；确需宽松策略用 workspace 配置（如 noStrictPeerDependencies） |fund`。 |
-| **6. 启动报错 "1 required plugin did not activate"** | 盲目相信了 `--dump-config`，实际存在缺包或版本 peer 拦截 | `--dump-config` 不加载插件代码！检查 `~/.dsh/profiles/<profile>/cfg.err`，使用 `allow-version` 豁免兼容性或安装缺失插件。 |
+| **6. 启动报错 "1 required plugin did not activate"** | 盲目相信了 `--dump-config`，实际存在缺包或版本 peer 拦截 | `--dump-config` 不加载插件代码！读宿主启动日志（`$DSH_HOME/logs/startup-*.log` 的 inspect 报告或终端 `dsh: disabling profile plugin <id>: <reason>` 行）定位被兼容性闸门拒绝的插件，再用 `allow-version` 豁免或安装缺失插件。 |
 | **7. 执行系统命令报注入或权限错误** | 试图拼接 shell 字符串并传给 `ctx.subprocess.spawn` | DSH 的子进程生成参数 **严格零 Shell 解释**！必须传入扁平的 `argv` 数组（如 `['git', 'status', '-s']`），绝不要传 `'sh -c "..."'`。 |
 | **8. Typert Remote 方法调用报 AST 语法错误** | 远程暴露的方法签名中使用了对象解构或默认参数值 | 远程方法签名必须严格遵守规则：单一名命参数对象，禁止解构，禁止默认值，协作中断 `signal` 必须为末位参数。 |
 | **9. 装插件时解析到过时的旧版本，随后报 incompatible** | **不是** peer 范围写错，而是**包管理器解析到了旧版本**：pnpm v11+ 默认 `minimumReleaseAge: 1440`（24 小时发布冷却期）把刚发布的新版本排除，叠加 `-tag.N` 预发布后缀被 semver 默认排除，解析一路回退到最老的合格版本，其 peer 锁在旧 DSH 契约上 | 先看 `~/.dsh/profiles/<profile>/.plugin-manager/logs/` 最新 `pnpm.log` 确认解析版本 → registry `dist-tags` 拿真实 latest → 比对宿主实装版本与该版本 peer 区间。修复：profile 的 `pnpm-workspace.yaml` 加 `minimumReleaseAge: 0`，或改用精确版本 `pkg@<version>`（精确 spec 绕过冷却期）。**清缓存无效，别浪费时间**。完整推导与复现实验见 [install-resolution-traps.md](./install-resolution-traps.md)。 |
@@ -235,7 +235,7 @@ DSH 的宿主包大量导出**纯读取、不需要启动 Web GUI** 的公开函
 | --- | --- | --- |
 | `readPluginMeta(spec, parentURL)` | `@deepseek-ai/dsh-app-boot` | 卡片标题 / 描述 / 图标能不能读到 |
 | `resolveBundleDir(bin, name, installAnchor, profileDir)` | `@deepseek-ai/dsh-app-boot` | 某个 bundle 从哪个目录解析 |
-| `bundleManifest(location, name)` | `@deepseek-ai/dsh-app-boot` 与 `@deepseek-ai/dsh-plugin-manager/operations` 均有导出 | 该 bundle 的 manifest 与 `dsh.bundle` 声明 |
+| `bundleManifest(name, dir, anchor)` | `@deepseek-ai/dsh-plugin-manager/operations`（dsh-app-boot 仅内部定义未导出） | 该 bundle 的 manifest 与 `dsh.bundle` 声明 |
 | `resolveDshHome()` | `@deepseek-ai/dsh-home-paths`（`dsh-plugin-manager` 等使用方） | 当前配置数据根算出来是哪个 |
 
 ### 2. 跨平台调用的两个坑
@@ -291,7 +291,7 @@ npm pack --dry-run --json    # 逐条断言 locale/、icon、lib/ 都在 files �
   pnpm-workspace.yaml    # pnpm 工作区配置（nodeLinker / autoInstallPeers / minimumReleaseAge）
   cordis.patch.yml       # 该 profile 的配置补丁层
   cordis.yml             # 组合后配置
-  compatibility.json     # 精确版本豁免表，默认 {}
+  compatibility.json     # 精确版本豁免表，默认不存在（读取语义视为 {}，首次 allow-version 才生成）
   .plugin-manager/logs/  # 每次安装/卸载的 pnpm 原始输出（operation-*/ 子目录）；启动黑匣子日志在宿主日志目录（logs/），cfg.log/cfg.err 并非每个 profile 都有
   compatibility.json     # 精确版本豁免表（**首次执行 allow-version 后才生成**，默认不存在；本机 desktop 无此文件）
 ```

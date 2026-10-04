@@ -1,0 +1,222 @@
+[
+ {
+  "id": "g01",
+  "slug": "SKILL-md",
+  "files": [
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/SKILL.md（431 行入口技能全文）"
+  ],
+  "hotspots": [
+   "第一节核心大动脉服务单复数清单（ctx.sessions/agents/agentTeams/tools/settings/clientModules 复数，systemPrompt/configEditor/schedule/planMode/workspaceRegistry/llm 单数）逐个到对应包 Service 构造第二参核实",
+   "第一节第 3 条五大事件派发模式语义（emit void / waterfall 环绕 next / parallel-serial-bail 短路与 isBailed）对照 @deepseek-ai/cordis 的 events 实现",
+   "第一节第 4 条配置补丁四层生效顺序与全量替换语义（bundles patch 到 profile 到全局到 CLI overlays）对照 dsh-app-boot / dsh-config-editor",
+   "第一节第 5 条 13 调度器+3 非调度器 16 环节流水线：presentCall/approval/guard/execute/projectContent/post-execute/finalizeContent/tools result/tool result/FS Gate 逐个在 dsh-tools lib 核对阶段与顺序",
+   "第六节场景矩阵每行的推荐形态/服务/文档名是否真实",
+   "第七节示例代码：defineTool 字段（name/description/parameters/output/execute(_args,exec) 与 exec.signal.aborted）、ctx.tools.register/guard、双面插件示例 package.json 的 dsh 段（dsh.bundle.id 疑似伪字段）、CJS factory 形态与 __ModuleLoader__.load 签名",
+   "第七之二 Playwright/token/401 换 Cookie 段；第八节 allow-version 命令形态与 pnpm --config.minimum-release-age=0",
+   "第九节交付清单 12 条（node --check、npm pack --dry-run --json、readPluginMeta、style[data-plugin-css]、aria-disabled、两帧一致、repository.url git+https 等）",
+   "SKILL.md 自身 frontmatter name/description 合法性对照 dsh-skill-filesystem 的解析规则"
+  ]
+ },
+ {
+  "id": "g02",
+  "slug": "README-index",
+  "files": [
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/README.md（门面 77 行）",
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/README.md（索引 127 行）"
+  ],
+  "hotspots": [
+   "references/README.md 列出的每个 references/*.md 文件名必须真实存在且标题一致；章节编号一到十八与九之二九之三连贯",
+   "33 篇、15 主题计数是否准确（实际数 references/ 目录文件数）",
+   "README.md 徽章（DSH 0.2.0-rc.2 / Cordis 4.0.4 / Node 大于等于 18）与快速开始三条命令（dsh plugin --profile web add、dsh --profile web --dump-config、dsh web）",
+   "README 核心大动脉清单、settings.yaml 已废弃说法、三角色表（隔离进程与 Worker 术语避让）",
+   "外部链接 https://deepseek-harness.github.io/deepseek-harness/en/ 是否存在（允许 web_fetch 仅此例外）"
+  ]
+ },
+ {
+  "id": "g03",
+  "slug": "config-anatomy",
+  "files": [
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/config.md（296 行）",
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/plugin-anatomy.md（217 行）"
+  ],
+  "hotspots": [
+   "config.md：四五层补丁生效顺序、整体替换非深合并（applyEntryPatches target[key]=value）、insert 带 id 需 group:true、!!js 动态表达式非沙盒任意求值（new Function with(ctx) 形态）、settings.yaml 导入一次（importLegacyDocument 改名 .imported 逐 section 合并）、dump-config 不 eval !!js、startup failed 文案、bundle peer 不兼容写 stderr",
+   "plugin-anatomy.md：三种插件形态、Context Proxy 与 extend/isolate/intercept、ctx.effect 可逆副作用、四角色模型、Schema 默认值吃掉未设置（z.default 与 shadow）、volatileForm 条件（仅条目含 volatile 字段时生成）、生命周期事件名（dsh-base / cordis-plugin-loader）"
+  ]
+ },
+ {
+  "id": "g04",
+  "slug": "tools-mcp",
+  "files": [
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/tools.md（202 行）",
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/mcp-and-tools-bridge.md（124 行）"
+  ],
+  "hotspots": [
+   "tools.md 16 环节流水线在 dsh-tools lib 的每步实现与顺序（approval 先于 guard、projectContent denied 也触发、Object.freeze(exec)、观察者故障隔离、finalizeContent 权限受限、serviceAsk 机会性消费降级 deny 三条件）",
+   "工具归属表逐行核对：run_code 属 dsh-tools？bash/pwsh/read/read_image/edit/write/glob/grep/skill/subagent/subagent_fork/list_agents/send_message/interrupt_agent/job_output/job_list/job_kill/get_goal/create_goal/update_goal/exit_plan_mode/ask_user_question/todo_write/present/web_search/web_fetch/schedule 四件套/spawn_teammate 系列/ralph/list_subagent_models/read_page/x_search 到各包 lib grep 工具注册名（read_page/x_search 来自 @liustack/modsearch 非官方）",
+   "defineTool 契约（parameters/output/execute/exec）",
+   "mcp-and-tools-bridge：mcp__server__tool 命名、Streamable-HTTP/StdIO 双传输、failOnStartupError、dsh-mcp-client 装配"
+  ]
+ },
+ {
+  "id": "g05",
+  "slug": "services-events",
+  "files": [
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/services.md（133 行）",
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/events.md（158 行）",
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/cordis-context-internals.md（32 行）"
+  ],
+  "hotspots": [
+   "services.md Core Spine 矩阵（挂载属性单复数、角色 core/seam/bundle、所属包）逐个核实；ScheduleService 配置项 deliveryHistoryDays 30 / deliveryHistoryRecords 200 与工具四件套；TeamService 工具清单；Compaction 三包；dsh-scope 纯函数库不挂服务且 peer 含 dsh-invariants；Seam 对照表（subprocess/terminal/fs/credentials/session-persistence/session-query/sandbox/user-approval/agent-preset-registry/skill）；Service 构造器两参、无 start/stop 钩子",
+   "events.md：五大派发模式（emit void、waterfall 环绕 next、parallel Promise.allSettled+AggregateError、serial/bail 短路、isBailed 非 null/false/undefined）；EventOptions prepend/global、thisArg 首参重载；宿主事件表；59 个 Persistence Catalog 事件在相关 lib 数一遍、5 类 surfaceOp 表面事件、ignorable 契约、SHA-256 指纹机制",
+   "cordis-context-internals.md：ctx.isolate / ctx.intercept / Context.is 三原语在 @deepseek-ai/cordis 源码核实"
+  ]
+ },
+ {
+  "id": "g06",
+  "slug": "skill-provider",
+  "files": [
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/skill-provider.md（211 行）",
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/provider-catalog-invalidation.md（57 行）"
+  ],
+  "hotspots": [
+   "skill-provider.md：registerProvider 同步工厂加返回 effect disposer（dsh-skill lib）；SkillProvider 只有 list/get 两方法；候选必填字段校验（name 正则小写连字符、description 非空、rank 有限、invocation 缺省双开、candidate.provider 必须等于提供方名）；rank 小者胜（compareIndexedCandidates 升序）",
+   "六类根 rank 表（100/200/300/400/500/600 与 source 名 project-dsh/project-agents/custom/user-dsh/user-agents/bundled）到 dsh-skill-filesystem lib 逐根核实；projectRoot 为最近含 .git 祖先",
+   "RUNTIME_RANK 250、RUNTIME_PROVIDER 保留名、register() 同层同名先到先得加 warn",
+   "complete:false 语义（数组等于完整、对象带 complete:false 不进缓存、watcher 启动失败才 complete:false、目录缺失返回空数组是完整空状态）",
+   "AbortSignal 贯穿（throwIfAborted / waitWithAbort、吞 abort 挂起）",
+   "屏蔽技能的唯一通道等于覆盖 invocation 布尔而非 filter；双失效（control.invalidate 加自清快照）",
+   "provider-catalog-invalidation.md：notifyChange 零 payload、监听器内反向 invalidate 同步递归栈溢出（notifyChange try/catch 吞）、registerProvider 工厂返回值捕获、filesystem roots 与 watcher 关系"
+  ]
+ },
+ {
+  "id": "g07",
+  "slug": "three-roles-remote",
+  "files": [
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/three-roles.md（236 行）",
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/remote-rpc-guide.md（198 行）"
+  ],
+  "hotspots": [
+   "three-roles.md：dsh.client 字段（platform/inject/external/immediately）真实存在；dsh.bundle.id 与 dsh.client.module 是否全 asar 0 命中（伪字段）；exports 下 ./client 为客户端半区解析真源且声明 dsh.client 无它等于硬错误（dsh-client-modules）；client.js CJS factory（__ModuleLoader__.load 对象形态）；插槽清单表（settings.section/plugins.tab/plugins.item/plugins.bundle.config/plugins.row.config/sidebar 系列/conversation 系列/shell 系列）的 cardinality（single/chain/list/keyed/root）逐行对照 dsh-cordis-client-runner 官方插槽目录；null 空渲染；Worker 术语避让（源码 Worker 专指 worker_threads）",
+   "remote-rpc-guide.md：四大硬约束（禁解构/默认值/rest、末位 signal）、TypertRemoteService 三参（含可选 options.namespace）、ok/value 与 ok/error 信封、运行时类 ClientStreamHandle、SRC 回退运行时签名解析（Function.prototype.toString 非 AST）、端到端示例与 package.json 伪字段"
+  ]
+ },
+ {
+  "id": "g08",
+  "slug": "settings-ui",
+  "files": [
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/settings-and-plugin-ui.md（306 行）"
+  ],
+  "hotspots": [
+   "settings.section 插槽与 order 官方 shipped 默认值（grep dsh-client-ui-settings 源码看官方分区 order；文档说 50 到 500 是否与官方冲突）；plugins.bundle.config 渲染门 configured 匹配键等于包名；plugins.tab 与 provider 卡片",
+   "readPluginMeta 的 exports 白名单契约（package.json 与 locale/en.json 子路径未放行抛 ERR_PACKAGE_PATH_NOT_EXPORTED 被吞）到 dsh-app-boot 或 dsh-host-plugin-inventory 核实",
+   "Nav Glyph、图标 256 KiB 上限与路径约束、本地 vs 补丁持久化（dsh-settings mergeLayers 字段级 merge 保留未知键、SettingsConflictError 抛错中止）",
+   "三大明星插件注入代码示例所用 API（ctx.slots.inject/register）真实性"
+  ]
+ },
+ {
+  "id": "g09",
+  "slug": "web-ui-slots",
+  "files": [
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/web-ui-slots-and-styling.md（466 行）",
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/client-ui-placement-and-verification.md（343 行）"
+  ],
+  "hotspots": [
+   "插槽树（sidebar.right.pane.tab、conversation.session.header.utilities、conversation.input.right、conversation.chat.node keyed、shell 系列）逐条对照 dsh-cordis-client-runner 官方插槽定义",
+   "CSS 变量数量 415 个 --dsw 前缀是否精确（去 dsh-client-ui-theme 或 web 前端 css 数）、四组常见误写、font-m-18 例外",
+   "primitives 组件族逐成员核对是否在 @deepseek-ai/dsh-client-ui-primitives 真实存在：Button/Switch/SegmentedControl/Pill/Tag/StateDot/Input/Checkbox/Menu/Tooltip/Modal/Toast/DisclosureRow/RiskConfirmation/MarkdownText/CodeBlock/DiffBlock/PathLabel/PluginArtwork；Switch.label 必填、SegmentedControl id 拼接、StateDot aria-hidden 配对",
+   "client-ui-placement：插槽映射表对照 runner 官方目录；slots.inject 在 spec 不存在时静默（spec 等于 void 0 return）；IMMUTABLE_CACHE（public,max-age=31536000,immutable）与 rev 等于 framedHash(mtime,ctime,size) artifactRevision；settings.section order shipped 值；HMR 通道（client-hmr 加 plugins/events SSE 与宿主形态无关）；data-plugin-css/removeOwnedStyles；端口非固定（web patch port 默认 3080）"
+  ]
+ },
+ {
+  "id": "g10",
+  "slug": "prompt-storage",
+  "files": [
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/system-prompt-and-projections.md（126 行）",
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/storage-terminals-and-checkpoints.md（108 行）"
+  ],
+  "hotspots": [
+   "system-prompt：ctx.systemPrompt.section()、SECTION_ORDERS、system-prompt/assemble 用 ctx.on 注册且签名 (assembly, context, next)、sessionProjections.register 字段 key/stateSchema/stateVersion/init/apply/wire、surfaceOp 合法值 append 或对象带 op replace startSeq endSeq、workspaceChanges.summary(sessionId, seq) 与 diff(sessionId,seq,index,signal) 逐个到 dsh-system-prompt/dsh-session-projection/dsh-workspace-changes 核实",
+   "storage：ctx.storage.domain 与 storageDomain 独立服务、defineDomain/open 签名与校验、put 不校验而 open loadAll 才 parse、终端 spawn/startSend/read(offset 非负、count 默认 500)/signal/kill（dsh-terminal-bash）、三检查点（llm/stream/tools/execute 顶层/agent/pre-step）、torn-tail 截断与 recoveredTail 重放、JobRegistry 与 job_output/job_list/job_kill 参数"
+  ]
+ },
+ {
+  "id": "g11",
+  "slug": "resolution-desktop",
+  "files": [
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/install-resolution-traps.md（287 行）",
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/desktop-vs-cli-runtime.md（325 行）"
+  ],
+  "hotspots": [
+   "重点：本节已被前轮修过，找残留矛盾：2.1 节 pnpm 11 内建默认 1440 与第七节决策表写显式开启后才成立是否矛盾；搜全篇残留默认关闭或显式配置才启用字样",
+   "minimumReleaseAgeExclude 自动登记、minimumReleaseAgeStrict、prerelease 纳入 pnpm registry 候选、ERR_PNPM_NO_MATURE_MATCHING_VERSION",
+   "compatibility.json 缺省不存在等于无豁免；allow-version 命令形态；bump-dsh 后缀社区约定（grep asar 官方包 0 命中）",
+   "7.2.2 dsh plugin add 自动 reconcile push bundles（dsh-app-boot reconcileProfilePlugins / dsh-plugin-manager operations.reconcile）；7.2.3 落地顺序",
+   "desktop-vs-cli：app.asar 实际布局（resources/app.asar/dsh 与 runtime/cli、primary-runtime、versions.json 三键无 python 在 runtime.json）；rejectElectronProfile 拒绝 boot/dump 但 plugin 在 manageDesktopProfile 放行（dsh/lib/bin.js 与 dsh-desktop-host cli.js）；两个 dsh 命令 PATH 冲突；参数形式坑；Cache-Control immutable 与 artifactRevision；凭据分层（进程环境到 .credentials.yaml 到项目 .env 到用户 .env）"
+  ]
+ },
+ {
+  "id": "g12",
+  "slug": "debug-sandbox",
+  "files": [
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/debugging-and-troubleshooting.md（300 行）",
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/silent-failure-and-gate-design.md（261 行）",
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/sandbox-internals-and-proxy.md（69 行）"
+  ],
+  "hotspots": [
+   "第零节伪 API 黑名单（registerTool/registerTab 等）grep 全 asar 是否真 0 命中；did not activate 文案在 dsh-app-boot 的真实拼写",
+   "免启动反证法：readPluginMeta 真实存在（dsh-app-boot 附近行）、裸包名前提、pathToFileURL Windows 坑",
+   "headless/web 位置参数归因（headless 收多位置参数、web 只收 --host/--port/--trusted-host/--no-open）；Failed to load plugins 是 DOM 遮罩标题非 console；exports 三路径三种吞法（js/package.json/locale）",
+   "浏览器验收：aria-disabled vs 原生 disabled、写入期间控件禁用、两帧一致收敛判定",
+   "sandbox-internals：Windows WRITE_RESTRICTED 令牌与 DACL 交集、Landlock、沙箱三状态（Policy Denial vs Runner Failure vs Exit Code）、image-offload、dsh-http-proxy undici 代理 到 dsh-sandbox-local/dsh-bash-sandbox/dsh-http-proxy/dsh-compaction-image-offload 核实"
+  ]
+ },
+ {
+  "id": "g13",
+  "slug": "packaging-i18n",
+  "files": [
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/packaging.md（230 行）",
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/publish-npm-verification.md（57 行）",
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/architecture-refactor-experience.md（65 行）",
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/client-i18n-pitfalls.md（84 行）"
+  ],
+  "hotspots": [
+   "packaging：bundle/profile 读写域互斥、schemastery 归属（仅用 schemastery 做 Config 校验的包放 dependencies）、main/exports/files/dsh.bundle.patch/dsh.client 规约、npm legacy-peer-deps（官方 289 包 0 命中？grep）、dsh-hmr 插件默认 root 为点（root 空数组是 dsh-base hmr 行显式配置）、豁免 CLI 不重载但 GUI 管理器会 HMR reload、pnpm add 不自动维护 dsh.profile.bundles（dsh plugin add 才会）",
+   "publish-npm：bump-dsh 后缀社区约定官方 0 命中、官方无 GH Actions/Release（.github/workflows 0 命中）、lib 是构建产物、PowerShell 5.1 的 且且 运算符报错",
+   "architecture-refactor：webServer.register(route) 单参对象（kind/path/handler）、state.set、invalidate 非 invalidateSkills、readRawConfigMode 标注文档私有、merge 保留未知键、写盘唯一目标是 cordis.patch.yml（非 config.json）、SettingsConflictError 抛错非返回 null",
+   "client-i18n：ctx.locale.register 运行时只校验 BCP47 id 加重复注册抛错（键成对是 LocaleNamespaceMap 编译期）；translate 缺词回退 key、FALLBACK_LOCALE 为 en；locale 下 json 由 en.json 锚定、文件名须语言 id；readPluginMeta 只读 meta 键；浏览器 import 依赖 exports 放行 locale 通配"
+  ]
+ },
+ {
+  "id": "g14",
+  "slug": "misc-bundles",
+  "files": [
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/builtin-enhancements-and-middleware.md（65 行）",
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/multimodal-and-deliverables.md（86 行）",
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/llm-adapter.md（276 行）",
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/webhook-headless-and-workflows.md（94 行）",
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/slash-commands-and-input-triggers.md（74 行）"
+  ],
+  "hotspots": [
+   "repeat-tool-reminder / time-context / message-feedback / dsh-invariants 的注入形态与事件名（对应 dsh 包 lib）",
+   "present 工具与 Deliverables 卡片、ask_user_question 交互（dsh-tool-ask-user）、dsh-attachment-local 存储路径与规范化、compaction-tool-result-pruner 默认 thresholdChars",
+   "llm-adapter：ctx.llm 挂载与协议、LlmAdapter 继承与 stream()、7 种 StreamChunk 封闭判别联合、listModels(provider)、注册方式",
+   "webhook：ctx.webhookRuntime、WebhookRule 字段（register/kind/run/workspacePath）、GitHub 集成、dsh-headless 参数与 --json ndjson 事件流、PTC 无 ChildPort 无断点快照、maxOldGenerationSizeMb/maxOutputBytes 进程配额、DAG 校验",
+   "slash-commands：ctx.commands.register 字段（name/description/input.hint/attachments/handler 收 invocation）、CommandResult 形状（kind/text/sourceEventSeq）、无 CommandDescriptor 类型、候选预热加 AbortSignal 竞态、dsh-client-ui-input-trigger、ctx.shortcuts.register/registerFixed/observeFixedInput（dsh-client-shortcuts）"
+  ]
+ },
+ {
+  "id": "g15",
+  "slug": "subagents-community",
+  "files": [
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/subagents-fs-policy-and-acp.md（62 行）",
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/community-patterns.md（1063 行）",
+   "C:/Users/Administrator/.agents/skills/dsh-plugin-dev/references/official-upstream-and-docs.md（166 行）"
+  ],
+  "hotspots": [
+   "subagents：ctx.subagents 服务、spawn-in-process/fork-in-process/acp 三提供方、start vs startContinuable、fs-observation 弱引用观察表与防覆盖锁（read-before-write、FS_STALE_VERSION/FS_NOT_OBSERVED）、ACP 到 dsh-subagent / dsh-fs-observation-policy 核实",
+   "community-patterns.md 只核对自指为官方性质的句子与统计数（如 11.167 等计数）、引用仓库格式；社区经验本身不逐条验证",
+   "official-upstream-and-docs.md：官方仓库 URL、文档站中英文 URL、包清单数量、证据分级表、本地官方包目录路径、单包结构速查法、版本升级回溯流程"
+  ]
+ }
+]

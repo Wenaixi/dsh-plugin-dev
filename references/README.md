@@ -115,14 +115,18 @@
   意图工具 + 投影 fold、服务提供方与 Typert RPC 的坑、凭据引用、prepare-before-swap
   热更新、Windows / Electron / DSH_HOME 环境坑、发布与验收纪律。每条经验带出处仓库，
   属"第三级证据"（社区实现），与官方源码冲突时以官方为准。
-### 十八、实战深挖沉淀：失效链路 / i18n 坑 / 重构经验 / 发布验证 (Field Experience)
+### 十八、跨专题工程治理与实战经验 (Cross-cutting Engineering)
 
 - **[provider-catalog-invalidation.md](./provider-catalog-invalidation.md)**：
-  技能目录/注册表失效链路的权威操作姿势——`skills/change` 是**消费方通知缝**（官方 `notifyChange()` 源码链路），提供者在其监听器内反向调 `control.invalidate()` 会**同步递归栈溢出**（`invalidateCache` 再次 emit，invalidate 守卫不抑制重入）；`registerProvider` 工厂返回值必须**捕获到闭包变量**否则 `invalidate()` 空转成静默失效；filesystem provider 的观察 roots 与插件包内 skillDir 的关系；正确姿势 = 变更点直调 invalidate；每条断言做破坏实测。
+  技能目录/注册表失效链路的操作参考——`skills/change` 是**消费方通知缝**（官方 `notifyChange()` 源码链路），提供者在其监听器内反向调 `control.invalidate()` 会**同步递归栈溢出**（`invalidateCache` 再次 emit，invalidate 守卫不抑制重入）；`registerProvider` 工厂返回值必须**捕获到闭包变量**否则 `invalidate()` 空转成静默失效；filesystem provider 的观察 roots 与插件包内 skillDir 的关系；正确姿势 = 变更点直调 invalidate；每条断言做破坏实测。
 - **[client-i18n-pitfalls.md](./client-i18n-pitfalls.md)**：
   客户端 `ctx.locale` 实战六铁律——双语键必须完全成对、值可相同（刻意单语条目也用同值占位）；字典是纯数据、**不能嵌 `t()` 调用**；构建期 Node 计算、产物只内嵌**字面量**（浏览器端执行 `readdirSync` 会 ReferenceError）；宿侧下发的诊断链中文在客户端按枚举查字典覆盖（宿侧契约零改动）；语言切换刷新用 `ctx.locale.subscribe` 而非 `locale/change` 事件；字典并入 `locale/*.json` 顶层键组与 meta 键共存；反向断言门禁清单。
 - **[architecture-refactor-experience.md](./architecture-refactor-experience.md)**：
-  「入口大函数 到 深模块」重构通用经验——多实现漂移收成唯一真源 + 反向断言 + 锁定测试；用户可控枚举值写入状态前必须归一化（防垃圾态注入持久化）；HTTP 端点剥离纯工厂 + `Symbol.asyncIterator` 假 req + 普通对象假 res 单测（零为测试造抽象）；配置写盘字段级 merge 保留未知键、非法值拒绝写盘；孤儿函数全仓确认零调用再删并清理导出与记忆库；**Windows CRLF 文件编辑按行号切割替换**；**可失败自检与破坏实测的复用写法（接口即测试表面）**；**正则字符类要按真实数据域写，别抄模板**（`[w-]+` 匹配不到 kebab 名的教训、手写括号配平器零守卫陷阱）。
-  维护提示：删除能力时同步检查所有对外承诺面；门禁计数注明统计口径或不写数字；缓存收益用实际测量裁决；测试替身覆盖生产防御所需的方法；文件拆分需同时考虑第二消费方与行为覆盖。
+  入口重构、深模块判据、可失败自检、产物断言、TDD 接线等价、缓存与文件拆分的经验；维护时关注行为覆盖和第二消费方，避免为拆而拆。
+- **[cross-cutting-engineering-practices.md](./cross-cutting-engineering-practices.md)**：
+  跨专题工程治理原则——证据等级、删除测试、运行时 adapter 与领域 module 分层、算法结果与 CLI 报告 seam、Host/Browser 隔离、产物 provenance、缓存指纹、顺序无关比较、数据域正则、失败能力、权威真值回读与能力删除承诺面。
+  不重复具体 DSH API、静默失效门禁或发布专题。
+
+### 十九、实战深挖沉淀：失效链路 / i18n 坑 / 重构经验 / 发布验证 (Field Experience)
 - **[publish-npm-verification.md](./publish-npm-verification.md)**：
-  发布验证通用经验——npm 镜像（npmmirror）会让 `npm view` 假阴性，直查官方 registry API 验 `versions` 与 `dist-tags.latest`；幂等发布「已发布跳过」只跳 npm 不跳 Release，需 `gh release view` 单独验证；tag 指向错误的修正流程（删 tag、补提交、重打、force push）；PowerShell 不支持 `&&` 的拼接坑；发布五步 checklist（bump、CHANGELOG、门禁、commit/tag/push、双真源验证）。
+  发布验证通用经验——镜像 registry 可能让 `npm view` 假阴性，直查官方 registry API 验 `versions` 与 `dist-tags.latest`；幂等发布「已发布跳过」只跳 npm 不跳 Release，需 `gh release view` 单独验证；tag 指向错误的修正流程（删 tag、补提交、重打、force push）；PowerShell 不支持 `&&` 的拼接坑；发布五步 checklist（bump、CHANGELOG、门禁、commit/tag/push、双真源验证）。

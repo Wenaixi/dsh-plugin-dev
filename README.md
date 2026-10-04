@@ -48,13 +48,13 @@ UI 插件必须遵循**双面插件 (Dual-Face)** 规范：Node 端 `lib/index.j
 
 ## 三、技术参考文档索引 (References)
 
-完整参考目录见 [references/README.md](./references/README.md)，其中包含本项目全部专题文档的导航与一句话概述：插件解剖学、核心服务矩阵、配置与补丁、事件与工具流水线、Web 插槽与主题、设置与插件中心 UI、跨端 Remote RPC、MCP 工具桥接、系统提示词与状态投影、多模态交付物、Webhook 与无头运行、内置中间件、领域存储与伪终端、斜杠命令与输入触发器、沙箱内核与网络代理、子智能体与文件锁、安装解析陷阱、官方上游核验与本地调试排毒。
+完整参考目录见 [references/README.md](./references/README.md)。新插件先读其中的通用专题，再按具体需求进入 DSH API 专题；通用专题覆盖依赖、生命周期、发现缓存、双面 UI、补丁与发布、静默失效和跨模块治理。具体服务、事件、工具、Remote、MCP、存储、沙箱、子智能体等专题也均在索引中维护。
 
 ---
 
 ## 四、交付前自检
 
-本技能是**纯文本规范集**，不含任何脚本、脚手架或示例工程。按 [SKILL.md](./SKILL.md) 第九节的清单逐项自检：`package.json` 的 `dsh.bundle.patch` 与 `dsh.client`（platform/inject/external/immediately；不存在 `dsh.bundle.id`/`dsh.client.module`）、`cordis.patch.yml` 的 `- id:` 与 name 一致性、入口 `apply` 导出、双面插件的 `ctx.slots` 挂载方式。
+本技能是**纯文本规范集**，不含脚本、脚手架或示例工程。按 [SKILL.md](./SKILL.md) 的路由和交付清单逐项自检：先核对真实服务与版本，再核对插件入口、依赖注入、生命周期、双面插件隔离、构建产物、打包清单和运行时真值。
 
 ## 五、快速开始
 
@@ -67,6 +67,8 @@ dsh --profile <profile> --dump-config
 
 # 3. 启动 DSH Web 实例
 dsh web
+
+# 4. UI 或跨端插件：在真实浏览器中操作后回读接口、磁盘或注册表真值
 ```
 
 ---

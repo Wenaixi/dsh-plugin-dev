@@ -32,7 +32,7 @@ DSH 里有一批「看起来非常合理、但根本不存在」的 API 和「�
 无需修改当前 profile 的配置，直接在启动命令后通过 `--patch` 挂载你正在编写的插件补丁：
 ```bash
 # 启动 Web 宿主并临时叠加本地插件补丁
-dsh --profile web --patch C:/path/to/my-plugin/cordis.patch.yml
+dsh --profile <name> --patch <本地插件目录>/cordis.patch.yml
 ```
 - 退出进程后系统恢复原样，零污染；
 - 每次修改代码后只需重启宿主即可立即看到变更。
@@ -40,7 +40,7 @@ dsh --profile web --patch C:/path/to/my-plugin/cordis.patch.yml
 ### 回路 2：本地相对路径添加法（持久联调）
 在测试用的 profile 中直接将本地目录添加为 bundle：
 ```bash
-dsh plugin --profile web add C:/path/to/my-plugin
+dsh plugin --profile <name> add <本地插件目录>
 ```
 - 该命令会自动将本地路径加入 profile 的 `package.json` 中（以 `file:` 协议软链）；
 - 插件源码修改后，Node 侧重启即生效，浏览器端配合 HMR 自动刷新。
@@ -49,7 +49,7 @@ dsh plugin --profile web add C:/path/to/my-plugin
 为了防止搞坏正在使用的日常 profile，可以通过重定向 `DSH_HOME` 启动完全隔离的测试环境：
 ```powershell
 # PowerShell 环境下重定向至临时目录
-$env:DSH_HOME = "C:\Temp\dsh-dev-sandbox"
+$env:DSH_HOME = "<临时目录>"
 dsh plugin --profile test-env add ./my-plugin
 dsh --profile test-env
 ```
@@ -117,7 +117,7 @@ window.__ModuleLoader__.load({
 });
 ```
 
-可对照的社区实现（非 `@deepseek-ai` 官方发布）：`dsh-better-sidebar`、`dsh-plugin-wallpaper-engine`、`@linxin666/dsh-client-ui-git-graph`。
+可对照的社区实现（非 `@deepseek-ai` 官方发布，如某侧边栏增强、某壁纸引擎、某 git 图插件）。
 
 ### 4. 同一个界面渲染出两份
 
@@ -197,7 +197,7 @@ export function apply(ctx) {
 
 ### 2. 宿主核心日志落盘位置
 若 DSH 宿主启动崩溃或静默退出，官方唯一的结构化故障落点是 **`$DSH_HOME/logs/startup-<ISO>-<uuid>.log`**（`dsh` 的 `reportStartupFailure` 写入，含完整 inspect 报告、profile/版本/node 平台信息，终端会打印 `Full diagnostics: <path>`）。
-`~/.dsh/profiles/<profile>/cfg.log` / `cfg.err` **没有任何官方写入者**（全库 0 命中）；本机实测 `cfg.err` 为 0 字节、`cfg.log` 只是一次 `--dump-config` 残留的 YAML 树——不要拿它们当诊断入口。
+`~/.dsh/profiles/<profile>/cfg.log` / `cfg.err` **没有任何官方写入者**（grep 全库 0 命中）；实测中它们或为空、或只是 `--dump-config` 残留——不要拿它们当诊断入口。
 ---
 
 ## 五、插件安装失败的排障入口与决策路径
@@ -293,7 +293,7 @@ npm pack --dry-run --json    # 逐条断言 locale/、icon、lib/ 都在 files �
   cordis.yml             # 组合后配置
   compatibility.json     # 精确版本豁免表，默认不存在（读取语义视为 {}，首次 allow-version 才生成）
   .plugin-manager/logs/  # 每次安装/卸载的 pnpm 原始输出（operation-*/ 子目录）；启动黑匣子日志在宿主日志目录（logs/），cfg.log/cfg.err 并非每个 profile 都有
-  compatibility.json     # 精确版本豁免表（**首次执行 allow-version 后才生成**，默认不存在；本机 desktop 无此文件）
+  compatibility.json     # 精确版本豁免表（**首次执行 allow-version 后才生成**，默认不存在）
 ```
 
 完整目录语义、`minimumReleaseAge: 0` 配置片段、BOM/CRLF 写入陷阱与排障决策表见 [install-resolution-traps.md](./install-resolution-traps.md)。

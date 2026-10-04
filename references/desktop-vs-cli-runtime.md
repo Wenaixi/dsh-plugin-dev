@@ -35,7 +35,7 @@ DSH 有两种主流宿主形态，它们的**插件包格式完全相同**，但
 <App>/                               ← Electron 应用根
   <Product>.exe                      ← 主程序
   resources/
-    app.asar/dsh/                    ← 【dsh 运行时打在这里】（285 个官方运行时包，sharedPackages 清单见 desktop-runtime.json；asar 顶层另有约 10 个共享主进程依赖）
+    app.asar/dsh/                    ← 【dsh 运行时打在这里】（全部 @deepseek-ai 官方包，清单以 desktop-runtime.json 的 sharedPackages 字段为准；asar 顶层另有 Electron 主进程自用的共享依赖，以 app.asar/node_modules 为准）
     app.asar.unpacked/
     runtime/
       cli/bin/dsh.cmd                ← 桌面版自带的 CLI 入口
@@ -47,7 +47,7 @@ DSH 有两种主流宿主形态，它们的**插件包格式完全相同**，但
 - **dsh 本体与全部官方包都在 `app.asar` 的 `dsh/` 子目录内**，不在 profile 的 `node_modules` 里。
 - profile 实体仍在 `$DSH_HOME/profiles/<name>/`，**结构与 CLI 完全一致**。
 - 依赖布局：常见 **hoisted**（`nodeLinker: hoisted`，顶层扁平、`.pnpm` 下只有 `lock.yaml`）。
-- `runtime/versions.json` 只含 `{schemaVersion, node, pnpm}` 三个键，**没有 python**；python 版本在 `primary-runtime/runtime.json`（实测 node 24.18.1 / pnpm 11.7.0 / python 3.12.14）。
+- `runtime/versions.json` 只含 `{schemaVersion, node, pnpm}` 三个键，**没有 python**；python 版本在 `primary-runtime/runtime.json`（版本随发行漂移，以该文件为准；捆绑基线见 `versions.json` 与 `desktop-runtime.json`）。
 
 ### 3. 对照表
 
@@ -105,7 +105,7 @@ npm 全局那份（%APPDATA%\\npm/dsh.cmd，即 npm 全局 bin，非 pnpm）  = 
 dsh web --port 8080            # ✅ 第一个位置参数即 profile 名（launcher 展开为 --profile web）
 dsh --profile web --port 8080   # ✅ 等价
 dsh web --profile web           # ❌ 展开后 --profile 出现两次 -> select a profile only once
-dsh --profile web web           # 等价 dsh web web：web 成为 app-args；与 --dump-config 等 launcher 形态互斥时报 unknown option（实测）
+dsh --profile web web           # 等价 dsh web web：web 成为 app-args；与 --dump-config 等 launcher 形态互斥时报 config dumps take no app arguments（实测）
 `
 
 另外：`select a profile only once` 在命令行重复传 `--profile` 或位置参数展开后撞上显式 `--profile` 时触发（launcher 未读取任何 `DSH_PROFILE` 环境变量；shell-env 注入的是出站环境的 `DSH_PROFILE` 值，与选中 profile 无关）。
@@ -116,7 +116,7 @@ dsh --profile web web           # 等价 dsh web web：web 成为 app-args；与
 
 | 布局 | 特征 | 易踩的坑 |
 | --- | --- | --- |
-| **isolated**（pnpm 默认） | `.pnpm` 下有真实 store，顶层是符号链接（本机 web 即 isolated） | 改顶层文件等于改 store；缓存清理影响面大；注意 DSH 生成的 profile 模板默认 `nodeLinker: hoisted` |
+| **isolated**（pnpm 默认布局） | `.pnpm` 下有真实 store，顶层是符号链接 | 改顶层文件等于改 store；缓存清理影响面大；注意 DSH 生成的 profile 模板默认 `nodeLinker: hoisted` |
 | **hoisted** | 顶层是真实文件，`.pnpm` 下只有 `lock.yaml` | **文件被删时 pnpm 不检测**（见 §九） |
 
 **推论**：在 hoisted 布局下"直接往 `node_modules/<pkg>` 里补文件"是**可行性较高**的应急修复手段（顶层就是真身）；但改完要自己保证与 lockfile 语义一致。
@@ -134,7 +134,7 @@ Cache-Control: public, max-age=31536000, immutable
 URL 形如 `/plugins/??<包id>/client.js&rev=<framedHash>`——**rev 由产物 mtime/ctime/size 派生，非内容哈希**（artifactRevision），内容变则哈希变。由此：
 
 - 浏览器刷新、重开面板、重开设置窗口**都不够**；桌面版（Electron）必须**完全退出应用再启动**。
-- 开发期由 dev:web 重建 client bundle，client-hmr（/plugins/events SSE）自动热替换插件条目；桌面版（desktop profile 未挂 client-hmr）只能重启。
+- 开发期由 dev:web 重建 client bundle，client-hmr（/plugins/events SSE）自动热替换插件条目；桌面版组合树同样含 client-hmr 行，但 client bundle 在 asar 内、没有 dev:web 重建路径，实际只能重启应用生效。
 
 **更隐蔽的是版本时序**：插件卡片显示的版本号来自宿主读 `package.json`，而界面来自 client bundle，**两者更新不同步**，会出现「卡片已显示新版本、界面还是旧版」的假象，极易误判成"改了没生效"。
 
@@ -162,7 +162,7 @@ URL 形如 `/plugins/??<包id>/client.js&rev=<framedHash>`——**rev 由产物 
 
 两种运行时的配置文件都在 `$DSH_HOME/profiles/<name>/cordis.patch.yml`，**机制完全一致**（顶层 YAML 数组，`- id:` 覆盖运行时条目，`- insert:` 追加新条目）。但**内容规模可以差很多**：
 
-- 桌面版常含**特有段**：preset 大块、GUI 专属覆盖段（例如把某些 `maxBytes` 从 asar 内默认值改大的段，注释里会写明"改 npm 那份对 GUI 无效"）。
+- 桌面版补丁常含 **GUI 专属覆盖段**（覆盖 asar 内默认值的整行替换，段内注释常注明"改 npm 那份对 GUI 无效"）；迁移时这些段必须整段保留、不覆盖。
 - 这些特有段**迁移时绝不能覆盖**。
 
 ### 2. 迁移方法论（安全顺序）

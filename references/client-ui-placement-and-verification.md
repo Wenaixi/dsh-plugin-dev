@@ -183,6 +183,18 @@ console.log(row.rev, row.url)   // 拿这个 URL 直接请求，检查内容是�
 
 ---
 
+### 3.3 产物内嵌宿侧代码 = 整段脚本语法失败（新形态的静默消失）
+
+客户端 bundle 的 CJS factory 里**不能出现任何 ESM 语法**（`import.meta`、顶层 `import`）。宿主把 bundle 原样字符串拼接进 combo script（只剥 sourceMappingURL 注释，无 esbuild/vite 转换），以普通 `<script src>` 加载——浏览器解析 `import.meta` 即抛 SyntaxError，**整段 combo 脚本解析失败**，含该 bundle 的全部面板静默消失，UI 层零报错。
+
+- 根因形态：构建模板里残留宿侧 Node 代码行（如 `const skillRoot = resolve(dirname(fileURLToPath(import.meta.url)), ...)`），变量零引用却原样进产物；
+- 判定三步：
+  1. 直接读产物 `grep import.meta|process.`（宿侧 API 关键字）；
+  2. Node 探针模拟 factory 执行：`new Function('window', 'require', clientSrc)`，SyntaxError 即实锤；
+  3. `git log -S "关键字" -- <构建脚本>` 定位引入提交，确认是否自己造成的回归；
+- 门禁：断言**产物文件内容**（readFile）不含 `import.meta` / `process.`；注意不是断言构建脚本源码（模板里的宿侧代码段会原样进产物，见 architecture-refactor-experience.md 第八节）；
+- 它属于「客户端模块层」的静默失效：boot 图里条目可能在（注册表已进图），但脚本解析期已死——三分法① 的判定（读 `__DSH_BOOT__.entries`）**不够**，还要看 combo script 是否能解析。
+
 ## 四、无浏览器验证：直接执行客户端 factory
 
 客户端 bundle 是 CJS factory 形态（window.__ModuleLoader__.load({ id, factory })），**因此完全可以在 Node 里执行它**，用来验证「apply 是否抛错、注册了什么、参数对不对」——不需要浏览器，也不需要起宿主。

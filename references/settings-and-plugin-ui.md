@@ -44,9 +44,9 @@ export function apply(ctx) {
 
 ## 二、三大明星插件的真实实现源码深度解密
 
-DSH 社区中最著名的三大带界面的插件，正是通过该机制成功在设置栏占据一席之地的：
+DSH 社区里带界面的插件正是通过该机制在设置栏占位的。以下三个**真实注册样本**（包名仅作标识，机制通用）展示了 settings.section 的完整契约：
 
-### 1. dsh-prompt-history（> 终端式输入）
+### 样本 1：终端式输入设置页（第三方包，order 60）
 - **左侧导航项效果**：显示为带有终端命令行提示符的 `> 终端式输入`（英文环境显示为 `>_ Terminal Input`），`order: 60`；
 - **注册源码**：
   ```js
@@ -66,7 +66,7 @@ DSH 社区中最著名的三大带界面的插件，正是通过该机制成功�
 - **图标注入技巧 (Glyph Injection)**：
   官方 Shell 默认对第三方未知的 `id` 统一渲染兜底的“齿轮”图标。为了呈现原生的 `>` 终端提示符，它通过极简的 DOM 补丁挂载了一个专有类名样式，将该项左侧的齿轮图标替换为精致的终端字符。
 
-### 2. dsh-better-sidebar（侧边卡片）
+### 样本 2：侧边卡片设置页（第三方包，order 100）
 - **左侧导航项效果**：在设置左侧显示 `侧边卡片`，`order: 100`；
 - **注册源码**：
   ```js
@@ -84,7 +84,7 @@ DSH 社区中最著名的三大带界面的插件，正是通过该机制成功�
   );
   ```
 
-### 3. dsh-plugin-wallpaper-engine（壁纸引擎）
+### 样本 3：壁纸引擎设置页（第三方包，order 500）
 - **左侧导航项效果**：在设置左侧显示 `壁纸引擎`，`order: 500`；
 - **注册源码**：
   ```js
@@ -183,7 +183,7 @@ async function saveHostConfig(patchConfig) {
    - 包含：**智能体团队 (实验性)**、**自动授权审查 (实验性)**、**自动化任务 (实验性)**、**语音输入 (实验性)**、**终端**、**Agent 循环**、**子智能体**、**网页搜索**；
    - 数据源：`pluginManager.listBundles()` 返回的 `optional: true` 标志（源自 app-boot 的 `OPTIONAL_BUNDLES` 常量，4 个实验 bundle）+ 4 个官方 `plugins.item` 配置页（agent-loop/shell/subagent/web-search）；`dsh-plugin-package-inventory-deepseek` 是 LLM 请求元数据包，与 UI 无关。
 2. **已安装列表 (已安装 10)**：
-   - 包含当前 profile 中已安装的所有第三方组合包（如 Better Sidebar、cfbridge、dsh-context、dsh-plugin-wallpaper-engine、dsh-prompt-history 等）；
+   - 包含当前 profile 中已安装的所有第三方组合包（以实际安装清单为准）；
    - 数据源：`remote.pluginManager.listBundles()`（读 profile manifest 的 dependencies 与 dsh.profile.bundles，排除 6 个 BUILTIN_PROFILE_BUNDLES）；`pluginInventory.list()` 只是 Loader 只读投影（entryId/moduleName/meta/enabled/fiberPhase），不扫 package.json。
 
 ### 2. 插件卡片元数据读取规范

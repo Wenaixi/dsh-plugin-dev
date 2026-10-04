@@ -88,7 +88,7 @@ DeepSeek Harness (DSH 0.2.0-rc.2) 采用清晰的物理分层与进程隔离架�
 
 注意：client 端插槽运行时是 `dsh-client-ui-slots`（SlotCore 纯注册表）+ `dsh-client-ui-renderer`（slots 服务包装）；连接/传输由 `dsh-client-connection` 独立提供；设置 UI 是 `dsh-client-ui-settings`（注入 remote.settings）。三包在 0.2.0-rc.2 均独立存在，未合并。**loader 行解析到其 package.json 后按该包名判定半侧**（locatePkgJson 支持子路径定位最近 ancestor 的 package.json，子路径行同样适用）。
 
-**真实契约（0.2.0-rc.2 全库实测，`dsh.bundle.id` 与 `dsh.client.module` 均不存在）**：双面包声明 `dsh.client.platform: "web"`（+ 可选 `inject`/`external`/`immediately`），客户端入口由 `exports["./client"]` 子路径导出（该路径必须真实存在）；组合补丁用 `dsh.bundle.patch`（路径或有序数组）。peerDependencies 以 `@deepseek-ai/cordis ~4.0.4` 为准 文件）。`exports` 也可以写成带条件导出对象的形式（`{ "types": ..., "default": "./lib/client.js" }`）。
+**真实契约（0.2.0-rc.2 全库实测，`dsh.bundle.id` 与 `dsh.client.module` 均不存在）**：双面包声明 `dsh.client.platform: "web"`（+ 可选 `inject`/`external`/`immediately`），客户端入口由 `exports["./client"]` 子路径导出（该路径必须真实存在）；组合补丁用 `dsh.bundle.patch`（路径或有序数组）。peerDependencies 以 `@deepseek-ai/cordis ~4.0.4` 为准）。`exports` 也可以写成带条件导出对象的形式（`{ "types": ..., "default": "./lib/client.js" }`）。
 
 ## 浏览器端插件加载、Slots 插槽与样式管理
 
@@ -156,7 +156,7 @@ root
 | 层级 | Slot 标识 | Cardinality | Scope | 典型用途 |
 | --- | --- | --- | --- | --- |
 | `sidebar.*` | `sidebar.brand.mark` / `sidebar.brand.name` | single | root | 侧边栏品牌标记与名称（无独立的 `sidebar.brand` 槽） |
-| | `sidebar.workspaces` | single | root | 工作区列表项 |
+| | `sidebar.workspaces` | single | root | 工作区/会话浏览区域（含搜索、会话列表与全部工作区对话框） |
 | | `sidebar.settings` | single | root | 侧边栏底部设置入口 |
 | | `sidebar.panellist` / `sidebar.footer.action` | list / list | root | 面板列表与底部动作（不存在 `sidebar.files`/`sidebar.terminal`） |
 | `main.*` | `main` | keyed | root | 主导航面板（`main.conversation` 为 single/session-maybe；不存在 `main.chat`） |
@@ -182,7 +182,7 @@ Cardinality 选错会导致重复渲染或完全不渲染；调试实时插槽�
 - 其他包只能 `import type`；只在拥有并渲染处声明新 child slot，他人 `inject + register`。
 - `single` 与已占用的 keyed cell 是替换点；增量用新 list id / 未占 key。
 - UI domain 间只传 JSON 兼容数据与 callback。
-- 调试：`cordis_inspect what:"client"` 查看实时插槽树。
+- 调试：用 `cordis_inspect_list` / `cordis_inspect_query`（参数 `{ platform, provider, method, input }`）查看实时插槽树（不存在 `what: "client"` 形态）。
 
 ### 3. 样式管理与自动回收
 
@@ -225,7 +225,7 @@ Cardinality 选错会导致重复渲染或完全不渲染；调试实时插槽�
 - 策略**逐调用携带**（per call），非固定在提供方：同时刻不同消费方可请求不同边界；已批准提权重试 = 更宽策略的新调用。
 - `confine(argv, policy, signal?) → ConfinedArgv{ argv; enforcement: 'full'|'partial'; denialSignatures; runnerFailureRules }`；无后端 → `SandboxUnavailableError`；受限策略下静默无隔离透传永不合法（fail-closed）。
 - deny 判定：allowedExitCodes 门控 → informationalLines 整行排除 → fatalSignatures 匹配；**退出状态永不能证明 runner 失败**（runner failure=命令从未执行，denial=沙箱正常拦截）。
-- 后端方言：EROFS/bwrap、EACCES/Landlock、EPERM/Seatbelt；Windows ACL 属 partial（硬链接/读不受限/AppContainer 边界）。
+- 后端方言：bwrap 报 `read-only file system`、Landlock 报 `permission denied`、Seatbelt 报 `operation not permitted`（stderr 签名串，非 errno 码）；Windows ACL 属 partial（硬链接/读不受限/AppContainer 边界）。
 - `ctx.sandboxPolicy.resolve()` 优先级：显式已批准 mode > 会话最近 sandbox/mode 事件 > 部署默认。
 
 ## 常见误解

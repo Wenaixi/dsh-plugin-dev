@@ -1,7 +1,7 @@
 # 插件安装版本解析陷阱：冷却期、预发布排序与兼容性闸门
 
 > 本文件记录 DSH 插件安装链路上最容易误诊为「缓存过期」的三类根因，以及可复现的判定与修复手法。
-> 全部结论均在本机 DSH 0.2.0-rc.2 + pnpm 12.8.1 + Node 24.4.1 环境实测验证。
+> 全部结论均在 DSH 0.2.0-rc.2 + pnpm 11/12 系列 + Node 24 系列环境实测验证（精确补丁版本随发行漂移，机制结论不变）。
 
 ---
 
@@ -30,7 +30,7 @@ dsh: restored package.json, pnpm-lock.yaml, and node_modules.
 
 ### 2.1 机制
 
-发布冷却期是 **pnpm 自身的配置项**（`minimumReleaseAge`，单位分钟）：**pnpm 11 起内建默认 1440（1 天），并非「默认关闭、显式配置后才启用」**（本机捆绑 pnpm 11.7.0 与全局 12.8.1 的 dist 默认块均为 `minimum-release-age: 24*60`；`config get minimum-release-age` 返回 undefined 只说明无显式配置，不代表内建默认关闭）。启用后，一个新版本发布不满阈值分钟数就不被考虑，解析回退到更早的合格版本；显式设置了 `minimumReleaseAge` 时 `minimumReleaseAgeStrict` 才默认 true（否则宽松处理、可经 exclude 放行）。这是 pnpm 防供应链攻击的「冷却期」。**该机制由包管理器实现，不由 DSH 代码实现**（本机 DSH 0.2.0-rc.2 全部 285 个 @deepseek-ai 运行时包与 dsh/lib 源码中 `minimumReleaseAge` 零命中）；可在 profile 的 `pnpm-workspace.yaml` 里调整（见 5.1）。
+发布冷却期是 **pnpm 自身的配置项**（`minimumReleaseAge`，单位分钟）：**pnpm 11 起内建默认 1440（1 天），并非「默认关闭、显式配置后才启用」**（pnpm 11/12 系列的 dist 默认块均为 `minimum-release-age: 24*60`；`config get minimum-release-age` 返回 undefined 只说明无显式配置，不代表内建默认关闭）。启用后，一个新版本发布不满阈值分钟数就不被考虑，解析回退到更早的合格版本；显式设置了 `minimumReleaseAge` 时 `minimumReleaseAgeStrict` 才默认 true（否则宽松处理、可经 exclude 放行）。这是 pnpm 防供应链攻击的「冷却期」。**该机制由包管理器实现，不由 DSH 代码实现**（本机 DSH 0.2.0-rc.2 全部 285 个 @deepseek-ai 运行时包与 dsh/lib 源码中 `minimumReleaseAge` 零命中）；可在 profile 的 `pnpm-workspace.yaml` 里调整（见 5.1）。
 
 关键点：**方向与直觉相反**。不是「新版本太新不能装」，而是**只有发布满阈值的版本才被考虑**，于是新版本被排除后解析回退到上一个「已满阈值」的合格版本（不是无限跌到底：pnpm 按发布时间取最近候选，阈值过长直接报 `ERR_PNPM_NO_MATURE_MATCHING_VERSION` 拒绝）。DSH 侧真正的兼容闸门是 **peer 兼容性预检 + allow-version 精确版本豁免**（写入 profile 的 `compatibility.json`，见第四节），与冷却期是两条独立机制。
 
@@ -40,8 +40,8 @@ dsh: restored package.json, pnpm-lock.yaml, and node_modules.
 
 | 执行时刻 | 解析结果 | 原因 |
 | --- | --- | --- |
-| T0 | `4.9.0-dsh.5` | 最新候选发布不足 24h，被排除 |
-| T0 + 若干小时 | `4.10.0-dsh.1` | 它刚好跨过 24h 门槛，自动放行 |
+| T0 | `<某预发布版>` | 最新候选发布不足 24h，被排除 |
+| T0 + 若干小时 | `<更新的预发布版>` | 它刚好跨过 24h 门槛，自动放行 |
 
 **同一个包、同一条命令，结果随时间自己往前爬 —— 这是冷却期的唯一指纹。** 缓存问题不会这样，缓存问题的表现是「结果一直不变」。
 
@@ -83,7 +83,7 @@ maxSatisfying(allVersions, '^4.10.0')           = null
 两个致命后果：
 
 1. **semver 库层面**：不带 `includePrerelease` 时范围不匹配 prerelease（`maxSatisfying(vers, '*')` 返回正式版而非 `4.10.0-dsh.x`）；**但 pnpm 的 registry 解析把 prerelease 纳入候选**（按发布时间取满足范围且已过冷却期的最近版本，实测裸装解析到 `4.10.0-dsh.5` 而非 4.9.0），两者不可互推；
-2. **pnpm 不回退到「最老合格版」**：实测回退链落在同系列较早的预发布版（age=180 → `.8`、age=1200 → `.5`、age=3000 → `.2`），阈值过长直接 `ERR_PNPM_NO_MATURE_MATCHING_VERSION` 拒绝；若持续拿不到新版，旧系列 peer 可能撞上 DSH 兼容闸门。
+2. **pnpm 不回退到「最老合格版」**：实测回退链落在同系列较早的预发布版（阈值设得越长回退越深），阈值过长直接 `ERR_PNPM_NO_MATURE_MATCHING_VERSION` 拒绝；若持续拿不到新版，旧系列 peer 可能撞上 DSH 兼容闸门。
 
 所以插件作者若采用 `<主>.<次>.<修订>-<dsh>.<序号>` 这类后缀发布，**应提醒使用者显式写精确版本（自动登记 exclude）、显式关闭冷却期（`minimumReleaseAge: 0`）或显式放行 `minimumReleaseAgeExclude`**，否则新发布的序号版会被 1 天冷却期挡在解析之外。
 
@@ -167,7 +167,7 @@ minimumReleaseAge: 0
 pnpm add <pkg> --config.minimum-release-age=0
 ```
 
-提示（已实测放宽）：BOM 或 CRLF 不会让 pnpm 的 YAML 解析把注释与后续配置黏成一行——pnpm 11.7.0 / 12.8.1 与 js-yaml/yaml 库对 BOM+CRLF+注释均正确解析（实测 `minimumReleaseAge: 0` 生效）。写完回读确认配置生效即可，不必担心字节头。
+提示（已实测放宽）：BOM 或 CRLF 不会让 pnpm 的 YAML 解析把注释与后续配置黏成一行——pnpm 11/12 系列与 js-yaml/yaml 库对 BOM+CRLF+注释均正确解析（实测 `minimumReleaseAge: 0` 生效）。写完回读确认配置生效即可，不必担心字节头。
 
 ---
 

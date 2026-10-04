@@ -5,14 +5,14 @@
 > 出处仓库（便于追溯与二次核验）。形态判定、API 契约等基础事实以官方类型声明为准，
 > 本文件是"工程做法"层面的补充。
 >
-> **证据强度**：本文件全部条目来自对上游仓库源码/README/patch 的直接阅读（2026-10-03
+> **证据强度**：本文件全部条目来自对上游仓库源码/README/patch 的直接阅读（最近一次快照
 > 快照），属于"第三级证据"（社区实现）；与官方源码冲突时以官方为准。
 
 ---
 
 ## 〇、怎么判定一个仓库是不是 DSH 插件（社区里的三种形态）
 
-topic:dsh-plugin 话题下 17306 个仓库里，真正是 DSH 插件的不到两成。判定只看三个信号：
+topic:dsh-plugin 话题下的高星仓库中，真正是 DSH 插件的不到两成（精确统计随话题增长漂移，不必写死）。判定只看三个信号：
 
 1. 根或子包的 `package.json` 里有 `dsh.bundle.patch`（或 `dsh.client`）声明；
 2. 存在 `cordis.patch.yml`；
@@ -35,7 +35,7 @@ topic:dsh-plugin 话题下 17306 个仓库里，真正是 DSH 插件的不到两
 
 ### 1.1 patch 的 config 是"整块替换"不是深合并（5+ 仓库独立印证）
 - dsh-TUI 注释原话：`A patch replaces the targeted row's whole config, so each row below restates every key it owns`。
-- dsh-desktop 的 `- id: ui-brand-official\n  disabled: true` 覆盖官方内置行；可选插件行要单独放一个 patch 文件（patch 引用不存在的 entry 会让 loader 每次启动都警告）。
+- 某桌面客户端用 `- id: <官方内置行>\n  disabled: true` 覆盖官方内置行；可选插件行要单独放一个 patch 文件（patch 引用不存在的 entry 会让 loader 每次启动都警告）。
 - **写法铁律**：覆盖任何一行的 config 时，把该行拥有的每个 key 全部重述，漏一个就是静默丢失。
 
 ### 1.2 patch 里做版本自适应（!!js 求值读自身依赖版本）
@@ -71,7 +71,7 @@ clearai 用 `dsh.bundle.patch: ["./cordis.patch.yml", "./presets/clearai/clearai
 ## 二、版本兼容层：高迭代宿主下的存活术（64/86 提及，全生态共识）
 
 ### 2.1 能力探测优先于版本号分支
-- 事件名新旧并存：0.1.6 起 agent 就绪事件是 `agent/created（payload 恒带 source: 'startup'|'resume'|'clear'|'compact'，按 source 值判而非 'source' in payload）；SessionStartSource = 'startup'|'resume'|'clear'|'compact'）——agent/session/created 是旧版事件名，0.2.0 全包 0 命中
+- 事件名新旧并存：0.1.6 起 agent 就绪事件是 `agent/created（payload 携带 source，类型为 'startup'|'resume'|'clear'|'compact'（0.2.0 运行时实际驱动方仅 startup 与 resume，clear/compact 属预留枚举），按 source 值判而非 'source' in payload）；SessionStartSource = 'startup'|'resume'|'clear'|'compact'）——agent/session/created 是旧版事件名，0.2.0 全包 0 命中
 - 方法探测：0.2.0-rc.2 已移除 session.events（用 snapshotEvents；eventAt/ownEvents deprecated）；Settings 无 register 方法（用 describe/update/replace/configure）；官方无 WEB_SERVER_KEYS 常量（服务名就是 ctx.webServer）。
 - 版本号分支只用在"补丁/配置键名"这类真的按版本变化的场景（dsh-TUI 的 persona→personaPrefix）。
 
@@ -83,6 +83,15 @@ Symbol.for('dsh.subagent.queuePrompt') 等进程级 Symbol + 能力探测，替�
 - **范围 + 兼容性矩阵**：`dsh.compatibility.dshReleases: { "0.1.5-rc.1": "compatible", ... }` 声明"测过的版本"（dsh-context、dsh-im 还加 `profiles: ['web']`）。
 - **rc 期区间**：`">=x-rc <下一主版本"`（ANOLISA 经验）。
 - 注意：peer 声明是**启动期硬约束**，caret 跨 minor 不成立；写清单只列实际验证过的宿主版本，"未测"不要写成"不支持"。
+
+### 2.5 同一语义的多实现收敛：入口/诊断/命令层共用唯一真源
+
+宿主迭代期高发坑：**同一默认值语义在多个消费路径各写一份解析**（启动判定一份、诊断面板一份、命令层兜底一份），靠注释「保持一致」必然漂移，且漂移是静默的（用户在某条路径拿到旧值，零报错）：
+
+- **收敛**：所有消费路径注入同一个实时解析闭包（如 `() => resolvePriority(...).effective`），删掉手写 if/else；
+- **实时而非快照**：注入「每次调用时重新解析」的闭包，不要注入启动期快照——配置写盘后下一次调用要读到新值（`/cmd default <档>` 场景会直接踩）；
+- **锁定测试**：production 接线级（经真实 apply 的事件链）断言各路径结果一致，覆盖大小写变体与非法值（TDD 形态必须与生产接线等价，见 architecture-refactor-experience.md 第九节）；
+- **「命令层兜底」是最容易漏的消费路径**：命令解析器的默认值回调若未显式注入，会回落到模块自己的简化实现（少一层配置源），与 UI/启动判定分裂——构造命令调度器时显式注入统一闭包。
 
 ### 2.4 版本基线门（fail-open）
 apply 时探测宿主版本：低于支持基线给 fallback 单元（零数据 + 门记录）；检测失败 fail-open 进正常组成（dsh-context）。`dsh.compatibility.dshReleases` 里的"unknown"档表示未验证。
@@ -139,7 +148,7 @@ apply 时探测宿主版本：低于支持基线给 fallback 单元（零数据 
 graph-memory + working-activity 双重印证：自定义 session 事件类型不在宿主的 `KNOWN_SESSION_EVENT_TYPES`（generated 只读集合，**注册机制被官方否决**——known-event-types.d.ts 注释原文 "event-name registration was rejected"）。持久化读取只认 `ignorable: true` 信封标记（lib/index.js：未知类型+ignorable=true 才接受），自定义事件必须写 ignorable:true，不存在"注册事件名"操作；严格读取路径会拒绝整个会话（写进去没报错、下次打不开）。
 
 ### 5.2 事件派发模式的坑
-- `agent/pre-step` 用 `{ prepend: true }` 注册且挂在**具体 Agent 的 context** 上；根组合拿不到每 agent 钩子，需 agent/created（payload 恒带 source: 'startup'|'resume'|'clear'|'compact'，按 source 值判而非 'source' in payload）；SessionStartSource = 'startup'|'resume'|'clear'|'compact'）——agent/session/created 是旧版事件名，0.2.0 全包 0 命中
+- `agent/pre-step` 用 `{ prepend: true }` 注册且挂在**具体 Agent 的 context** 上；根组合拿不到每 agent 钩子，需 agent/created（payload 携带 source，类型为 'startup'|'resume'|'clear'|'compact'（0.2.0 运行时实际驱动方仅 startup 与 resume，clear/compact 属预留枚举），按 source 值判而非 'source' in payload）；SessionStartSource = 'startup'|'resume'|'clear'|'compact'）——agent/session/created 是旧版事件名，0.2.0 全包 0 命中
 - serial 事件监听器**不要抛错**（一个监听器抛错会中断整条链）；waterfall 必须 `await next()` 再 `{...seed}`。
 - turnTail 插槽从 chain 形态演进到 list 形态，双形态都要兼容（dsh-ads）。
 - `ctx.effect` 的 this 是 Fiber（dsh-tauri 经验）。
@@ -192,7 +201,7 @@ cc-safety-net：守卫插件是跨宿主薄适配（每个宿主一个入口）�
 ### 7.3 MCP 客户端桥接
 - 插一行 `@deepseek-ai/dsh-mcp-client` 就能给模型一批工具（`mcp__<server>__<tool>` 命名空间由宿主接管）。
 - `ctx.plugin(mcpClient, {...})` 作子 fiber 挂载：端点配一次、生命周期共享（agentrq）。
-- 外部 CLI 版本要钉下限并写明可验证的行为理由（antibrow：2.19.1 是第一个真正结束进程的版本，更老只断连接 → 浏览器残留/锁死/许可证占满）。
+- 外部 CLI 版本要钉下限并写明可验证的行为理由（某浏览器桥插件实测：某版本起才真正结束进程，更老只断连接 → 残留/锁死）。
 - 生产环境 `failOnStartupError` 与单调守卫拦截。
 
 ---
@@ -288,14 +297,14 @@ bundle loader 调 apply 时外层 ctx 可能仍在等服务，直接读 `ctx.llm
 
 ### 11.5 运行中宿主版本的可靠识别（dsh-plugin-shop）
 不要从 node_modules 走查 `@deepseek-ai/dsh` ——插件自身依赖会被 hoist/链接农场重指，
-实测把运行中的 0.1.5-rc.3 误判成 0.1.2-rc.1。可靠做法：**realpath 解析启动本进程的 bin 脚本**
+实测会把运行中的版本误判成更老的一个（版本号随宿主迭代变化，不必写死）。可靠做法：**realpath 解析启动本进程的 bin 脚本**
 → 其所属 package.json 的 version 就是运行版；其 import 的 `@deepseek-ai/dsh-app-boot` 的
 PROFILE_TEMPLATES 就是当前模板表。运行信息一次读取并缓存（进程内不变）。
 
 ### 11.6 兼容判定借用宿主实现，不要自己重写
 0.1.7+ 宿主自带 `evaluatePluginCompatibility(manifest, exemptions, runtimeVersion)` 与
 `readProfileVersionExemptions(profileDir)`。自己重实现必与真实拒绝行为漂移；直接调用宿主
-判定来预测安装拒绝。注意该 API 默认每次重读 manifest（实测 75ms/2000 条），调用方要缓存。
+判定来预测安装拒绝。注意该 API 默认每次重读 manifest（重读有实测成本），调用方要缓存。
 
 ### 11.7 权限与沙箱随 profile 打包（漏了就是"装上但没工具"）
 `sandbox-policy` + `approval` + `permission` 三行联动定义多档预设
@@ -362,7 +371,7 @@ LLM 摘要串行化（promise 链），捕获失败仅记日志不中断；摘�
 定时维护 `setInterval` + `unref` + due-state 门（每任务每 interval 至多一次）。
 
 ### 11.19 生命周期注入必须延迟到"首个持久信号"（Aegis）
-在 `agent/created（payload 恒带 source: 'startup'|'resume'|'clear'|'compact'，按 source 值判而非 'source' in payload）；SessionStartSource = 'startup'|'resume'|'clear'|'compact'）——agent/session/created 是旧版事件名，0.2.0 全包 0 命中
+在 `agent/created（payload 携带 source，类型为 'startup'|'resume'|'clear'|'compact'（0.2.0 运行时实际驱动方仅 startup 与 resume，clear/compact 属预留枚举），按 source 值判而非 'source' in payload）；SessionStartSource = 'startup'|'resume'|'clear'|'compact'）——agent/session/created 是旧版事件名，0.2.0 全包 0 命中
 首个模型请求之前，破坏依赖"无菌首请求"基线的轨迹预设。正确做法：每个会话边界只 ARM 一次
 注入（记录 sessionId→agent 映射），等会话发出第一个**持久化**信号（`tool/call` 或
 `assistant/message`）才真正 `agent.inject(message)`；`compaction/end` 重新 ARM
@@ -386,7 +395,7 @@ session v4 要求 producer-owned 的 `source.kind`（如 `plugin:<name>`、`form
   `prepare` 脚本会让每个用户先 allowlist 构建才能首装成功）。
 - SKILL.md frontmatter 描述用**正则解析**不引 YAML 依赖；load 失败返回 undefined/[] 而非抛错。
 
-### 11.22 MCP 连接器无凭据时整体禁用 + !!js 表达式若以 ! 开头必须带引号——js-yaml 4.3.2 实测无引号 `!!js !ctx.get(...)` 抛 "duplication of a tag property"（必然解析失败）；`name: @scope/pkg` 无引号抛 "bad indentation of a mapping entry"（不是解析成指令）。官方 dsh-base 原文 disabled: !!js "!ctx.get('profileContext')" 就这么写（treg）
+### 11.22 MCP 连接器无凭据时整体禁用 + !!js 表达式若以 ! 开头必须带引号——js-yaml 实测无引号 `!!js !ctx.get(...)` 抛 "duplication of a tag property"（必然解析失败）；`name: @scope/pkg` 无引号抛 "bad indentation of a mapping entry"（不是解析成指令）。官方 dsh-base 原文 disabled: !!js "!ctx.get('profileContext')" 就这么写（treg）
 - 注册一个没有 token 的 connector 得到的是常开工具、每次调用都 401：`disabled: !!js
   (process.env.X ?? '') === ''` 让 patch 行缺 token 时根本不挂载。
 - **patch 里 `!!js` 表达式不能以 `!` 开头**：YAML 会把第二个 `!` 读成又一个 tag
@@ -598,7 +607,7 @@ loopback/trusted 围栏再看 capability + `lstat` 禁 symlink + realpath 包含
 
 ### 11.64 进程外二进制插件样板（noema 拉式生命周期）
 懒启动 + idle 回收 + 崩溃退避 + 状态面；子进程二进制缺失是**静默性能悬崖**
-（npx 回退 3.6-6.5s/tap vs 57ms）→ 启动时探测 + warn；绝不两个 xcodebuild（busy
+（npx 回退比原生慢一个数量级以上）→ 启动时探测 + warn；绝不两个 xcodebuild（busy
 cooldown）；命令串用 tokenize 而非 shell 解析。
 
 ### 11.65 插件 id 与 npm 包名解耦 + patch 不含本机路径
@@ -649,7 +658,7 @@ QuickJS（quickjs-emscripten）+ 静态扫描（先剥字面量再匹配 FORBIDD
 ### 11.76 设备桥的防 TOCTOU 与鉴权细节（android/ios）
 截图/文件路由：逐级 `lstat` + `O_NOFOLLOW` + `realpath` 包含校验防 TOCTOU；流路由
 loopback + Origin 鉴权。真机与模拟器 idle 回收策略分开（真机 `idleTimeoutMs = 0` 禁用回收，
-xcodebuild 重启分钟级）；npx 兜底是 60 倍性能悬崖（3.6-6.5s vs 57ms）启动时大声警告。
+xcodebuild 重启分钟级）；npx 兜底可能是数十倍性能悬崖，启动时大声警告。
 
 ### 11.77 进程外引擎的 MCP stdio 客户端（noema）
 自写 MCP stdio 客户端：initialize 握手 + 包络大小上限（如 8MB）+ 超时（如 15s）；
@@ -685,7 +694,7 @@ Host 命中 loopback（127/8、localhost、[::1]）+ sec-fetch-site cross-site �
 删除客户端（迭代前 Array.from 快照）；并发 SSE 客户端硬上限。
 
 ### 11.84 第三方插件借用官方包名（voice-ai-girlfriend）
-`@deepseek-ai/dsh-client-ui-voice` 是第三方借用官方命名空间的包——判定插件归属看实际仓库
+第三方插件可能借用官方命名空间发布（如 `@deepseek-ai/*` 下的非官方包）——判定插件归属看实际仓库
 （owner/repo + 发布者），不能只看包名。
 
 ### 11.85 跨宿主桥的 CLI 自管理安装 + 版本钉扎（plugin-cc）
@@ -776,7 +785,7 @@ timingSafeEqual 长度不等会抛——先比 length 再比较；admin token �
 apiProxy 协议，独立端口 + 零依赖（node:http）复用宿主会话/权限；inject 由 patch 行声明。
 
 ### 11.105 TOOL_WRAPPER_PROTOCOL 版本矩阵（sandbox-escalation-fix）
-包装宿主工具前先枚举支持版本矩阵（19 个）+ DSH_PACKAGES 清单 + 窄包装白名单
+包装宿主工具前先枚举支持版本矩阵（数量随宿主版本演进，勿写死）+ DSH_PACKAGES 清单 + 窄包装白名单
 （TARGET_NAMES：bash/pwsh/write/edit）+ ESCALATION_FIELDS 协议字段。
 
 ### 11.106 PTY relay 的 Electron node 解析（wsl-workspace）
@@ -808,11 +817,11 @@ apply 的同步段若不同步载配置，注册闸门会"结构性恒假"（异
 
 ### 11.113 双 entry 拆分 web 面（agy）
 主插件（llm 注册）+ web entry（等 ctx.webServer 激活后注册 RPC/OAuth）；headless 下
-主插件照常；无 Config 合法（env 逃生口 DSH_AGY_DISABLE）；registerAdapter 官方已内部 ctx.effect，插件再包一层是双保险不必要。
+主插件照常；无 Config 合法（env 逃生口，如 `<插件>_DISABLE` 类自有变量）；registerAdapter 官方已内部 ctx.effect，插件再包一层是双保险不必要。
 
 ### 11.114 零运行时 @deepseek-ai 依赖 = 全 type-only import
 多个仓库独立印证（taskboard/with-chatgpt/cloader）：零运行时依赖的插件全用 type-only
-import（9 个类型增强包），协议段进 systemPrompt 带 order，执行走 fresh 会话 + pinned 模型。
+import（类型增强包数量随项目而异），协议段进 systemPrompt 带 order，执行走 fresh 会话 + pinned 模型。
 
 ### 11.115 审批 answerer 完整模板（三方印证）
 approval/request 瀑布接入：不匹配预设即 `next()`；转人工 `await next()` 并回记终态；

@@ -24,7 +24,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 2. **核心大动脉服务单复数铁律 (The Core Spine)**——写错单复数是最常见的低级错误：
    - **复数**（注册表 / 多成员服务）：`ctx.sessions`、`ctx.agents`、`ctx.agentTeams`、`ctx.tools`、`ctx.settings`、`ctx.clientModules`；
    - **单数**（引擎 / 运行时 / 控制器）：`ctx.systemPrompt`、`ctx.configEditor`、`ctx.schedule`、`ctx.planMode`、`ctx.workspaceRegistry`、`ctx.llm`；
-   - `ctx.agentLoop` 是唯一的具体循环包（bundle），扩展插件依赖 `@deepseek-ai/dsh-agent` 的事件与服务即可；
+   - `ctx.agentLoop` 由 `@deepseek-ai/dsh-agent-loop` 挂载的 Service（`super(ctx, "agentLoop")`）提供，扩展插件依赖 `@deepseek-ai/dsh-agent` 的事件与服务即可；
    - `@deepseek-ai/dsh-scope` 是纯函数库，不在 Context 上挂载服务。
    完整角色矩阵（core / seam / bundle）、所属包与提供方见 [services.md](./references/services.md)。
 3. **Cordis 五大事件派发模式**：
@@ -37,8 +37,8 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
    - 补丁中的 `config` **整体替换，不做深合并**；
    - **绝对严禁教导用户修改 `settings.yaml`**（已彻底废弃，启动时自动重命名为 `settings.yaml.imported`）。
    落点路径、`- insert:` 语法、`- id:` 覆盖、`!!js` 动态求值与两种写入语义见 [config.md](./references/config.md)。
-5. **官方工具执行流水线**（讲解拆为 16 个编号环节 = 13 个调度器环节 + 3 个非调度器环节；完整逐条与源码行号见 [tools.md](./references/tools.md)）：
-   `tool/call` 记录 -> `presentCall` -> `pre-execute` -> **`approval` (serviceAsk 审批裁决)** -> **单调 guard (终极一票否决权)** -> `execute`(环绕分派) -> 工具 `execute`(主体) -> FS Gate -> 工具自有事件 -> **`projectContent` (denied 依然触发)** -> `post-execute` -> 规范化 -> `finalizeContent` -> `tools/result` (同步) -> `tool/result` (持久化) -> `presentResult`。
+5. **官方工具执行流水线**（讲解拆为带编号的环节序列；真实调度器环节 12-13 个，`presentCall`/`presentResult` 是工具可选展示声明、不在调度器调用链上；完整逐条与源码行号见 [tools.md](./references/tools.md)）：
+   `tool/call` 记录 -> `pre-execute` -> **`approval` (serviceAsk 审批裁决)** -> **单调 guard (终极一票否决权)** -> `execute`(环绕分派) -> 工具 `execute`(主体) -> FS Gate -> 工具自有事件 -> **`projectContent` (denied 依然触发)** -> `post-execute` -> 规范化 -> `finalizeContent` -> `tools/result` (同步) -> `tool/result` (持久化)。
    **审批先于守卫**：用户点了「允许」之后，单调 guard 仍可否决，详见 tools.md 第 4、5 阶段。
 6. **反例与误诊**：以上铁律都有一批「看起来合理但不存在」的 API 和「听起来顺理成章但方向错」的归因（改 `settings.yaml`、`registerTool`、`registerTab`、`did not activate` 等），逐条附可执行判定动作，见 [debugging-and-troubleshooting.md](./references/debugging-and-troubleshooting.md) 的「伪 API 与伪归因黑名单」。
 
@@ -240,7 +240,7 @@ export function apply(ctx) {
 
   // 2. 注册单调安全守卫（返回 string 立即阻断，不可逆转）
   ctx.tools.guard((exec) => {
-    if (exec.toolName === 'dangerous_tool') {
+    if (exec.name === 'dangerous_tool') {
       return '安全策略阻断：当前环境禁止调用 dangerous_tool'
     }
   })
@@ -327,7 +327,7 @@ DSH 自带的 Playwright 不含浏览器二进制，必须指到本机 Chrome；
 
 ```python
 b = await p.chromium.launch(
-    executable_path=r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+    executable_path=os.environ.get("CHROME_PATH") or r"<本机 Chrome 绝对路径，Windows 常为 C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe>",
     headless=True, args=["--no-sandbox"])
 pg = await c.new_page()
 pg.on("console", lambda m: errs.append(m.text) if m.type == "error" else None)

@@ -115,10 +115,10 @@ DSH 允许在 YAML 中使用 `!!js` 标签执行非沙盒的任意 JavaScript �
 - 使用 `pnpm` 解析超大依赖图时，链接阶段极易发生物理内存溢出（OOM，`invalid array length`）；若使用 `pnpm install --prod` 又会错误排除 devDependencies 导致插件全量卡死在旧版本；
 - **官方推荐解决方案**：
   ```bash
-  cd ~/.dsh/profiles/web
-  npm install --legacy-peer-deps --no-audit --no-fund
+  cd $DSH_HOME/profiles/<name>
+  npm install --legacy-peer-deps --no-audit --no-fund   # 仅作 OOM 临时规避，官方链路是 pnpm
   ```
-  使用 `--legacy-peer-deps` 压制非致命 ERESOLVE 警告，npm 默认采用扁平化 `node_modules` 结构，解析极速且零 OOM。
+  使用 `--legacy-peer-deps` 压制非致命 ERESOLVE 警告，npm 默认扁平化 `node_modules`、解析极速且零 OOM——这仅是本机 OOM 时的临时规避手段（与 DSH 官方 pnpm 链路结果可能不同），用后必须以 `plugin list` 零报错验收。
 
 ### 3. 版本兼容性豁免机制 (allow-version)
 DSH 会在启动与安装时严格检查各插件的 `peerDependencies`（组合阶段的 bundle 预检 + 装载前的条目预检，见第四节）。遇到第三方插件尚未适配最新 DSH 但功能完全兼容时，可通过官方豁免命令放行。相关命令共三个：`allow-version` / `revoke-version` / `version-exemptions`（均挂在 `dsh plugin` 下），usage 形如 `dsh plugin <command> <pkg>@<ver> --dsh-version <exact> [--accept-risk]`：
@@ -131,25 +131,11 @@ dsh plugin --profile <profile> version-exemptions
 
 ---
 
-## 五、Web Profile 官方生效的 14 个 Bundles 清单
+## 五、Profile 实际挂载哪些 Bundles
 
-在当前最新的生产基准（2026-10-01）中，Web profile 包含以下 14 个标准组合包：
-1. `@deepseek-ai/dsh-base`（基础微内核与大动脉服务）
-2. `@deepseek-ai/dsh-web-app`（Web 宿主控制台与会话管理器）
-3. `dshmarket`（插件市场）
-4. `dsh-context`（上下文增强）
-5. `dsh-better-sidebar`（侧边栏扩展）
-6. `@wenaixi/dsh-ponytail`（代码精简与极简工程引擎）
-7. `@wenaixi/dsh-superpower`（开发超级能力套件）
-8. `dsh-prompt-history`（提示词历史记录）
-9. `@linxin666/dsh-client-ui-git-graph`（Git 分支图可视化）
-10. `dsh-plugin-wallpaper-engine`（动态壁纸与视觉主题）
-11. `@deepseek-ai/dsh-experimental-agent-team-profile`（Agent Teams 多智能体协作团队预设）
-12. `@wenaixi/cfbridge`（Cloudflare Code Mode MCP 桥）
-13. `@deepseek-ai/dsh-experimental-schedule-bundle`（挂钟定时提醒系统）
-14. `@liustack/modsearch`（多引擎网络搜索桥接）
+profile 实际挂载哪些 bundle 以 `profiles/<name>/package.json` 的 `dsh.profile.bundles` 为准（含官方 `dsh-base`/`dsh-web-app`/`dsh-experimental-*` 与用户自行安装的第三方包）。不要在文档里维护固定清单——第三方包会增删，清单必然失真。
 
-> 注：`@deepseek-ai/dsh-experimental-voice-input-bundle` 属 `dsh-app-boot` 的 OPTIONAL_BUNDLES（随安装提供、默认不启用、由插件管理器开启），不在本清单内；实际清单以 `profiles/<name>/package.json` 的 `dsh.profile.bundles` 为准。
+> 官方可选组合包（如 `@deepseek-ai/dsh-experimental-voice-input-bundle`）由 `dsh-app-boot` 的 OPTIONAL_BUNDLES 随安装提供、默认不启用、经插件管理器开启；不依赖它们时无需在 `dsh.profile.bundles` 中列出。
 
 ---
 

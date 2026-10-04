@@ -47,7 +47,7 @@ my-feature-plugin/
 - `dsh.bundle.patch` 支持字符串路径（`"./cordis.patch.yml"`），也支持**有序文件数组**（`["./base.patch.yml", "./web.patch.yml"]`），按序作为同一层应用。
 - patch 行按**包名**引用（`- insert: - { id: hello, name: 'dsh-hello-plugin' }`），不是文件路径。
 
-### package.json 不变式（pnpm run constraints 强制）
+### package.json 不变式（面向 deepseek-harness 官方仓库内新增 workspace 包的贡献者；独立发布的第三方插件包只需满足通用契约 main/exports/files/dsh.bundle/dsh.client）
 
 新增 workspace 包（`packages/<group>/<pkg>/`）必须满足：
 
@@ -195,9 +195,9 @@ pnpm link --global dsh-plugin-foo
 ### 多包发布最佳实践
 
 1. **统一类型定义**：共享类型抽离至纯类型包或根模块导出，避免跨包循环依赖。
-2. **peerDependencies 严格解耦**：只把 `@deepseek-ai/cordis` 与 `@deepseek-ai/dsh-*` 系列声明为 peerDependencies；`react` 一律放 devDependencies——官方包全部如此（57 个含 react 的包 peer 计数为 0），浏览器模块表 `PLATFORM_MODULES` 提供运行时 react，不复用宿主实例。
+2. **peerDependencies 严格解耦**：只把 `@deepseek-ai/cordis` 与 `@deepseek-ai/dsh-*` 系列声明为 peerDependencies；`react` 一律放 devDependencies——官方包全部如此（57 个含 react 的包 peer 计数为 0），浏览器运行时 react 由 Web 壳引导时注入的平台种子表（staticModules）提供，插件侧只需在自己的 devDependencies 声明 react。
 3. **发布前校验**：`files` 显式包含编译后的 `lib/` 与 `cordis.patch.yml`，避免遗漏关键补丁。
-4. **client 半侧挂载规则**：浏览器半侧**只挂在说明符恰为裸包名的那一行上**；子路径导出挂载的行永远不带半侧。拆成多行的组合包，其半侧留在根行，注册的每个页面随根行关闭而消失；需在其他行关闭时仍保留页面的子插件应作为**独立包**发布。`./client` 必须是客户端模块系统的 lazy-CJS factory 格式；生成它的 tsdown 预设只在仓库 `packages/client/tsdown.client.ts`，仓库之外需自行复刻。
+4. **client 半侧挂载规则**：浏览器半侧**只挂在说明符恰为裸包名的那一行上**；子路径导出挂载的行永远不带半侧。拆成多行的组合包，其半侧留在根行，注册的每个页面随根行关闭而消失；需在其他行关闭时仍保留页面的子插件应作为**独立包**发布。`./client` 必须是客户端模块系统的 lazy-CJS factory 格式；生成它的 tsdown client 预设属于官方仓库内部构建产物，npm 包内不带源码；仓库之外需自行复刻同构配置。
 
 ## 安装与依赖陷阱避坑指南 (npm & pnpm Pitfalls)
 
@@ -213,7 +213,7 @@ pnpm link --global dsh-plugin-foo
 
 - **现象**：在 Profile 目录或大型 monorepo 中执行 `pnpm install` 或 `pnpm run build` 时，Node.js 进程卡死并崩溃，报错：`FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory`。
 - **根本原因**：
-  - **超深依赖拓扑**：DSH 核心生态包含 289 个细粒度包（0.2.0-rc.2 实测），深层依赖符号链接图极其庞大复杂。
+  - **超深依赖拓扑**：DSH 核心生态包含数百个细粒度包（精确清单以运行时 `desktop-runtime.json` 的 `sharedPackages` 为准），深层依赖符号链接图极其庞大复杂。
   - **V8 默认堆内存限制**：Node.js 默认分配给 V8 的最大堆内存通常仅 1.4GB ~ 2GB。pnpm 在全量计算符号链接图、跨包校验依赖一致性、或 tsc 同时编译数十个包的双面 bundle 时，内存极易被打爆。
 - **避坑与解决实操**：
   1. **临时/全局提高 Node.js 内存上限**：设置环境变量 `NODE_OPTIONS="--max-old-space-size=8192"`（提升至 8GB 堆内存）。

@@ -82,11 +82,11 @@
 | 用途 | 路径 | 内容 |
 | :--- | :--- | :--- |
 | 全局安装本体 | npm全局根/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/ | 官方核心包与共享依赖，含 cordis、dsh-tools、dsh-session、dsh-system-prompt 等 |
-| Profile 本地 | DSH_HOME/profiles/&lt;profile&gt;/node_modules/ | 该 profile 自行安装的包，如 dsh-better-sidebar、dsh-plugin-wallpaper-engine 等界面与增强插件 |
+| Profile 本地 | DSH_HOME/profiles/&lt;profile&gt;/node_modules/ | 该 profile 自行安装的第三方插件（界面、增强类） |
 
 Windows 上全局本体通常位于：
 
-C:\Users\&lt;用户名&gt;\AppData\Roaming\npm\node_modules\@deepseek-ai\dsh\node_modules\@deepseek-ai\
+npm 全局根（`npm root -g` 查询；Windows 默认 %APPDATA%\npm\node_modules）下的 @deepseek-ai/dsh/node_modules/@deepseek-ai/
 
 ### 1. 单包结构速查
 
@@ -129,7 +129,7 @@ declare module '@deepseek-ai/cordis' {
         ↓ 若与下层冲突则弃用
 [中等] 官方仓库 packages/包名/README.md
         ↓ 若与下层冲突则弃用
-[最强] 本地 lib/index.js 与 lib/index.d.ts 真实实现
+[最强] 本地 lib/*.js 真实实现（含内联 JSDoc；多数包无 .d.ts）
         ↓ 若与运行时不符则弃用
 [运行时] 宿主真实行为
 ```

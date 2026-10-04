@@ -32,6 +32,8 @@
 | `for...of` 或展开运算对字符串逐字符迭代，写入全是空 | 调用点传了裸字符串，而函数签名已经改成数组 | 打印实际传入的 `typeof` 与 `Array.isArray`；把签名与**全部**调用点一起 grep 一遍 |
 | 批量操作生效了、单次操作毫无动静 | 多处调用点共用一个 helper，改签名时只改了一部分 | 全仓 grep helper 名，逐个核对实参形态 |
 
+| 整段 UI 静默消失、页面控制台零报错 | 客户端 bundle 里残留宿侧 Node 代码（`import.meta` / `process.`），宿主原样拼接进 combo 以 `<script src>` 加载，解析期 SyntaxError 杀死整段脚本 | 读产物 grep `import.meta|process.`；`new Function('window','require',src)` 探针复现 SyntaxError；门禁断言**产物内容**不含宿侧 API 关键字（不是断言门禁脚本自身） |
+
 **这一类的判定铁律**：任何「定义了但不确定跑了」的代码，都必须有一条能直接数出它跑过几次的观测点（DOM 节点数、注册表条数、配置里的键、事件派发计数）。
 
 ### 第 2 类：契约写错，但错误被吞掉

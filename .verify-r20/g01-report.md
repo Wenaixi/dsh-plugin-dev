@@ -1,88 +1,86 @@
 # g01 · SKILL.md
 
-核实基线：DSH 0.2.0-rc.2（asar 真源码 @ E:/newCC/APP/dsh/resources/app.asar/dsh/node_modules/@deepseek-ai/）+ 本机 desktop profile 运行时配置
+核实基线：DSH 0.2.0-rc.2（asar 真源码）+ 本机 desktop profile 运行时配置
 核实时间：2026-10-04
 
 ## 结论概览
 
-- 核实断言总数：63
-- OK：57
-- WRONG：2
-- STALE：2
-- CONFLICT：0
+- 核实断言总数：49
+- OK：40
+- WRONG：5
+- STALE：1
+- CONFLICT：1
 - UNVERIFIED：2
-
-## 说明：本次核实的盘面与任务快照差异
-
-任务消息附带的 SKILL.md 快照为 431 行；实际盘面为 433 行，且 L262（dsh.bundle.id 示例）与 L97/L70（cfg.err）已被并行修正为正确形态。本报告以**当期盘面**为准，已修正项不再列入 WRONG/CONFLICT，仅在摘要中标注。
 
 ## 逐条报告
 
-### [WRONG] 文档 L289：slots.register 的 options 缺 name，必抛错
+### [WRONG] 文档 L241-245：场景 B 示例 guard 使用 exec.toolName，应为 exec.name
 
-- **现文**：`ctx.slots.register({ id: 'custom-panel', title: '扩展面板' }, CustomWidget)`
-- **问题**：SlotsCore.register(options, component) 第一步即 `this.records.get(options.name)`，name 为 undefined → rec 为 undefined → 抛 `slot "undefined" is not declared`。真实注册（dsh-client-ui-sidebar-files:1003-1004）都是 `inject(key, () => register({ name: key, id, ... }, Component))`，name 必须等于被注入的插槽键。
-- **应为**：`ctx.slots.register({ name: 'sidebar.right.pane.tab', id: 'custom-panel', title: '扩展面板' }, CustomWidget)`
-- **证据**：`dsh-client-ui-slots/lib/index.js:163-165`；对照 `dsh-client-ui-sidebar-files/lib/client.js:1003-1004`。
+- **现文**：ctx.tools.guard((exec) => { if (exec.toolName === 'dangerous_tool') { return '安全策略阻断...' } })
+- **问题**：exec 对象没有 toolName 字段。createExecution 构造的 execution 字段为 token/callId/rootCallId/name/signal/agent/parent/schema/deferContext/concludeTurn/arguments，工具名在 exec.name。
+- **应为**：if (exec.name === 'dangerous_tool')
+- **证据**：dsh-tools/lib/index.js:3143-3168（createExecution base 字段）；官方 guard 调用点 dsh-subagent-in-process-driver/lib/index.js:85（exec.name）。
 
-### [WRONG] 场景矩阵 L168 场景 H：不存在 "agent_team 系列工具"
+### [WRONG] 文档 L41（第 5 条流水线）：presentCall/presentResult 被列为 16 环节之一，但源码没有执行调用点
 
-- **现文**：`Agent Teams 架构：消费 ctx.agentTeams，使用 agent_team 系列工具`
-- **问题**：dsh-experimental-tool-agent-team 注册的工具名无 agent_team 前缀：spawn_teammate、send_message、list_agents、wait_agent、interrupt_agent、team_task_create、team_task_list、team_task_get、team_task_update。`grep "agent_team" 全库 0 命中`。
-- **应为**：使用 `spawn_teammate / send_message / team_task_*` 系列工具（来自 @deepseek-ai/dsh-experimental-tool-agent-team）。
-- **证据**：`dsh-experimental-tool-agent-team/lib/index.js:238-459`（name 字段逐行，无 agent_team 前缀）。
+- **现文**：流水线含 tool/result (持久化) -> presentResult，且整条 16 环节 = 13 调度器 + 3 非调度器
+- **问题**：源码里 presentCall/presentResult 只有定义（defineTool wrapper 与各工具包），没有宿主调度器调用它们；notifyResult 只 dispatch tools/result。卡片渲染在 client 端由各 toolview 直接读 event 数据，不走 presentCall 函数。
+- **应为**：把 presentCall/presentResult 从「执行流水线环节」中移除（它们是展示意图声明，供 UI/CLI 渲染参考，不参与执行顺序），或将 16 环节改述为不含 presentResult 的 15 环节。
+- **证据**：dsh-tools/lib/index.js:3409-3427（notifyResult 只 emit tools/result）；全 asar 递归 grep 只找到定义点，无 .presentCall( 调用点；dsh-tools/lib/types/presentation.js:1-6（注释明言是 render intent 声明）。
 
-### [STALE] L13 与 L115：指引读者查验 lib/index.d.ts，但该文件不存在
+### [WRONG] 文档 L97：第四-1 说检查 ~/.dsh/profiles/<profile>/cfg.err，该文件不存在
 
-- **L13 现文**：`本地已安装官方包的 lib/index.d.ts / lib/index.js 源码与类型声明`
-- **L115 现文**：`本地 lib/index.d.ts 与 lib/index.js`（证据强度表"最强"行）
-- **问题**：实测 @deepseek-ai 包 lib 下 `.d.ts` 文件数为 0（前 400 包 474 个 .js、0 个 .d.ts；lib/types 下同样 0 个 .d.ts）。package.json 的 types 字段指向不存在的文件（如 dsh-tools types: lib/types/index.d.ts，实际目录只有 .js）。
-- **应为**：改为 `本地 lib/*.js 实现 + JSDoc 注释`（lib/types/*.d.ts 多数不存在）。
-- **证据**：`dsh-tools/package.json` types 字段 vs `dsh-tools/lib/types/` 目录（无任何 .d.ts）；目录扫描统计 `.d.ts: 0`。
+- **现文**：立即检查 ~/.dsh/profiles/<profile>/cfg.err
+- **问题**：全 asar（含 Electron main.js、dsh-web-frontend bundle）与 desktop profile 目录对 cfg.err 零命中。启动失败的诊断链路是：CLI 走 stderr + StartupError；桌面走 IPC fatal + Electron app.getPath('logs') 下 crash-*.log（writeCrashReport）。
+- **应为**：改为「检查启动日志（桌面端：app.getPath('logs') 下 crash-*.log；CLI：stderr / .plugin-manager/logs）」，或直接删掉该文件名。
+- **证据**：dsh-app-boot/lib/index.js:3864-3867（StartupError.startup 只在内存携带，不写盘）；E:/newCC/APP/dsh/resources/app.asar/lib/main.js:7609-7715（crash-*.log 落盘 app.getPath('logs')）；desktop profile 目录实际文件清单无 cfg.err。
 
-### [UNVERIFIED] L41 流水线中 presentCall / presentResult / FS Gate 三环节
+### [WRONG] 文档 L262：双面插件示例 package.json 含 dsh.bundle.id，该字段无任何消费方
 
-- **现文**：`... presentCall -> ... 工具 execute(主体) -> FS Gate -> ... tools/result (同步) -> tool/result (持久化) -> presentResult`
-- **问题**：dsh-tools 主路径（lib/index.js:3116-3397）内无任何 `presentCall`/`presentResult` 调用：二者仅出现在 defineTool 定义（:838-887、:874-881）与 ToolDefinition 类型契约（api-catalog:7532），@deepseek-ai 全库 50 处出现中 44 处定义、6 处类型/注释，零消费调用。FS Gate 在 dsh-tools 内零命中，实现在沙箱/观测层（dsh-fs-observation-policy、dsh-sandbox-policy）。
-- **应为**：保留教学表述但标注来源层：presentCall/presentResult 属 UI 展示契约（ToolCallView/ToolResultView，dsh-tools/lib/types/presentation.js），FS Gate 属沙箱观测层；三者均不在 dsh-tools 调度器主路径。
-- **证据**：`dsh-tools/lib/index.js:3116-3397` 全文无 presentCall/presentResult 调用；`grep presentCall 全库 50 处，消费零`；`grep "fs.?gate|fileSystem" dsh-tools 零命中`。
+- **现文**："dsh": { "bundle": { "id": "custom-ui" }, "client": {...} }
+- **问题**：官方 bundle 声明只读 dsh.bundle.patch；dsh.bundle.id 在全 asar 零读取（唯一近似命中是 plugin-manager 的 row.id，是 entry id 不是 bundle id）。示例是双面 UI 插件，本就不该带 bundle 段（bundle 是组合包语义）。
+- **应为**：删除 "bundle": { "id": "custom-ui" }，只保留 "client": { "platform": "web", "inject": [...] }。
+- **证据**：dsh-app-boot/lib/index.js:496-508（bundlePatchFiles 只读 patch）、:928-933（bundle 声明必须含 patch）；官方 bundle 包 package.json（dsh-base/dsh-web-app/dsh-experimental-agent-team-profile 等）全部只有 dsh.bundle.patch。
 
-### [UNVERIFIED] L40 与 L66：16 环节 = 13 调度器 + 3 非调度器的环节计数
+### [WRONG] 文档 L168（场景 H）：「使用 agent_team 系列工具」名不存在
 
-- **现文**：`讲解拆为 16 个编号环节 = 13 个调度器环节 + 3 个非调度器环节`
-- **问题**：dsh-tools 源码可数出的调度器阶段约 12-13 个（pre-execute → approval/serviceAsk → guardReason → tools/execute 环绕 → dispatchToolBody → normalizeDispatchResult → projectContent → tools/post-execute → materializeFinalResult → applyFinalContent → notifyResult(tools/result)），无法唯一对应文档的 13+3 拆分；presentCall、FS Gate、presentResult 三环节不在 dsh-tools 主路径（见上条）。
-- **应为**：在 tools.md 中给出逐阶段的源码行号对照表（dsh-tools/lib/index.js:3214-3397），并说明 presentCall/presentResult/FS Gate 归属层；不要写死"13+3"这类无法由源码唯一验证的计数。
-- **证据**：`dsh-tools/lib/index.js:3116-3397` 阶段序列实测。
+- **现文**：Agent Teams 架构：消费 ctx.agentTeams，使用 agent_team 系列工具
+- **问题**：官方工具名是 team_task_create / team_task_list / team_task_get / team_task_update / team:policy，全库无 agent_team 前缀工具。
+- **应为**：改为「使用 team_task_* 系列工具」。
+- **证据**：dsh-experimental-tool-agent-team/lib/index.js:238-459。
 
-## 已修复项（对应任务快照，当前盘面正确，无需再改）
+### [STALE] 文档 L262：示例 dsh.client.inject 把 primitives 列为 inject 值，字段用法与官方语义不符
 
-- 任务快照 L262 `"bundle": { "id": "custom-ui" }`：当前盘面已删除 bundle.id，且 L267 注记"不存在 dsh.bundle.id/dsh.client.module 字段"——与源码一致（dsh-app-boot bundlePatchFiles 只读 bundle.patch，dsh-app-boot/lib/index.js:495-499）。
-- 任务快照 L97 `~/.dsh/profiles/<profile>/cfg.err`：当前盘面已改为 `~/.dsh/logs/startup-*.log` 且注明"profile 目录下没有 cfg.err"——与源码一致（dsh/lib/bin.js:151、178-179：`startup-${ISO}-${uuid}.log` 于 DSH_HOME/logs；全库 `grep cfg.err 0 命中`）。
-- 任务快照 L70 `检查控制台 window.__DSH_BOOT__ 与 cfg.err`：当前盘面已改为"window.__DSH_BOOT__ 与宿主启动日志（$DSH_HOME/logs/）"——同样与源码一致。
+- **现文**："client": { "inject": ["@deepseek-ai/dsh-client-ui-primitives"] }
+- **问题**：官方 dsh.client.inject 的语义是「运行时依赖需先抵达」（dsh.client.inject 生成模块图边并 arrive 依赖）；官方 UI 包 inject 的是 remotes/locale 等运行时服务，primitives 只是被 require 的 seed/静态模块，从不进 inject。示例照抄会把 primitives 当作需先抵达的动态模块。
+- **应为**：从示例 inject 中移除 primitives（客户端代码直接 require 它即可）。
+- **证据**：dsh-client-modules/lib/index.js:713-727（inject 进 meta 并生成图边）；dsh-client-modules/lib/client.js:643-660（arriveGraphRow 对 inject 做依赖 arrive，未注册即抛错）；官方 dsh-client-ui-plan package.json dsh.client.inject 无 primitives。
 
-## 其余断言判定摘要（OK，不逐条展开）
+### [CONFLICT] 文档 L27 与 L26：ctx.agentLoop 既被说成「唯一的具体循环包（bundle）」，又与它是挂载 Service 的事实冲突
 
-- L2-3 frontmatter name/description：dsh-skill-filesystem 解析器要求 name+description 非空且 name 匹配 kebab-case（parseSkillFile；SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/），`dsh-plugin-dev` 与长 description 合法。
-- L25-26 核心服务单复数：复数 sessions/agents/agentTeams/tools/settings/clientModules、单数 systemPrompt/configEditor/schedule/planMode/workspaceRegistry/llm 全部与 Service 构造第二参一致（dsh-session:1621 / dsh-agent:332 / dsh-experimental-agent-team:1704 / dsh-tools:2704 / dsh-settings:330 / dsh-client-modules:526 / dsh-system-prompt:213 / dsh-config-editor:20 / dsh-schedule:2614 / dsh-plan-mode:149 / dsh-workspace:374 / dsh-llm:1801）。
-- L27 agentLoop 唯一具体循环包：dsh-agent-loop super(ctx,"agentLoop")（:1552）。L28 dsh-scope 纯函数库：只导出 NamedEntries/AnonymousEntries/ScopedLayers/bindScopeParent 等，无 Service。
-- L31-33 事件语义：emit 同步 void；waterfall 环绕 + next 短路；parallel 用 Promise.allSettled → Promise<void>（错误聚合 AggregateError）；serial/bail 遇 isBailed（非 null/false/undefined）短路（cordis/src/events.ts）。
-- L36-38 配置四层顺序（bundle patch → profile patch → 用户全局 patch → CLI overlays）与 config 整块替换、settings.yaml 废弃重命名（dsh-app-boot/lib/index.js:1023-1033；applyEntryPatches target[key]=value；dsh-settings/lib/index.js:350-351）。
-- L42 审批先于守卫：prepareExecution 中 serviceAsk 在 guardReason 之前（dsh-tools/lib/index.js:3226、3241）。
-- L62 dsh.bundle.patch 与 dsh.client.platform 校验（dsh-client-modules/lib/client.js:65-68；dsh-app-boot:496-497）。L67 ctx.credentials：dsh-credentials super(ctx,"credentials")（:110）。
-- L74 --dump-config 不加载插件代码：boot 注释（:966-967、:984-992）。
-- L86 扁平数组零 Shell：validateSubprocessSpec 要求 argv[0] 程序 + argv 数组（dsh-subprocess-local/lib/runner-launch-B2zsQ1Dz.js:764-771）。
-- L88 allow-version 命令形态：dsh/lib/plugin-BGnVfe_D.js:8-48 完全一致（含 --dsh-version、usage 提示）。
-- L70/L97 宿主日志路径：`startup-*.log` 于 DSH_HOME/logs（bin.js:178-179）——与当前盘面一致。
-- L161-193 场景矩阵：34 个 references/*.md 全部存在（缺失 0）；场景 A-Z 的服务名与推荐形态逐一核对（defineTool/Service/tracker、LlmAdapter stream→ctx.llm、ctx.schedule、ctx.agentTeams、settings.section、sidebar.right.pane.tab、conversation.input.*、ctx.remote、mcp__<server>__<name>、sessionProjections（ctx.sessionProjections.register 证实）、present 与 ask_user_question、webhookRuntime、repeat-tool-reminder+time-context、ctx.storageDomain、ctx.terminals、ctx.commands、ctx.subagents.startContinuable、.plugin-manager/logs（dsh-plugin-manager/lib/index.js:441/973）、SkillProvider list/get/registerProvider/rank 小者胜（skill/lib/index.js:520 compareIndexedCandidates 升序）/complete:false/invocation.modelInvocable+userInvocable）。
-- L218-246 defineTool 示例：name/description/parameters{type,properties}/output{type,properties}/execute(args,exec)（源码 execute(args, exec)，dsh-tools:866-870）；exec.signal.aborted（ToolExecutionInput.signal: AbortSignal）；ctx.tools.register(definition)（:2878）；ctx.tools.guard(exec)（:2921，返回 string 即拒）。
-- L252-267 双面 package.json：type module / main lib/index.js / exports {".","./client"} / dsh.client.platform web / inject，与 dsh-client-locale 等真实双面包一致；bundle.id 已移除（见已修复项）。
-- L272-297 CJS factory（window.__ModuleLoader__.load({id, factory})）与 dsh-client-modules/lib/client.js:1-31 逐字一致（var module={exports:{}}、Symbol.toStringTag、return module.exports）；ESM import/顶层 return/JSX 禁限同源注释（:16-23）。
-- L300 primitives 组件清单：Button/Switch/SegmentedControl/Pill/Tag/StateDot/Input/Checkbox/Menu/Tooltip/Modal/Toast/DisclosureRow/SettingsForm/MarkdownText/CodeBlock/DiffBlock 全部存在于导出列表（dsh-client-ui-primitives/lib/index.js export）。
-- L310-322 七之二 token/Cookie：launchToken 进 URL query + 303 + set-cookie（dsh-client-connection/lib/index.js:374-408）；GET /api/* 需 cookie（isAuthenticated）。
-- L326-336 Playwright：playwright 仅 dsh-web-frontend devDependency（^1.49.0），不含浏览器二进制语义成立；domcontentloaded 指引合理。
-- L375-384 --dump-config 退出码只表 YAML 合规（boot:30/50）；allow-version 命令与 pnpm 冷却期（外部行为）。
-- L392 webServer.register 属性 handler：route.handler(req,res)（dsh-host-webserver/lib/index.js:235）；L393 readPluginMeta：dsh-app-boot:1969。
-- L397 style[data-plugin-css]：dsh-client-locale/lib/client.js:1029 等真实查询。
-- L427 body[data-ds-dark-theme]：dsh-client-ui-layout/lib/client.js:499 DARK_ATTRIBUTE。
-- L429 aria-disabled：client-ui 组件大量使用（如 dsh-client-ui-settings-account/lib/client.js:3602）。
-- L420-433 交付清单：node --check / npm pack --dry-run --json / readPluginMeta 非 undefined / icon <=256KiB / 带条件导出 exports 取 default（dsh-client-modules clientExportOf :170-180 接受 string 与含 default 的对象）/ repository.url git+https 规范化 —— 全部成立。
+- **L27 现文**：ctx.agentLoop 是唯一的具体循环包（bundle）
+- **问题**：agentLoop 是挂载的 Service（super(ctx,"agentLoop")），不是 bundle 名也不是「包」；「唯一的具体循环包」表述与它作为 ctx 服务的事实冲突（且 dsh-agent 也有 AgentRegistry 服务，循环由 dsh-agent-loop 提供，不是「唯一包」）。
+- **应为**：把 L27 改为「ctx.agentLoop 由 dsh-agent-loop 提供（super(ctx,'agentLoop')），扩展插件通过 @deepseek-ai/dsh-agent-loop 的 AgentLoop 服务挂载点接入」，删除「唯一的具体循环包」措辞。
+- **证据**：dsh-agent-loop/lib/index.js:1552（super(ctx, "agentLoop")）。
+
+### [UNVERIFIED] 文档 L363：Playwright 段「DSH 自带的 Playwright 不含浏览器二进制」
+
+- 本机 profile 无 playwright 包；该断言指向运行时外部行为，源码零命中，需人工在真实安装中确认。
+
+### [UNVERIFIED] 文档 L371-375：`--dump-config` 退出码 0 只代表 YAML 语法合规、不加载插件代码
+
+- dump-config 实现不 boot、不 evaluate !!js、不 import 插件代码（只 compose 补丁层并 render），断言成立；但「只代表 YAML 语法合规」的措辞与源码「连 YAML 语法都可能没验证、只做条目结构组合」略偏差，已按源码核到 runDumpConfig 只调 prepareProfile + collectConfigDumpLayers + renderConfigDump，且默认不解析 profile 用户层（defaultOnly）。保留为 UNVERIFIED 边界说明。
+
+## 其它重点核实（OK 项摘要）
+
+- 服务单复数：6 复数（sessions/agents/agentTeams/tools/settings/clientModules）+ 6 单数（systemPrompt/configEditor/schedule/planMode/workspaceRegistry/llm）全部与各包 super(ctx,name)/provide 一一对应。
+- 五大事件派发：cordis EventsService emit/parallel/serial/bail/waterfall 语义与 L31-33 描述一致（isBailed = 非 null/false/undefined；waterfall 环绕；parallel allSettled 后 throw AggregateError）。
+- 配置补丁：applyEntryPatches 对 config 直接 target[key]=value 整块替换（非深合并）；四层顺序 = bundle layers -> profile -> home -> CLI overlays（L1024-1033）；settings.yaml.imported 重命名真实（dsh-settings L348-351）。
+- 流水线（除 presentResult 环节外）：approval(serviceAsk) 先于 guard、projectContent 先于 post-execute、finalizeContent 先于 notifyResult、tools/result 同步 emit、tool/result 持久化在 agent-loop appendToolResult、FS Gate 在工具 execute 内部（fs/write-intent waterfall）——均与 L41 顺序一致。
+- defineTool 字段：name/description/parameters（属性必填 true 语法）/output（schema+render+presentationMeta）/execute(_args,exec)（官方示例同为两个形参）与 L224-237 一致；exec.signal.aborted 存在（createExecution base.signal）。
+- ctx.tools.register/guard 存在（register L2878、guard L2921）。
+- __ModuleLoader__.load({id,factory}) 签名与 CJS factory 形态完全一致（client-modules client.js 官方 bundle 即为同形态）。
+- 双面插件 exports["./client"] 与 exports["./package.json"]/locale 放行真实（readPluginMeta 走 Node ESM resolver，未放行抛 ERR_PACKAGE_PATH_NOT_EXPORTED，L1892-1895）。
+- frontmatter：name/description 必须为非空字符串，SKILL.md 的 frontmatter 合法。
+- 第九节 12 条：node --check / npm pack --dry-run --json / readPluginMeta / style[data-plugin-css]（client 端数十处使用）/ aria-disabled（client 端 10 包使用）/ 两帧一致（UI 段）/ repository.url git+https（npm publish 规范化告警，docs 层）——全部有源码或官方文档依据。
+- 场景矩阵 26 行推荐形态/服务/文档名全部与包存在性对应（含 mcp__ 前缀、webhookRuntime、team_task_*、schedule_create 等）。

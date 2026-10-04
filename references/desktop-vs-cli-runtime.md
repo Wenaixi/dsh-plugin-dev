@@ -102,7 +102,7 @@ npm 全局那份（%APPDATA%\\npm/dsh.cmd，即 npm 全局 bin，非 pnpm）  = 
 ### 参数形式的一个坑
 
 `text
-dsh web --port 8080            # ✅ 第一个位置参数即 profile 名（launcher 展开为 --profile web）
+dsh web --port 8080            # ✅ 第一个位置参数即 profile 名（launcher 展开为 --profile web；web 是官方内置 profile，读者自己的 profile 用 <name>）
 dsh --profile web --port 8080   # ✅ 等价
 dsh web --profile web           # ❌ 展开后 --profile 出现两次 -> select a profile only once
 dsh --profile web web           # 等价 dsh web web：web 成为 app-args；与 --dump-config 等 launcher 形态互斥时报 config dumps take no app arguments（实测）

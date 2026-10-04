@@ -128,9 +128,9 @@ dsh plugin --profile <profile> add ./hello-plugin-0.1.0.tgz
 豁免用精确版本命令族管理，豁免记录独立存于 profile 的 `compatibility.json`（与 package manifest、patch 无关）：
 
 ```bash
-dsh plugin --profile web allow-version dsh-my-feature@0.1.0 --dsh-version 0.2.0-rc.2 --accept-risk
-dsh plugin --profile web revoke-version dsh-my-feature@0.1.0 --dsh-version 0.2.0-rc.2
-dsh plugin --profile web version-exemptions     # 列出当前豁免
+dsh plugin --profile <profile> allow-version <pkg>@<版本> --dsh-version <DSH 版本> --accept-risk
+dsh plugin --profile <profile> revoke-version <pkg>@<版本> --dsh-version <DSH 版本>
+dsh plugin --profile <profile> version-exemptions   # 列出当前豁免
 ```
 
 - 豁免键是精确的 `package@version`，`--dsh-version` 必须是含预发布与构建元数据的精确 SemVer；`allow-version` 需要 `--accept-risk` 显式确认。

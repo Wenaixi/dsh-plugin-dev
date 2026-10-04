@@ -27,7 +27,7 @@
 
 ---
 
-## 一、patch 与插件装配（出现率最高的坑区，62/86 份深度笔记提及）
+## 一、patch 与插件装配（常见坑区）
 
 ### 1.1 patch 的 config 是"整块替换"不是深合并（5+ 仓库独立印证）
 - dsh-TUI 注释原话：`A patch replaces the targeted row's whole config, so each row below restates every key it owns`。
@@ -57,25 +57,25 @@ dsh-market 的机制（从 dsh-plugin-hub 移植）：
 dsh-TUI issue #183：CLI 从自己的安装锚点解析 bundle 的 cordis.patch.yml（通常全局 launcher），Loader 却从 profile 的副本 import 插件模块；两份不同步时 patch 里还没有某 row，硬 `inject` 会**死锁整个树**（`pending (waiting for service: xxx)`）。解法：把该服务从 code-level inject 移除，只在 patch 的 row-level inject 保留（存在时当顺序保证），代码内部走 local fallback。
 
 ### 1.5 聚合载具（family bundle）五段式
-聚合载具（family bundle）的 aggregate.yml 五段式（patchFrom/deps/rows/tombstones/inactive）是 dsh-web 仓库**早期/自建形态**——0.2.0-rc.2 官方 dsh-web-app 包已无 aggregate.yml（只有 cordis.patch.yml + presets/*.patch.yml，patchFrom/tombstones 关键词全无）。参考价值在行 id 命名空间化（web-ui-* 前缀）防 duplicate entry + 生成脚本 --check 幂等门禁，不按官方契约写。
+聚合载具（family bundle）的 aggregate.yml 五段式（patchFrom/deps/rows/tombstones/inactive）是 dsh-web 仓库**早期/自建形态**——当前核验的官方 dsh-web-app 发布物已无 aggregate.yml（只有 cordis.patch.yml + presets/*.patch.yml，patchFrom/tombstones 关键词全无）。参考价值在行 id 命名空间化（web-ui-* 前缀）防 duplicate entry + 生成脚本 --check 幂等门禁，不按官方契约写。
 
 ### 1.6 多 bundle 套件 = 一个 patch 数组
 clearai 用 `dsh.bundle.patch: ["./cordis.patch.yml", "./presets/clearai/clearai.patch.yml"]`；Openwrite 的 suite 形态按产出物切包；每个子插件行 `name` 用 `@scope/pkg/<family>` 子路径让官方列表每行独立标题。
 
 ---
 
-## 二、版本兼容层：高迭代宿主下的存活术（64/86 提及，全生态共识）
+## 二、版本兼容层：高迭代宿主下的存活术
 
 ### 2.1 能力探测优先于版本号分支
 - 事件名新旧并存：0.1.6 起 agent 就绪事件是 `agent/created（payload 携带 source，类型为 'startup'|'resume'|'clear'|'compact'（0.2.0 运行时实际驱动方仅 startup 与 resume，clear/compact 属预留枚举），按 source 值判而非 'source' in payload）；SessionStartSource = 'startup'|'resume'|'clear'|'compact'）——agent/session/created 是旧版事件名，0.2.0 全包 0 命中
-- 方法探测：0.2.0-rc.2 已移除 session.events（用 snapshotEvents；eventAt/ownEvents deprecated）；Settings 无 register 方法（用 describe/update/replace/configure）；官方无 WEB_SERVER_KEYS 常量（服务名就是 ctx.webServer）。
+- 方法探测：较新版本可能移除旧的 session.events 接口（用 snapshotEvents；eventAt/ownEvents deprecated）；Settings 无 register 方法（用 describe/update/replace/configure）；官方无 WEB_SERVER_KEYS 常量（服务名就是 ctx.webServer）。
 - 版本号分支只用在"补丁/配置键名"这类真的按版本变化的场景（dsh-TUI 的 persona→personaPrefix）。
 
 ### 2.2 进程级稳定符号做跨包通信
 Symbol.for('dsh.subagent.queuePrompt') 等进程级 Symbol + 能力探测，替代对内部子路径的静态 import（子路径在不同版本可能不存在，静态 import 直接让插件加载失败）。
 
 ### 2.3 peerDependencies 的三种写法
-- **精确枚举**（最可控）：`"@deepseek-ai/dsh-agent": "0.2.0-rc.2 || 0.1.7-rc.2 || 0.1.5-rc.3 || ..."`（agent-teams、dsh-TUI）。
+- **精确枚举**（最可控）：`"@deepseek-ai/dsh-agent": "<已验证版本范围>"`（agent-teams、dsh-TUI）。
 - **范围 + 兼容性矩阵**：`dsh.compatibility.dshReleases: { "0.1.5-rc.1": "compatible", ... }` 声明"测过的版本"（dsh-context、dsh-im 还加 `profiles: ['web']`）。
 - **rc 期区间**：`">=x-rc <下一主版本"`（ANOLISA 经验）。
 - 注意：peer 声明是**启动期硬约束**，caret 跨 minor 不成立；写清单只列实际验证过的宿主版本，"未测"不要写成"不支持"。
@@ -117,7 +117,7 @@ apply 时探测宿主版本：低于支持基线给 fallback 单元（零数据 
 
 ---
 
-## 四、客户端（browser）半区的工程纪律（62/86 提及）
+## 四、客户端（browser）半区的工程纪律
 
 ### 4.1 客户端模块扫描只看宿主 Loader 行
 任何要出现在浏览器里的 UI 必须插在 patch 的宿主平面（insert 行）；放在 agent 预设里的行浏览器看不见（dsh-worktable）。
@@ -668,7 +668,7 @@ worker/派工类插件的递归防护：以 (backend, cwd) 做起源链标识，
 
 ### 11.79 patch insert-only 铁律 + duplicate 行为年级限定（trading）
 patch 行支持 **insert 与 id 覆盖两种动词**（last write winning per row，dsh-base 注释），非 insert 行必须 id+name 匹配。duplicate entry id 行为分代：
-0.1.5 世代抛 "duplicate loader entry id"；0.2.0-rc.2 新世代 EntryTree.create 用 `store[id] ??=` **复用已有 entry 不崩溃**（非静默塌缩）。顶层 YAML 数组形状强制（空层 []）。
+0.1.5 世代抛 "duplicate loader entry id"；较新的 EntryTree.create 实现 用 `store[id] ??=` **复用已有 entry 不崩溃**（非静默塌缩）。顶层 YAML 数组形状强制（空层 []）。
 
 ### 11.80 storage-domain 无版本号加字段的兼容写法（mimir）
 新增可空字段用 `.optional()`、可缺省数组用 `.default([])`——旧 v2 JSON 继续加载，
@@ -826,7 +826,7 @@ parseReason 解析 escalate 语义；callId 回溯 tool/call 取结构化路径�
 可能只读）。
 
 ### 11.116 settings 双轨兼容 + FEATURE DETECTION（catppuccin 印证）
-（0.2.0-rc.2 的 `dsh-settings` 已无 `installSection`，统一走 `Config.volatile` + `configForms`）
+（当前核验的 `dsh-settings` 已无 `installSection`，统一走 `Config.volatile` + `configForms`；使用前请复核目标版本）
 <=0.1.6 用 installSection / >=0.1.7 用 Config.volatile + configForms——用**特性探测**
 不解析版本号；可选 settings 用 ctx.inject 降级 localStorage（只做首帧种子）。
 

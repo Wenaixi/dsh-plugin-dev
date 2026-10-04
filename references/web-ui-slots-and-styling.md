@@ -133,7 +133,7 @@ export function apply(ctx) {
 ### 4. 消息流链式拦截与自定义渲染 (`conversation.chat.node`)
 适用于在聊天对话流中，对特定类型的消息卡片进行自定义包装或替换（例如高亮渲染代码、增加气泡水印、拦截显示特殊结果）。
 
-- **Slot 属性**：`kind: "keyed"`、scope `session`（**不是 chain**；0.2.0-rc.2 中本槽按 key 注册，客户端用 `useChatNode(key)`/`useChatNodeProcess(key)` 渲染；chain 槽真实存在的是 `conversation.composer` 与 `shell.quota-notice`，chain 注册必须提供 `select`，缺失即抛错）。
+- **Slot 属性**：`kind: "keyed"`、scope `session`（**不是 chain**；当前核验版本中本槽按 key 注册，客户端用 `useChatNode(key)`/`useChatNodeProcess(key)` 渲染；chain 槽真实存在的是 `conversation.composer` 与 `shell.quota-notice`，chain 注册必须提供 `select`，缺失即抛错）。
 - **实战注册范例**：
 ```jsx
 export function apply(ctx) {
@@ -245,7 +245,7 @@ DSH 前端提供了一套标准的主题 CSS 变量，支持自动跟随深色�
 ### 1. 官方核心颜色变量矩阵
 开发插件 UI 时，**严禁硬编码 `#ffffff` 或 `#000000`**，必须优先使用官方设计令牌（Tokens）。
 
-下表每一行都经本地官方包源码全量扫描核实。数量口径（统一剔伪影）：全官方包 `lib/client.js` 提及 `--dsw-*` 去重 414 个（若把 runner 里的 `--dsw-alias-` 截断残片计入为 415）；按 js+css 全口径为 417 个；其中真正由 `dsh-client-ui-theme` 定义在 `body/:root` 上、**照抄即可生效**的是 403 个（全库 js+css 口径与 theme 定义数之差仅 14 个（如 primitives HoverCard 的 --dsw-hovercard-bg），引用它们宿主 body 未定义）——**下表只列 403 个已定义变量中的常用项**：
+下表只列当前主题包中常用的 CSS 变量示例。变量清单、定义范围和是否可直接使用，必须扫描目标版本主题包的实际 CSS/JS 导出确认：
 
 | CSS 变量名 | 语义作用 |
 | :--- | :--- |

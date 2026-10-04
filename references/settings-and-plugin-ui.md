@@ -1,6 +1,6 @@
-# DSH 插件设置栏 (Settings) 与插件管理中心 (Plugin Manager) UI 深度开发指南 (DSH 0.2.0-rc.2)
+# DSH 插件设置栏（Settings）与插件管理中心（Plugin Manager）UI 参考指南
 
-本文件是 DeepSeek Harness (DSH 0.2.0-rc.2) Web GUI 前端扩展的两大核心界面的权威技术规范：
+本文件整理 Web GUI 前端扩展的两类常见界面。插槽、元数据和持久化契约必须按目标版本 client 包与运行时复核：
 1. **全局设置窗口 (Settings Modal)**：如何在左侧导航栏添加专属设置项（Tab），并在右侧渲染自定义 React 设置面板；
 2. **主导航插件管理中心 (Plugin Manager Page)**：插件卡片在“官方”与“已安装”列表中如何展现、元数据来源以及配置与启用开关机制。
 

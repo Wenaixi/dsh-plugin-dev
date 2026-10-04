@@ -1,6 +1,6 @@
-# DSH 模型工具体系与 ToolRuntime 权威指南 (DSH 0.2.0-rc.2)
+# DSH 模型工具体系与 ToolRuntime 参考指南
 
-本文件是 DeepSeek Harness (DSH 0.2.0-rc.2) 工具定义规范、工具执行时序、单调守卫法则与官方工具归属全貌的技术规范。
+本文件整理工具定义、执行管线和单调守卫的核验要点。工具名、包归属、阶段顺序和返回值必须按目标版本的实际发布物与运行时复核。
 
 > 术语说明：官方 README 把执行路径描述为固定管线（pre-execute → 单调 guards → execute → post-execute → finalizeContent → result，共 8 步）。下文「16 环节」是本文档为讲解方便展开的编号，**不是源码里的枚举**；其中 `presentCall`/`presentResult` 是工具定义上**可选的纯渲染描述符**（dsh-tools 调度器从不调用它们，属 Host-local 消费者读取面），阶段 8（FS Gate）是 `dsh-tool-fs` 工具内部行为。
 

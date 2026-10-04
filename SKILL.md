@@ -63,11 +63,11 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
    - **输出**：完整实现的业务代码。
 4. **步骤 4：本地极速联调与排错验证**
    - **输入**：未发布的本地插件代码；
-   - **执行**：使用 `dsh --profile web --patch ./my-plugin/cordis.patch.yml` 0 侵入启动测试；检查控制台 `window.__DSH_BOOT__` 与宿主启动日志（`$DSH_HOME/logs/`，profile 目录下没有 `cfg.err`/`cfg.log` 这类通用产物）；
+   - **执行**：使用 `dsh --profile <profile> --patch ./my-plugin/cordis.patch.yml` 0 侵入启动测试；检查控制台 `window.__DSH_BOOT__` 与宿主启动日志（`$DSH_HOME/logs/`，profile 目录下没有 `cfg.err`/`cfg.log` 这类通用产物）；
    - **输出**：在 Web GUI 或终端中正常激活并生效的插件功能。
 5. **步骤 5：自动化验收与合规校验**
    - **输入**：完成测试的插件目录；
-   - **执行**：逐项自检本项目 [CONTRIBUTING.md](./CONTRIBUTING.md) 第四节的五条硬性规范；对外发布前用 `dsh --profile web --dump-config` 确认补丁被解析（注意它不加载插件代码，阳性不等于能启动）；
+   - **执行**：逐项自检本项目 [CONTRIBUTING.md](./CONTRIBUTING.md) 第四节的五条硬性规范；对外发布前用 `dsh --profile <profile> --dump-config` 确认补丁被解析（注意它不加载插件代码，阳性不等于能启动）；
    - **输出**：全部绿色通过的交付物。
 
 ---

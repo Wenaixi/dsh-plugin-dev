@@ -87,7 +87,7 @@ DeepSeek Harness（DSH）采用清晰的物理分层与进程隔离架构：**Br
 
 注意：client 端插槽、连接和设置能力由宿主提供的相应 client 包装配；具体包名、注入名和是否拆包随版本变化，应以目标安装物的 `package.json`、`lib` 实现和运行时清单为准。**loader 行解析到其 package.json 后按该包名判定半侧**（locatePkgJson 支持子路径定位最近 ancestor 的 package.json，子路径行同样适用）。
 
-**声明边界（以目标版本实际发布物为准；当前核验版本未发现 `dsh.bundle.id` 与 `dsh.client.module`）**：双面包声明 `dsh.client.platform: "web"`（+ 可选 `inject`/`external`/`immediately`），客户端入口由 `exports["./client"]` 子路径导出（该路径必须真实存在）；组合补丁用 `dsh.bundle.patch`（路径或有序数组）。peerDependencies 以 `@deepseek-ai/cordis ~4.0.4` 为准）。`exports` 也可以写成带条件导出对象的形式（`{ "types": ..., "default": "./lib/client.js" }`）。
+**声明边界（以目标版本实际发布物为准；当前核验版本未发现 `dsh.bundle.id` 与 `dsh.client.module`）**：双面包声明 `dsh.client.platform: "web"`（+ 可选 `inject`/`external`/`immediately`），客户端入口由 `exports["./client"]` 子路径导出（该路径必须真实存在）；组合补丁用 `dsh.bundle.patch`（路径或有序数组）。peerDependencies 应按目标 DSH 发布物声明的兼容范围填写。`exports` 也可以写成带条件导出对象的形式（`{ "types": ..., "default": "./lib/client.js" }`）。
 
 ## 浏览器端插件加载、Slots 插槽与样式管理
 
@@ -199,7 +199,7 @@ Cardinality 选错会导致重复渲染或完全不渲染；调试实时插槽�
 - 方法签名硬约束：公开/非静态/有具体实现、不能泛型、参数具名必填简单标识符、**禁解构/默认值/rest/可选**。
 - **协作取消**：Host 签名最后一个参数必须是 `signal: AbortSignal`（记于描述符而非 args）。
 - 一元 RPC：`connection.rpc.call('/api','<ns>/<method>',{args},signal)` → HTTP `POST /api/<ns>/<method>`。
-- **`@Remote({mode:'stream'})`**：返回 `Iterable/AsyncIterable/RemoteStream<Out,In>`，经 `/api/remote.mux` WebSocket 投递；Client 得 `ClientStreamHandle`（send/end/dispose，0.2.0-rc.2 中没有 `RemoteStreamHandle` 这个名字），上行经 `ctx.invocation.uplink<In>()` 读取。**这就是 remote.mux 的唯一合法用途（流式 Remote），不是通用多路复用总线**。
+- **`@Remote({mode:'stream'})`**：返回 `Iterable/AsyncIterable/RemoteStream<Out,In>`，经 `/api/remote.mux` WebSocket 投递；Client 得 `ClientStreamHandle`（send/end/dispose，当前核验版本中没有 `RemoteStreamHandle` 这个名字），上行经 `ctx.invocation.uplink<In>()` 读取。**不要根据 `remote.mux` 的名称推断其用途；应以目标版本的 Remote 实现和类型为准。**
 - `ctx.remote.$on()` 把 allowlist 事件交 root Context、scoped waterfall 事件交 Session Context（可返回结果 / next() / 拒绝）。
 - 依赖声明归实际调用方：业务包 `inject` 须含 `['remote','remote.<ns>']`。
 - 错误码：`gateway/lookup-unavailable`、`session/not-found`、`session/agent-busy`、未归类 → `gateway/internal`。

@@ -145,9 +145,11 @@ dsh plugin --profile <profile> version-exemptions
 9. `@linxin666/dsh-client-ui-git-graph`（Git 分支图可视化）
 10. `dsh-plugin-wallpaper-engine`（动态壁纸与视觉主题）
 11. `@deepseek-ai/dsh-experimental-agent-team-profile`（Agent Teams 多智能体协作团队预设）
-12. `@deepseek-ai/dsh-experimental-voice-input-bundle`（语音输入套件）
+12. `@wenaixi/cfbridge`（Cloudflare Code Mode MCP 桥）
 13. `@deepseek-ai/dsh-experimental-schedule-bundle`（挂钟定时提醒系统）
 14. `@liustack/modsearch`（多引擎网络搜索桥接）
+
+> 注：`@deepseek-ai/dsh-experimental-voice-input-bundle` 属 `dsh-app-boot` 的 OPTIONAL_BUNDLES（随安装提供、默认不启用、由插件管理器开启），不在本清单内；实际清单以 `profiles/<name>/package.json` 的 `dsh.profile.bundles` 为准。
 
 ---
 

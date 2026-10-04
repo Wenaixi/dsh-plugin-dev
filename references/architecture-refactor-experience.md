@@ -42,7 +42,7 @@ export function createConfigHttpEndpoint(deps: Deps):
 { method: 'POST', [Symbol.asyncIterator]: async function* () { yield JSON.stringify(payload) } }
 ```
 
-- **假 res**：`node:http` 的 res 不是 class、无私有状态，普通对象即可冒充——`{ setHeader(){}, writeHead(c){status=c}, end(b){body=b} }`；
+- **假 res**：`node:http` 的 res 是 class（OutgoingMessage 子类）且带内部状态，但 handler 只触碰 `setHeader`/`writeHead`/`end` 这类方法时，普通对象即可冒充——`{ setHeader(){}, writeHead(c){status=c}, end(b){body=b} }`；
 - **零为测试造抽象**：不需要为可测性新增 bodyReader 参数，stub async iterator 已够；
 - 抽取时把 GET/POST 共用的响应组装（快照）收成一个函数，避免把重复代码搬家。
 

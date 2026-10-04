@@ -26,7 +26,7 @@ export function apply(ctx) {
 
 ### 2. 专家级环绕中间件 (`system-prompt/assemble`)
 
-> 提示：真实事件是 `system-prompt/assemble`（waterfall，签名 (assembly, context, next)）。轮次结束没有 `agent/turn-stopping（`turn/end` 是会话事件，不是 agent 生命周期事件）` 事件——用 `ctx.on('session/event')` 过滤 `turn/end`（载荷 {turn, reason}），或监听 `agent/turn-stopping`。
+> 提示：真实事件是 `system-prompt/assemble`（waterfall，签名 (assembly, context, next)）。轮次结束的 agent 生命周期事件是 `agent/turn-stopping`（载荷 { agent, turn, signal }）；`turn/end` 是会话事件（载荷 { turn, reason }），可经 `ctx.on('session/event')` 过滤后使用。
 若需要在提示词最终交付给模型前进行全局拦截、审计或占位符替换，可以监听 `system-prompt/assemble` waterfall 环绕事件：
 
 ```js
@@ -52,7 +52,7 @@ ctx.on('system-prompt/assemble', async (assembly, context, next) => {
 
 ### 1. 核心铁律：仅追加日志 (Append-Only Log)
 - 所有会话历史（用户消息、模型回复、工具调用、审批记录、计划变更）均作为不可变的 `SessionEvent` 顺序落盘（JSONL 格式）；
-- **严禁任何插件通过 Node.js 原生 `fs` 直接修改底层 `.jsonl` 文件**！直接修改会破坏会话序号指纹（`SessionSeq`）与 SHA-256 结构校验，导致会话无法反序列化崩溃；
+- **严禁任何插件通过 Node.js 原生 `fs` 直接修改底层 `.jsonl` 文件**！直接修改会破坏事件 seq 的连续性（`session event seq X is not contiguous`）、首行 header 结构与格式版本校验（`corrupt session log`），并可能引入未知事件类型而被拒绝重建（会话日志本身没有 SHA-256 完整性校验）；
 - 任何状态变化（如取消、编辑、修剪），必须通过追加新的事件（带 `surfaceOp` 的合法 replace 形状 `{ op: 'replace', startSeq, endSeq }`（裸字符串 `'replace'` 会被当作无效 replace 抛错）或专属事件）来合法表达。
 
 ---
@@ -106,7 +106,7 @@ export function apply(ctx) {
 
 ### 1. 轮次变更快照
 在每个 Agent 轮次（Turn）结束时，系统会自动执行 Git Diff 对比，并生成结构化的变更摘要：
-- `WorkspaceChanges`：包含新增、修改、删除的文件清单；
+- `WorkspaceChangesSummary`（字段 turn/cwd/files/total/added/deleted/snapshot，文件项类型 `WorkspaceChangedFile`）：包含新增、修改、删除的文件清单；
 - `WorkspaceFileDiff`：包含具体文件的修改 Diff 块（Hunks）。
 
 ### 2. 插件自动化响应实战
@@ -114,11 +114,12 @@ export function apply(ctx) {
 
 ```js
 export function apply(ctx) {
-  ctx.on('agent/turn-end', async ({ sessionId, turnId }) => {
-    // 查询该轮次造成的文件变动
-    const changes = await ctx.workspaceChanges?.summary(sessionId, seq)（第二参是那次 workspace/changes 事件的 seq，不是 turnId）;
+  ctx.on('agent/turn-stopping', async ({ agent }) => {
+    // 该轮次工作区变动经 workspace/changes 会话事件落盘后，用 summary(sessionId, seq) 读取
+    const seq = /* 那次 workspace/changes 事件的 seq（从会话事件流捕获） */ 0;
+    const changes = await ctx.workspaceChanges?.summary(agent.session.id, seq);
     if (changes && changes.files.length > 0) {
-      ctx.logger('audit').info(`轮次 ${turnId} 修改了 ${changes.files.length} 个文件:`, changes.files.map(f => f.path));
+      ctx.logger('audit').info(`轮次修改了 ${changes.files.length} 个文件:`, changes.files.map(f => f.path));
     }
   });
 }

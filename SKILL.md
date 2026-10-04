@@ -67,7 +67,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
    - **输出**：完整实现的业务代码。
 4. **步骤 4：本地极速联调与排错验证**
    - **输入**：未发布的本地插件代码；
-   - **执行**：使用 `dsh --profile web --patch ./my-plugin/cordis.patch.yml` 0 侵入启动测试；检查控制台 `window.__DSH_BOOT__` 与 `cfg.err`；
+   - **执行**：使用 `dsh --profile web --patch ./my-plugin/cordis.patch.yml` 0 侵入启动测试；检查控制台 `window.__DSH_BOOT__` 与宿主启动日志（`$DSH_HOME/logs/`，profile 目录下没有 `cfg.err`/`cfg.log` 这类通用产物）；
    - **输出**：在 Web GUI 或终端中正常激活并生效的插件功能。
 5. **步骤 5：自动化验收与合规校验**
    - **输入**：完成测试的插件目录；
@@ -94,7 +94,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 若插件联调过程中出现系统异常，请按以下预案秒级恢复：
 
 1. **Web 宿主启动崩溃 (required plugin did not activate)**：
-   - 立即检查 `~/.dsh/profiles/<profile>/cfg.err`；
+   - 立即检查宿主启动日志（`~/.dsh/logs/startup-*.log`，profile 目录下没有 `cfg.err`）；
    - 撤销最近一次在 `cordis.patch.yml` 中插入的条目，或将该条目置为 `disabled: true` 即可秒级恢复启动。
 2. **插件卡在 PENDING 状态无法就绪**：
    - 检查该插件的 `inject` 列表，定位缺失的服务名称；将其从 `inject` 移除，改用代码内部 `ctx.get('service')` 动态降级容错。
@@ -259,11 +259,12 @@ export function apply(ctx) {
     "./client": "./lib/client.js"
   },
   "dsh": {
-    "bundle": { "id": "custom-ui" },
     "client": { "platform": "web", "inject": ["@deepseek-ai/dsh-client-ui-primitives"] }
   }
 }
 ```
+> 注：双面插件声明**不存在** `dsh.bundle.id` / `dsh.client.module` 字段；声明了 `exports` 就必须同时放行 `"./package.json"` 与 `"./locale/*.json"`。
+
 Browser 侧 `lib/client.js`（**必须是 CJS factory 形态**；ESM import / 顶层 return / JSX 三者任一出现都会加载失败）：
 
 ```js

@@ -53,8 +53,8 @@ my-feature-plugin/
 
 - `private: true`、version 与根一致、`type: module`。
 - `main: "lib/index.js"`、`types: "lib/types/index.d.ts"`、`exports["."]` 同构（types + default）。
-- `@deepseek-ai/cordis` **同时**出现在 peerDependencies 与 devDependencies（同版本范围）；每个 dsh peer 在 dev 镜像；用 schemastery 做 Config 校验的包（如 dsh-plugin-manager）放 dependencies；其余包（如 dsh-app-boot）只把它放 devDependencies。
-- `files` 精确列表（lib/index.js + lib/types/**/*.d.ts；不发布 src/声明映射/JS map）；带 bin 的包在 files 中紧跟 lib/bin.js。
+- `@deepseek-ai/cordis` **同时**出现在 peerDependencies 与 devDependencies（同版本范围）；每个 dsh peer 在 dev 镜像（唯一例外：dsh-terminal-bash 的 peer `dsh-session-projection` 未镜像进 dev）；用 schemastery 做 Config 校验的包（如 dsh-plugin-manager）放 dependencies；其余包（如 dsh-app-boot）只把它放 devDependencies。
+- `files` 精确列表：dsh-* 生态包一般不含 src/声明映射/JS map（cordis 内核是例外，files 含 `src` 与 `.d.ts.map`、根 `bin.js`）；带 bin 的包由 files 覆盖其 bin 输出（dsh 主包用 `lib/*.js` 通配含 `lib/bin.js`）。
 - 源码内相对导入用显式 `.ts` 后缀（JS 输出重写为 `.js`，声明保留 `.ts`）。
 
 ### 角色命名规则（官方）
@@ -123,7 +123,7 @@ dsh plugin --profile web add ./hello-plugin-0.1.0.tgz
 
 ### 兼容门禁与精确版本豁免（allow-version 命令族）
 
-插件对 `@deepseek-ai/dsh` 与 `@deepseek-ai/dsh-*` 的 peer 声明是**兼容门禁**：启动时对每个 bundle 做 peer 预检（`workspace:*` 等协议按当前运行时解析；其余范围用 semver 含预发布版本判断），不兼容且未豁免的 bundle **启动时跳过**；安装时（`dsh plugin` 转发的 add/update）在 pnpm 运行**之前**预检清单，不兼容直接拒绝安装、一个都不装。
+插件对 `@deepseek-ai/dsh` 与 `@deepseek-ai/dsh-*` 的 peer 声明是**兼容门禁**：启动时对每个 bundle 做 peer 预检（`workspace:*` 等协议按当前运行时解析；其余范围用 semver 含预发布版本判断），不兼容且未豁免的 bundle **启动时跳过**；安装时（`dsh plugin` 转发的 add/install/i）在 pnpm 运行**之前**预检清单，不兼容直接拒绝安装、一个都不装（INSTALL_COMMANDS 不含 update）；`update` 走的是安装后兼容复查路径，不合格则恢复 `package.json`/`pnpm-lock.yaml` 并 repair。
 
 豁免用精确版本命令族管理，豁免记录独立存于 profile 的 `compatibility.json`（与 package manifest、patch 无关）：
 

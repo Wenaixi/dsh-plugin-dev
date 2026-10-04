@@ -9,7 +9,7 @@
 ## 一、契约层与服务层（读 `@deepseek-ai/dsh-skill` 的类型声明）
 
 ```ts
-// contract 包：@deepseek-ai/dsh-skill（seam，必须 peer 依赖，不能当 dependencies 拉进来）
+// contract 包：@deepseek-ai/dsh-skill（服务定义 + 注册表实现；插件通常 peer 引用以复用宿主实例，宿主 dsh/dsh-base 自身以 dependencies 兜底装配）
 // provider 包：@deepseek-ai/dsh-skill-filesystem（官方实现，通常由宿主 bundle 已装）
 // 挂载：ctx.skills（复数，是注册表）
 ```
@@ -76,9 +76,9 @@ registerProvider(create: (control: SkillProviderControl) => SkillProvider): () =
 | `name` | 必须匹配 `/^[a-z0-9]+(?:-[a-z0-9]+)*$`（小写、连字符分隔），非法直接被拒 |
 | `description` | 必须是非空字符串 |
 | `rank` | 必须是有限数字 |
-| `invocation` | 缺省时宿主补 `{ modelInvocable: true, userInvocable: true }` |
+| `invocation` | 必须是含 `modelInvocable`/`userInvocable` 两布尔的对象；缺省不被拒绝也不被宿主补全（放行 undefined，下游读 invocation 会崩）。双开补全仅发生在 `register()` 输入与 filesystem frontmatter 缺省时 |
 | `locator` | 不透明句柄，`get()` 原样收回；宿主不会解释它，只能由 provider 自己解析 |
-| `resourceBase` | 可选，`{ kind: 'directory', path }`，供技能正文解析相对资源 |
+| `resourceBase` | 可选，closed union：`{ kind: 'directory', path }` \| `{ kind: 'url', url }` \| `{ kind: 'opaque', description }`，供技能正文解析相对资源 |
 
 常见误用：
 
@@ -177,7 +177,7 @@ candidate.invocation = { ...candidate.invocation, modelInvocable: false }
 | **覆盖 `invocation` 布尔**（正确） | 技能仍占注册表名额与同名裁决权；语义与写 frontmatter 完全一致；改回去即恢复 |
 | 从 `list()` 结果里 filter 掉（错误） | 丢失同名裁决权；`get()` 若未同步过滤仍能取到；宿主侧 `skill` 工具的报错从「该技能对当前不可见」退化为「未知技能」，用户拿不到有效诊断 |
 
-**两处都必须套用**：`list()` 与 `get()` 都要按同一份屏蔽表改写。只改 `list()` 会让模型目录里看不到它，但 `skill` 工具调用依然成功，这是「看起来生效了其实没生效」的典型形态。
+**两处都必须套用**：`list()` 与 `get()` 都要按同一份屏蔽表改写。只改 `list()` 会让模型目录不可见，且 `skill` 工具调用同样被拦（`dsh-tool-skill` 在 get 之前先查 summary 的 `modelInvocable`，报「该技能对当前不可见」）；只改 `get()` 则目录仍显示、用户显式 invocation 仍注入——两种单改都构成「看起来生效了其实没生效」。
 
 **热生效要双失效**：想让运行时改开关立刻生效，必须同时让「注册表的目录缓存」与「你自己的候选快照」双双作废。前者靠 provider 的 `control.invalidate()`（宿主据此广播 `skills/change`），后者靠你自己在数据源变化时清快照。缺任一方都表现为「UI 已更新而模型侧目录不变」。
 

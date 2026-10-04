@@ -18,7 +18,7 @@
 - `order: 10`：**模型** (`id: "models"`，来自 `@deepseek-ai/dsh-client-ui-settings-models`)
 - `order: 15`：**内置插件** (`id: "plugins"`，来自 `@deepseek-ai/dsh-client-ui-settings-plugins`)
 - `order: 20`：**Agent 预设** (`id: "agent-presets"`，来自 `@deepseek-ai/dsh-client-ui-agent-preset`；`dsh-client-ui-settings-agent-loop` 注册的是插件页 `plugins.item`，不是设置页)
-- 0.2.0-rc.2 无「插件市场」section（`dshmarket` 包不存在）；全部 settings.section 注册者仅 account(-10, 条件)/general(0)/models(10)/plugins(15)/agent-presets(20)
+- 官方 @deepseek-ai 包内无插件市场 section（`dshmarket` 属第三方包，本机已装并注册 id=`market` order=40）；官方内置注册者仅 account(-10, 条件)/general(0)/models(10)/plugins(15)/agent-presets(20)，已安装的第三方（dshmarket 与三大明星插件）会以更高 order 追加
 
 ### 2. 第三方插件注入专属 Tab 的核心语法
 任何第三方双面插件（Dual-Face Plugin）只需在其客户端入口（`lib/client.js`）的 `apply(ctx)` 中，向 `settings.section` 插槽注入一个注册项：
@@ -101,7 +101,7 @@ DSH 社区中最著名的三大带界面的插件，正是通过该机制成功�
   );
   ```
 - **自绘 SVG 图标替换法**：
-  在 `src/nav-icon.js` 中，它监听 DOM 就绪后，精准选中 `div[data-slot="settings.section"]:has([data-section="wallpaper-engine"])`，将默认齿轮平滑替换为壁纸调色盘 SVG。
+  在 `src/nav-icon.js` 中，它通过 MutationObserver 监听设置对话框挂载，遍历 `nav button` 按文本匹配当前译文的「壁纸引擎」标签，把第一个子元素（兜底齿轮）替换为同 class 的自绘壁纸调色盘 SVG（语言切换后重放）。
 
 ---
 
@@ -158,11 +158,11 @@ export function MySettingsPanel() {
 // 提交补丁至宿主 cordis.patch.yml
 async function saveHostConfig(patchConfig) {
   // 通过官方 api-gateway 提供的 remote 客户端调用
-  // 真实路径：客户端注入 ctx.remote.settings，调用 mutate/set/unset/replace（命名空间=宿主 entry id）
+  // 真实路径：客户端注入 ctx.remote.settings，调用 update/replace/mutate（命名空间=宿主 entry id）
   // → Host dsh-settings SettingsForms（revision 冲突抛 SETTINGS_CONFLICT）→ configEditor.edit() 落盘 profile 补丁
   // （window.__DSH_REMOTE__.configEditor.updateProfilePatch 是伪 API，不存在）
-  const result = await ctx.remote.settings.mutate("my-plugin-id", {
-    config: patchConfig // 全量替换该插件条目的 config
+  const result = await ctx.remote.settings.replace("my-plugin-id", {
+    config: patchConfig // 全量替换该插件条目的 config（mutate 第二参是有序 ops 数组，不接 {config} 值对象）
   });
   if (!result.ok) {
     alert("保存失败: " + result.error.message);
@@ -177,7 +177,7 @@ async function saveHostConfig(patchConfig) {
 当用户点击主侧边栏的“拼图”积木图标（插件）时，进入的是 **插件管理中心**。
 
 ### 1. 界面呈现与分组规则
-插件管理中心由 `@deepseek-ai/dsh-client-ui-settings-plugins` 与 `@deepseek-ai/dsh-client-ui-settings-plugin-inventory` 联合渲染，分为两大区域：
+插件管理中心由 `@deepseek-ai/dsh-client-ui-plugin-manager` 渲染（注册 `sidebar.panellist` id=plugins），分为两大区域：
 
 1. **官方扩展 (8个)**：
    - 包含：**智能体团队 (实验性)**、**自动授权审查 (实验性)**、**自动化任务 (实验性)**、**语音输入 (实验性)**、**终端**、**Agent 循环**、**子智能体**、**网页搜索**；
@@ -195,7 +195,7 @@ ${specifier}/package.json
 ${specifier}/locale/en.json
 ```
 
-**任一子路径不在包的 `exports` 白名单里，Node 抛 `ERR_PACKAGE_PATH_NOT_EXPORTED`，被宿主吞掉且三种吞法不同：`package.json` 子路径吞成空（title 回退到完整包说明符，卡片只剩包名）；`locale` 子路径返回 `{ error: "Plugin metadata for …" }` 诊断（插件管理 UI 显示 metadata error）；icon 失败保留 title 并附 error。**
+**任一子路径不在包的 `exports` 白名单里，Node 抛 `ERR_PACKAGE_PATH_NOT_EXPORTED`，被宿主吞掉且三种吞法不同：`package.json` 子路径吞成空（title 回退到完整包说明符，卡片只剩包名）；`locale/en.json` 与 `package.json` 一样走可选资源路径：未放行时静默跳过（title 回退 manifest.name、UI 兜底包名、无 error）；仅当 en 已放行而其它语言文件不在 exports 时才抛 `ERR_PACKAGE_PATH_NOT_EXPORTED` 并被吞成 `{ error: "Plugin metadata for …" }` 诊断；icon 失败保留 title/description 并附 error。**
 
 这是最容易踩的一个坑：包明明装好了、插件也在跑，卡片却像没写 manifest。
 

@@ -71,7 +71,7 @@ export function apply(ctx) {
 ### 1. 持续终端核心原语
 1. **`spawn(owner, { type, name?, cwd? }, signal)`**：创建长寿命伪终端会话，返回 { sessionId, name?, type, pid?, status, motd? } 快照；真正的后台进程由已注册的后端（如 `dsh-terminal-bash`）承载；
 2. **`read(owner, id, { offset?, count? })`**：同步返回一段最近端 scrollback 的分页快照（offset 为相对最新内容的**非负**偏移：0 即最新、越大越深入历史，传负值会抛错；count 为行数上限，默认 500），无等待、无超时，不阻塞；
-3. **`startSend(owner, id, { text, submit, signal? })`**：向正在运行的终端写入 `stdin`（`\x03` 代表 Ctrl+C），返回 `{ done, ... }` 等待句柄；同一会话同一时刻只允许一个活动的 send，并发调用抛 `SEND_ACTIVE`；
+3. **`startSend(owner, id, { text, submit, signal? })`**：向正在运行的终端写入 `stdin`（`text + (submit ? "\r" : "")` 拼成，不写 `\x03` 模拟中断），返回 `{ done, ... }` 等待句柄；同一会话同一时刻只允许一个活动的 send，并发调用抛 `SEND_ACTIVE`；中断/取消经 `signal(…, 'SIGINT')` 对前台进程组投递真实信号；
 4. **`signal(owner, id, signal)`**：向终端进程组发送标准 POSIX 信号（如 `SIGINT`、`SIGTERM`、`SIGKILL`），实现安全收敛与优雅停机；另有 `kill(owner, id, reason?)` 关闭会话、`list(owner)` 列出本所有者可见会话。
 
 行（cols/rows）与回滚行数等尺寸参数属于终端后端自身的 `Config`（如 `dsh-terminal-bash` 默认 40×160），不是 spawn 请求参数；请求参数只含 `type` 与可选的 `name`、`cwd`。
@@ -98,7 +98,7 @@ export function apply(ctx) {
 
 - 模型侧通过工具 `schedule_create` / `schedule_list` / `schedule_delete` / `schedule_update` 操作，业务插件消费同一服务；
 - 规则持久化在 storage domain `"schedule"`（表 `tasks`，`defineDomain` 声明，加载即校验）；
-- 投递依赖 `session/flush` 确认：任务写入与送达回执在会话刷新边界才落盘，因此**不保证恰好一次**（崩溃在刷新前会重投或丢失）；
+- 投递依赖 `session/flush` 确认：任务创建/编辑即时落盘于 schedule 的 storage domain（`table("tasks").put`）；仅**投递与送达回执**在 `ctx.sessions.flush()` 确认后才提交，因此**不保证恰好一次**（崩溃在刷新前会重投或丢失）；
 - 固定频率规则（every）最小间隔 60 秒（`MIN_EVERY_INTERVAL_SECONDS`）。
 
 ### 2. `ctx.jobs`（`@deepseek-ai/dsh-jobs` + `dsh-jobs-local`）

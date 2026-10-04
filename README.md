@@ -51,7 +51,7 @@ UI 插件必须遵循**双面插件 (Dual-Face)** 规范：Node 端 `lib/index.j
 
 ## 三、技术参考文档索引 (References)
 
-完整参考目录（33 篇，按 15 个主题分类）见 [references/README.md](./references/README.md)，其中包含本项目全部专题文档的导航与一句话概述：插件解剖学、核心服务矩阵、配置与补丁、事件与工具流水线、Web 插槽与主题、设置与插件中心 UI、跨端 Remote RPC、MCP 工具桥接、系统提示词与状态投影、多模态交付物、Webhook 与无头运行、内置中间件、领域存储与伪终端、斜杠命令与输入触发器、沙箱内核与网络代理、子智能体与文件锁、安装解析陷阱、官方上游核验与本地调试排毒。
+完整参考目录（33 篇专题，按 20 个分类导航）见 [references/README.md](./references/README.md)，其中包含本项目全部专题文档的导航与一句话概述：插件解剖学、核心服务矩阵、配置与补丁、事件与工具流水线、Web 插槽与主题、设置与插件中心 UI、跨端 Remote RPC、MCP 工具桥接、系统提示词与状态投影、多模态交付物、Webhook 与无头运行、内置中间件、领域存储与伪终端、斜杠命令与输入触发器、沙箱内核与网络代理、子智能体与文件锁、安装解析陷阱、官方上游核验与本地调试排毒。
 
 ---
 
@@ -62,11 +62,11 @@ UI 插件必须遵循**双面插件 (Dual-Face)** 规范：Node 端 `lib/index.j
 ## 五、快速开始
 
 ```bash
-# 1. 向 web profile 添加插件组合包（plugin 子命令必须带 --profile）
-dsh plugin --profile web add ./path/to/my-plugin
+# 1. 向目标 profile 添加插件组合包（plugin 子命令必须带 --profile）
+dsh plugin --profile <profile> add ./path/to/my-plugin
 
 # 2. 导出并验证合并后的完整配置树
-dsh --profile web --dump-config
+dsh --profile <profile> --dump-config
 
 # 3. 启动 DSH Web 实例
 dsh web

@@ -1,13 +1,13 @@
-# DSH Web GUI 全量插槽树、主题系统与 i18n 国际化实战指南 (DSH 0.2.0-rc.2)
+# DSH Web 插槽、主题与国际化参考指南
 
-本文件是辅助开发 DeepSeek Harness (DSH 0.2.0-rc.2) 客户端双面 UI 插件的权威技术规范。
+本文件辅助开发 DeepSeek Harness（DSH）客户端双面 UI 插件。插槽、主题变量和国际化 API 必须以目标版本的 client 包源码和运行时为准。
 详细梳理了主界面全量插槽（右侧栏、会话头、输入框、消息流、全局外壳）、官方主题设计系统（CSS 变量与深浅色模式）、以及多语言国际化（i18n）的实战开发指南。
 
 ---
 
 ## 一、Slot 层级树见 three-roles.md
 
-DSH 的 Web GUI 采用组件化微前端插槽体系，**所有 UI 扩展一律通过 `ctx.slots.inject` 注入**，挂载与样式回收由宿主负责。
+DSH 的 Web GUI 采用组件化微前端插槽体系，**当前 client UI 扩展通常通过 `ctx.slots.inject` 注入；具体插槽和注册方式以目标版本的 slot spec 与 renderer 实现为准**，挂载与样式回收由宿主负责。
 
 Slot 标识清单、cardinality（single/list/keyed/chain）与 scope（root/session-maybe/session）的完整对照表见 [three-roles.md](./three-roles.md) 的「常用 Slot 标识清单」；本文件只讲各插槽的注册实战与样式/i18n 配套。
 
@@ -100,7 +100,7 @@ export function apply(ctx) {
           title="导出当前会话"
           onClick={() => alert('点击了会话顶部按钮！')}
         >
-          📥
+          导出
         </button>
       )
     )

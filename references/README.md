@@ -1,4 +1,4 @@
-# DSH 插件开发权威技术参考目录 (DSH 0.2.0-rc.2)
+# DSH 插件开发技术参考目录
 
 > **⚠️ 核心定位声明**  
 > **本目录是用于【辅助开发 DeepSeek Harness (DSH) 插件】的权威架构规范与知识库（Agent Skill 参考集）。**  
@@ -10,7 +10,7 @@
 
 ### 一、官方上游源码与官方文档核验指引 (Upstream & Docs)
 - [official-upstream-and-docs.md](./official-upstream-and-docs.md)：
-  官方一手资料权威索引——上游仓库 (`deepseek-ai/deepseek-harness`) 包清单与模块依赖图、本地已安装官方包的目录结构与类型声明速读法、官方文档站全部权威页面清单（中英双语入口）、事实核验三级证据强度与版本升级回溯流程。
+  官方一手资料索引——上游仓库 (`deepseek-ai/deepseek-harness`) 包清单与模块依赖图、本地已安装官方包的目录结构与类型声明速读法、官方文档站页面索引（中英双语入口）、事实核验三级证据强度与版本升级回溯流程。
   **任何架构结论与官方源码冲突时，一律以源码为准。**
 
 ### 二、微内核与服务架构 (Microkernel & Spine)
@@ -29,7 +29,7 @@
 
 ### 四、事件总线与工具流水线 (Events & Tool Execution)
 - **[events.md](./events.md)**：
-  Cordis 五大派发模式源码剖析（`emit` 同步广播、`waterfall` 同步环绕中间件与 `next()` 拦截、`parallel` 并发与 `AggregateError`、`serial` 串行短路与 bail 判定、`bail` 同步短路）、宿主运行事件族、59 个 Persistence Catalog 事件、5 类 SurfaceEventType 与 `ignorable` 契约。
+  Cordis 五大派发模式源码剖析（`emit` 同步广播、`waterfall` 同步环绕中间件与 `next()` 拦截、`parallel` 并发与 `AggregateError`、`serial` 串行短路与 bail 判定、`bail` 同步短路）、宿主运行事件族、Persistence Catalog 事件与 SurfaceEventType 兼容性、5 类 SurfaceEventType 与 `ignorable` 契约。
 - **[tools.md](./tools.md)**：
   ToolRuntime 架构、工具执行时序（六段官方管线）、单调安全守卫法则、全量官方工具归属包对照表与 `defineTool` 编写规范。
 
@@ -37,7 +37,7 @@
 - **[settings-and-plugin-ui.md](./settings-and-plugin-ui.md)**：
   全局设置窗口 (Settings) 与插件管理中心 UI 深度指南——`settings.section` 与 `plugins.bundle.config` 插槽机制、源码级解密三大明星插件（终端输入、侧边卡片、壁纸引擎）的真实注入代码、导航图标 (Nav Glyph) 替换技法、React 设置面板的本地 vs 补丁持久化、左侧“插件”管理中心卡片呈现、**`readPluginMeta` 的 exports 白名单契约（卡片空白根因与修法）**、图标 256 KiB 上限与路径约束、**改完必跑的两道验证（`npm pack --dry-run` + 直接调 `readPluginMeta`）**与开发决策树。
 - **[web-ui-slots-and-styling.md](./web-ui-slots-and-styling.md)**：
-  Web GUI 全量插槽树实战——右侧边栏（`sidebar.right.pane.tab`）、会话顶部工具栏（`conversation.session.header.utilities`）、输入框挂件（`conversation.input.right`）、消息流拦截（`conversation.chat.node`）、全局外壳（`shell.*`）；官方主题 CSS 变量（415 个 `--dsw-*`，含四组常见误写对照）；样式安全注入与 HMR 回收铁律；**官方 primitives 组件族优先策略**（SegmentedControl / Switch / StateDot / Tag / Button）与「客户端产物单一来源」纪律；多语言国际化（`ctx.locale` 双语注册、声明 `locale:` 注入 t 席位、缺词静默返回 key）；语言边界契约（静态文案进词典、内容数据保持单语）。
+  Web GUI 全量插槽树实战——右侧边栏（`sidebar.right.pane.tab`）、会话顶部工具栏（`conversation.session.header.utilities`）、输入框挂件（`conversation.input.right`）、消息流拦截（`conversation.chat.node`）、全局外壳（`shell.*`）；官方主题 CSS 变量（以当前主题包导出为准，含常见误写对照）；样式安全注入与 HMR 回收铁律；**官方 primitives 组件族优先策略**（SegmentedControl / Switch / StateDot / Tag / Button）与「客户端产物单一来源」纪律；多语言国际化（`ctx.locale` 双语注册、声明 `locale:` 注入 t 席位、缺词静默返回 key）；语言边界契约（静态文案进词典、内容数据保持单语）。
 
 - **[client-ui-placement-and-verification.md](./client-ui-placement-and-verification.md)**：
   客户端 UI **落点选择与真机取证**——「界面语义 → 插槽」完整映射表（设置窗口各级 Tab / 插件页分组条目 / 卡片内联配置区 / 右侧栏 Tab / 侧边栏底部 / 全局浮层）；**铁律「一个功能一个入口」**（多落点冗余 = UI 污染，实测需回滚）；插槽三个必知机制（spec 由父条目 `children` 表声明、四种 kind 与注册参数对应关系、**`slots.inject` 在 spec 不存在时静默不执行且零报错**）；`plugins.bundle.config` 的 **`configured` 渲染门（匹配键是包名）**；「UI 不显示」三分法（模块没进图 / apply 没跑 / 落点或渲染门不匹配）；客户端产物 **`immutable` 长缓存与「版本号先于界面更新」的假象**（桌面端必须完全重启）；**无浏览器验证法（Node 直跑 CJS factory 探针）**；CDP / browser-harness 真机取证的环境坑；**解析 Electron `app.asar` 做桌面版与 CLI 版差异比对**。
@@ -46,7 +46,7 @@
 - **[remote-rpc-guide.md](./remote-rpc-guide.md)**：
   Typert Remote RPC 跨端通信开发指南——Browser 前端 ↔ Host Node.js 服务端通信规范、方法签名四大硬约束（禁止解构、禁止默认值、禁止 rest、末位 signal 协作取消）、一元 RPC 与流式 mux 通道、端到端可运行范本。
 - **[three-roles.md](./three-roles.md)**：
-  Browser / Host / Worker 三角色物理隔离模型、子进程生成原语（`ctx.subprocess.spawn` 与 `spawnTerminal` 零 Shell 解释）、`SandboxMode`（仅限文件系统效果）与沙箱隔离。
+  Browser / Host / 隔离进程三角色物理隔离模型（源码中 Worker 专指 worker_threads，教学上避免用 Worker 指代第三角色）、子进程生成原语（`ctx.subprocess.spawn` 与 `spawnTerminal` 零 Shell 解释）、`SandboxMode`（仅限文件系统效果）与沙箱隔离。
 
 ### 七、模型适配、MCP 外部工具桥接与打包分发 (LLM, MCP & Packaging)
 - **[mcp-and-tools-bridge.md](./mcp-and-tools-bridge.md)**：
@@ -104,7 +104,7 @@
 
 ### 十七、社区实践图谱：高星插件共性工程经验 (Community Patterns)
 - **[community-patterns.md](./community-patterns.md)**：
-  由 GitHub topic:dsh-plugin 高星仓库（约 100 个，2026-10 快照）逐一分析蒸馏的
+  由 GitHub topic:dsh-plugin 高星仓库（最近一次快照）逐一分析蒸馏的
   **跨仓库通用工程经验**——插件形态判定三信号（`dsh.bundle.patch` / `cordis.patch.yml` /
   `@deepseek-ai/*` 依赖）、patch 整块替换与 `!!js` 版本自适应、版本兼容层四种写法
   （能力探测 / Symbol.for / peer 枚举 / 基线门）、webServer 路由与浏览器信任围栏

@@ -1,6 +1,6 @@
 # 技能目录/注册表失效链路：invalidate 的正确姿势与两大反模式
 
-> 适用于：自定义 SkillProvider 插件、管理 skill 候选集、目录扫描型 provider。官方源码：`@deepseek-ai/dsh-skill@0.2.0-rc.2`（`lib/index.js`）。
+> 适用于：自定义 SkillProvider 插件、管理 skill 候选集、目录扫描型 provider。具体方法和缓存行为以目标安装物的 `@deepseek-ai/dsh-skill` 实现为准。
 
 ## 一、先建立事实：`skills/change` 是什么
 
@@ -27,7 +27,7 @@ notifyChange() {
 }
 ```
 
-**含义**：`skills/change` 是注册表「我变了」的**消费方通知缝**——宿主 UI / agent-loop 订阅它去重取目录。官方运行时全树**零订阅者**；它**不是给提供者**的回调。
+**含义**：`skills/change` 可作为注册表变更后的**消费方通知缝**。提供者不应在该事件监听器中反向调用 `control.invalidate()`；官方树是否存在订阅者、哪些消费方订阅以及刷新策略，都必须按目标版本和 profile 实际检查。
 
 ## 二、反模式 1：在 `skills/change` 监听器里调 `control.invalidate()` —— 同步递归栈溢出
 
@@ -82,5 +82,5 @@ providerInstance?.invalidate()
 
 - `skills/change` = 消费方通知缝，提供者订阅它反向 invalidate = 同步递归栈溢出。
 - `registerProvider` 工厂返回值必须捕获到闭包变量，否则 invalidate 空转。
-- 变更点直调 `control.invalidate()` 是官方模式、唯一正确姿势。
+- 提供者在自身数据变更点调用 `control.invalidate()`；具体控制对象与缓存行为以目标版本实现为准。
 - 每条新断言做破坏实测：人为制造反模式，确认门禁变红，再还原。

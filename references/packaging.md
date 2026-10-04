@@ -98,7 +98,7 @@ Bundle 携带的补丁文件用于在装配树中挂载插件实例：
 
 ```bash
 # 向 web profile 添加已发布的 npm 插件包（--profile 必填，宿主 CLI 无"默认 profile"概念）
-dsh plugin --profile web add dsh-my-feature
+dsh plugin --profile <profile> add dsh-my-feature
 
 # 向特定 profile 添加
 dsh plugin --profile demo add ./hello-plugin
@@ -110,7 +110,7 @@ dsh --profile demo --dump-config
 dsh plugin --profile demo remove dsh-hello-plugin
 
 # 从本地 tarball 安装
-dsh plugin --profile web add ./hello-plugin-0.1.0.tgz
+dsh plugin --profile <profile> add ./hello-plugin-0.1.0.tgz
 ```
 
 ### git 安装与构建授权

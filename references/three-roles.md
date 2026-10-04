@@ -1,6 +1,6 @@
 # 三角色架构模型与 Client-UI 插件开发标准
 
-DeepSeek Harness (DSH 0.2.0-rc.2) 采用清晰的物理分层与进程隔离架构：**Browser 界面端**、**Host 核心宿主** 与**隔离进程沙箱区**（教学名；源码中 Worker 专指 worker_threads）。前端 Web GUI 同样是运行在浏览器中的 Cordis 运行时，所有含界面的插件均采用"双面插件"（Dual-Face Architecture）规范。
+DeepSeek Harness（DSH）采用清晰的物理分层与进程隔离架构：**Browser 界面端**、**Host 核心宿主** 与**隔离进程沙箱区**（教学名；源码中 Worker 专指 worker_threads）。前端 Web GUI 同样是运行在浏览器中的 Cordis 运行时，所有含界面的插件均采用"双面插件"（Dual-Face Architecture）规范。
 
 ```
 ┌────────────────────────────────────────────────────────┐
@@ -72,12 +72,11 @@ DeepSeek Harness (DSH 0.2.0-rc.2) 采用清晰的物理分层与进程隔离架�
     "./client": { "types": "./lib/types/client/index.d.ts", "default": "./lib/client.js" }
   },
   "dsh": {
-    "bundle": { "id": "client-ui-example", "patch": "./cordis.patch.yml" },
     "client": {
       "platform": "web",
-      "module": "./lib/client.js",
       "inject": ["@deepseek-ai/dsh-client-ui-settings"]
-    }
+    },
+    "bundle": { "patch": "./cordis.patch.yml" }
   },
   "peerDependencies": {
     "@deepseek-ai/dsh": ">=0.2.0-rc.1",
@@ -86,9 +85,9 @@ DeepSeek Harness (DSH 0.2.0-rc.2) 采用清晰的物理分层与进程隔离架�
 }
 ```
 
-注意：client 端插槽运行时是 `dsh-client-ui-slots`（SlotCore 纯注册表）+ `dsh-client-ui-renderer`（slots 服务包装）；连接/传输由 `dsh-client-connection` 独立提供；设置 UI 是 `dsh-client-ui-settings`（注入 remote.settings）。三包在 0.2.0-rc.2 均独立存在，未合并。**loader 行解析到其 package.json 后按该包名判定半侧**（locatePkgJson 支持子路径定位最近 ancestor 的 package.json，子路径行同样适用）。
+注意：client 端插槽、连接和设置能力由宿主提供的相应 client 包装配；具体包名、注入名和是否拆包随版本变化，应以目标安装物的 `package.json`、`lib` 实现和运行时清单为准。**loader 行解析到其 package.json 后按该包名判定半侧**（locatePkgJson 支持子路径定位最近 ancestor 的 package.json，子路径行同样适用）。
 
-**真实契约（0.2.0-rc.2 全库实测，`dsh.bundle.id` 与 `dsh.client.module` 均不存在）**：双面包声明 `dsh.client.platform: "web"`（+ 可选 `inject`/`external`/`immediately`），客户端入口由 `exports["./client"]` 子路径导出（该路径必须真实存在）；组合补丁用 `dsh.bundle.patch`（路径或有序数组）。peerDependencies 以 `@deepseek-ai/cordis ~4.0.4` 为准）。`exports` 也可以写成带条件导出对象的形式（`{ "types": ..., "default": "./lib/client.js" }`）。
+**声明边界（以目标版本实际发布物为准；当前核验版本未发现 `dsh.bundle.id` 与 `dsh.client.module`）**：双面包声明 `dsh.client.platform: "web"`（+ 可选 `inject`/`external`/`immediately`），客户端入口由 `exports["./client"]` 子路径导出（该路径必须真实存在）；组合补丁用 `dsh.bundle.patch`（路径或有序数组）。peerDependencies 以 `@deepseek-ai/cordis ~4.0.4` 为准）。`exports` 也可以写成带条件导出对象的形式（`{ "types": ..., "default": "./lib/client.js" }`）。
 
 ## 浏览器端插件加载、Slots 插槽与样式管理
 

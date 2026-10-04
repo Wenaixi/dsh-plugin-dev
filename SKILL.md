@@ -1,6 +1,6 @@
 ---
 name: dsh-plugin-dev
-description: "Use when creating, modifying, reviewing, or debugging DeepSeek Harness (DSH 0.2.0-rc.2) / Cordis plugins. REQUIRED for any DSH plugin development task. Trigger on: DSH 插件、Cordis、plugin、服务注入、事件监听、模型工具 (defineTool)、单调守卫 (guard)、LLM 适配器、双面插件 (Dual-Face)、Slots 插槽、Agent Teams 团队协作、Schedule 挂钟定时、cordis.patch.yml 补丁配置、三角色架构、或组合包打包安装。"
+description: "Use when creating, modifying, reviewing, or debugging DeepSeek Harness (DSH) / Cordis plugins. REQUIRED for any DSH plugin development task. Trigger on: DSH 插件、Cordis、plugin、服务注入、事件监听、模型工具 (defineTool)、单调守卫 (guard)、LLM 适配器、双面插件 (Dual-Face)、Slots 插槽、Agent Teams 团队协作、Schedule 挂钟定时、cordis.patch.yml 补丁配置、三角色架构、或组合包打包安装。"
 ---
 
 # dsh-plugin-dev
@@ -9,12 +9,12 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 >
 > **【必须调用要求与事实核验指引】**
 > - **必须调用**：进行任何 DeepSeek Harness (DSH) 插件开发、调试、审查或配置任务时，**必须调用本 Skill**；API、服务挂载属性与配置字段一律以本技能文档与官方类型声明为准，不要凭印象推断；
-> - **权威参考路由**：进行具体插件设计与编码前，必须通过第六节【场景决策与开发导引矩阵】路由到对应的权威参考文档（[`references/*.md`](./references/README.md)），全景主题导航见 [`references/README.md`](./references/README.md)；
+> - **参考路由**：进行具体插件设计与编码前，先通过第六节【场景决策与开发导引矩阵】路由到对应专题文档（[`references/*.md`](./references/README.md)），全景主题导航见 [`references/README.md`](./references/README.md)；
 > - **鼓励并要求核验真实细节**：涉及具体服务契约、参数类型、Schema 结构或版本行为时，**强烈鼓励并要求查验真实细节**（官方上游仓库 `deepseek-ai/deepseek-harness`、本地已安装官方包的 `lib/*.js` 实现（含 JSDoc）与 `package.json` 声明、以及运行时 `ctx.tools.schemas()` 等真源，详见 [`references/official-upstream-and-docs.md`](./references/official-upstream-and-docs.md)），拒绝盲目断言。
 
 ---
 
-开发 DeepSeek Harness (DSH 0.2.0-rc.2) 插件的标准与权威参考 Skill。
+开发 DeepSeek Harness（DSH）插件的参考 Skill；具体契约以目标版本的源码、发布物和运行时为准。
 
 ---
 
@@ -27,11 +27,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
    - `ctx.agentLoop` 由 `@deepseek-ai/dsh-agent-loop` 挂载的 Service（`super(ctx, "agentLoop")`）提供，扩展插件依赖 `@deepseek-ai/dsh-agent` 的事件与服务即可；
    - `@deepseek-ai/dsh-scope` 是纯函数库，不在 Context 上挂载服务。
    完整角色矩阵（core / seam / bundle）、所属包与提供方见 [services.md](./references/services.md)。
-3. **Cordis 五大事件派发模式**：
-   - `emit`：同步广播，返回 `void`；
-   - `waterfall`：**同步环绕中间件**，监听器收 `(...args, next)`，调 `next()` 驱动下游，不调即短路并可整体替换返回值；
-   - `parallel` / `serial` / `bail`：都在遇到首个 bail 值（非 null / false / undefined）时短路；`serial` 逐个 await，`parallel` 等待全部 settle 后返回 `Promise<void>`。
-   源码级调度算法、`isBailed` 边界与 `EventOptions` 见 [events.md](./references/events.md)。
+3. **事件派发模式必须分别核对**：`emit`、`waterfall`、`parallel`、`serial`、`bail` 的等待、短路和返回值语义不同，不能按名称推断。源码级调度算法、`isBailed` 边界与 `EventOptions` 见 [events.md](./references/events.md)。
 4. **配置补丁四层生效与全量替换语义**：
    - 生效顺序：bundles 自带 patch -> profile patch -> 用户全局 patch -> CLI `--patch` overlays（后层按行胜出）；
    - 补丁中的 `config` **整体替换，不做深合并**；
@@ -50,7 +46,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 
 ```
 [步骤 1: 架构选型] ──► [步骤 2: 生成骨架] ──► [步骤 3: 核心实现] ──► [步骤 4: 极速联调] ──► [步骤 5: 验收交付]
-   确定形态与依赖         调用 scaffold 脚本       生命周期与插槽/服务     --patch 临时叠加       批量校验与死链检测
+   确定形态与依赖         按专题文档建立最小骨架       生命周期与插槽/服务     --patch 临时叠加       批量校验与死链检测
 ```
 
 1. **步骤 1：架构选型与依赖规划**
@@ -106,7 +102,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 
 ## 五、官方一手资料核验指引 (Upstream Verification)
 
-本技能库所有结论均出自官方一手来源。**与官方源码冲突时，一律以源码为准。**
+本技能库包含源码核验结论、工程归纳和社区案例。使用具体 API 前必须回到目标环境的运行时与实际发布物核验；与源码冲突时以运行时和源码为准。
 
 | 证据强度 | 来源 | 用途 |
 | :--- | :--- | :--- |
@@ -180,14 +176,14 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 | **T** | 沙箱内核级隔离、多模态图片压缩转储与网络代理 | 底层安全与基础设施：理解 Windows ACL/Landlock 原理、image-offload 恢复、undici 代理 | [sandbox-internals-and-proxy.md](./references/sandbox-internals-and-proxy.md) |
 | **U** | 子智能体持续多轮交互、文件系统防覆盖锁与 ACP 协议 | 委派与文件安全：使用 `ctx.subagents.startContinuable`、理解 fs-observation 读后写规则 | [subagents-fs-policy-and-acp.md](./references/subagents-fs-policy-and-acp.md) |
 | **V** | 装插件解析到过时的旧版本、被 incompatible 拒绝、版本选择与预期不符 | 安装解析排障：读 `.plugin-manager/logs/` 确认解析版本，识别 pnpm 冷却期与 semver 预发布排序，配置 `minimumReleaseAge: 0` 或改用精确版本 | [install-resolution-traps.md](./references/install-resolution-traps.md) |
-| **W2** | 自定义技能失效不生效、UI 开关后模型目录不刷新、怀疑 skills/change 误用 | 失效链路与 invalidate 正确姿势：`provider-catalog-invalidation.md`（消费方通知缝 vs 提供者直调、registerProvider 捕获实例、反模式两例） | [provider-catalog-invalidation.md](./references/provider-catalog-invalidation.md) |
-| **W3** | 双面插件接入 ctx.locale 双语、构建产物内嵌字典、宿侧文案客户端覆盖、发布后 npm 验证假阴性 | i18n 六铁律 + 发布验证：`client-i18n-pitfalls.md` / `publish-npm-verification.md` / `architecture-refactor-experience.md` | [client-i18n-pitfalls.md](./references/client-i18n-pitfalls.md) · [publish-npm-verification.md](./references/publish-npm-verification.md) · [architecture-refactor-experience.md](./references/architecture-refactor-experience.md) |
-| **W4** | 长驻缓存/清单比对/正则守卫三类静默失明（快照 mtime 判据、按索引比对、字符类不符） | 多键聚合指纹 + Map 比对 + 数据域正则 + 可失败自检：`silent-failure-and-gate-design.md` / `architecture-refactor-experience.md` | [silent-failure-and-gate-design.md](./references/silent-failure-and-gate-design.md) · [architecture-refactor-experience.md](./references/architecture-refactor-experience.md) |
+| **W1** | 自定义技能失效不生效、UI 开关后模型目录不刷新、怀疑 skills/change 误用 | 失效链路与 invalidate 正确姿势：`provider-catalog-invalidation.md`（消费方通知缝 vs 提供者直调、registerProvider 捕获实例、反模式两例） | [provider-catalog-invalidation.md](./references/provider-catalog-invalidation.md) |
+| **W2** | 双面插件接入 ctx.locale 双语、构建产物内嵌字典、宿侧文案客户端覆盖、发布后 npm 验证假阴性 | i18n 六铁律 + 发布验证：`client-i18n-pitfalls.md` / `publish-npm-verification.md` / `architecture-refactor-experience.md` | [client-i18n-pitfalls.md](./references/client-i18n-pitfalls.md) · [publish-npm-verification.md](./references/publish-npm-verification.md) · [architecture-refactor-experience.md](./references/architecture-refactor-experience.md) |
+| **W3** | 长驻缓存/清单比对/正则守卫三类静默失明（快照 mtime 判据、按索引比对、字符类不符） | 多键聚合指纹 + Map 比对 + 数据域正则 + 可失败自检：`silent-failure-and-gate-design.md` / `architecture-refactor-experience.md` | [silent-failure-and-gate-design.md](./references/silent-failure-and-gate-design.md) · [architecture-refactor-experience.md](./references/architecture-refactor-experience.md) |
 
 > **通用工程经验（社区图谱）**：开发任何形态插件前，先查
 > [community-patterns.md](./references/community-patterns.md)——高星插件共性做法与高频坑
 > （patch 整块替换、版本兼容层、信任围栏、客户端纪律、事件词汇表等）已按专题蒸馏完毕。
-| **W** | 想把自研资源（打包资源、远端、动态裁剪）变成原生技能，或替换技能发现逻辑 | 自定义技能发现：实现 `SkillProvider` 的 `list`/`get`，经 `ctx.skills.registerProvider` 接入，取 `rank`（小者胜）裁决重名；`complete: false` 只用于发现未完成（目录缺失返回空数组即可）；`invocation` 的 `modelInvocable`/`userInvocable` 控制模型/用户两侧可见性 | [skill-provider.md](./references/skill-provider.md) |
+| **W0** | 想把自研资源（打包资源、远端、动态裁剪）变成原生技能，或替换技能发现逻辑 | 自定义技能发现：实现 `SkillProvider` 的 `list`/`get`，经 `ctx.skills.registerProvider` 接入，取 `rank`（小者胜）裁决重名；`complete: false` 只用于发现未完成（目录缺失返回空数组即可）；`invocation` 的 `modelInvocable`/`userInvocable` 控制模型/用户两侧可见性 | [skill-provider.md](./references/skill-provider.md) |
 | **X** | 代码与门禁都写完了，运行时功能却不生效且无任何报错 | 静默失效排查：按「代码从未执行 / 契约被吞 / 解析到别的东西」三类定位；给每条新断言做破坏实测；真机浏览器验收并逐次回读真值 | [silent-failure-and-gate-design.md](./references/silent-failure-and-gate-design.md) |
 | **Y** | 界面注册了却不出现、改完看不出效果、分不清「没渲染 / 渲染在别处 / 用的旧缓存」 | 客户端 UI 落点与取证：先查「界面语义 → 插槽」映射表，坚持**一个功能一个入口**；记住 `slots.inject` 在插槽 spec 不存在时**静默不执行**；改完桌面端必须完全重启；用 Node 直跑 factory 与 CDP 真机取证 | [client-ui-placement-and-verification.md](./references/client-ui-placement-and-verification.md) |
 | **Z** | 同一插件在桌面版与 CLI Web 上表现不一致；要把插件与配置从一个 profile/运行时迁到另一个 | 跨运行时差异与迁移：桌面版本体在 `app.asar`、profile 被 Electron 独占（部分 CLI 操作仍可用）、依赖多为 hoisted；**官方包由运行时提供不必装**；**装了 ≠ 挂载**（`dependencies` vs `dsh.profile.bundles`）；pnpm **不检测文件缺失**；配置迁移要追加不覆盖 | [desktop-vs-cli-runtime.md](./references/desktop-vs-cli-runtime.md) |

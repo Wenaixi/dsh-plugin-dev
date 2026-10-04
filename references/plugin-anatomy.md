@@ -165,7 +165,7 @@ ctx.effect(() => {
 
 - `ctx.on(name, listener, options?)`：注册事件监听器（disposable）；`ctx.once(name, listener)` 单次监听。
 - 派发有五个互不通用的方法：`ctx.emit` / `ctx.waterfall` / `ctx.parallel` / `ctx.serial` / `ctx.bail`。事件一旦在类型声明里标注了 `@mode`，就只能用对应方法派发，混用无效。
-- 事件的完整语义（`waterfall` 的环绕中间件形态、`parallel`/`serial`/`bail` 的 bail 值短路、`EventOptions`、`isBailed` 源码、disposer 返回值）见 [events.md](./events.md) 第一节。
+- 事件的完整语义（`waterfall` 的环绕中间件形态、`serial`/`bail` 的 bail 值短路、`parallel` 并发等全部 settle 后抛 `AggregateError`、`EventOptions`、`isBailed` 源码、disposer 返回值）见 [events.md](./events.md) 第一节。
 
 ### 3.5 上下文过滤与隔离：ctx.isolate()
 

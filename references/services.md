@@ -68,8 +68,8 @@ DSH 采用微内核架构，没有特权核心，所有核心能力均以 Cordis
 - **规范说明**：纯函数库，导出 `createScope`, `scopeOf`, `scopeTarget`，以直接导入调用；它不在 Context 上挂载任何服务（不存在 `ctx.scope`）。其 peerDependencies 含 `@deepseek-ai/dsh-invariants` 与 `cordis`，不是零依赖包。
 
 ### 7. 外部信息桥接 (Modsearch Bridge)
-- **所属包**：`@liustack/modsearch`（替代旧版 Exa Filter）——该桥不在官方发布包内（本机 0.2.0-rc.2 发布物中不存在该依赖）
-- **职责**：为会话提供多引擎网络搜索与抓取桥接（`web_search`/`read_page`/`x_search` 由运行时注入）。具体提供方以运行时为准，未在本机源码验证。
+- **所属包**：`@liustack/modsearch`（第三方桥，替代旧版 Exa Filter）——不在官方发布包内，按宿主运行时版本注入
+- **职责**：为会话提供多引擎网络搜索与抓取桥接（`web_search`/`read_page`/`x_search` 由运行时注入）。具体提供方以运行时为准。
 
 ---
 

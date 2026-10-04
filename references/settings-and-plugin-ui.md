@@ -18,7 +18,7 @@
 - `order: 10`：**模型** (`id: "models"`，来自 `@deepseek-ai/dsh-client-ui-settings-models`)
 - `order: 15`：**内置插件** (`id: "plugins"`，来自 `@deepseek-ai/dsh-client-ui-settings-plugins`)
 - `order: 20`：**Agent 预设** (`id: "agent-presets"`，来自 `@deepseek-ai/dsh-client-ui-agent-preset`；`dsh-client-ui-settings-agent-loop` 注册的是插件页 `plugins.item`，不是设置页)
-- 官方 @deepseek-ai 包内无插件市场 section（`dshmarket` 属第三方包，本机已装并注册 id=`market` order=40）；官方内置注册者仅 account(-10, 条件)/general(0)/models(10)/plugins(15)/agent-presets(20)，已安装的第三方（dshmarket 与三大明星插件）会以更高 order 追加
+- 官方 @deepseek-ai 包内无插件市场 section（若你的 profile 装了第三方插件市场包，它会在相应插槽注册自己的 section）；官方内置注册者仅 account(-10, 条件)/general(0)/models(10)/plugins(15)/agent-presets(20)，已安装的第三方插件按其声明的 order 追加在官方项之后
 
 ### 2. 第三方插件注入专属 Tab 的核心语法
 任何第三方双面插件（Dual-Face Plugin）只需在其客户端入口（`lib/client.js`）的 `apply(ctx)` 中，向 `settings.section` 插槽注入一个注册项：

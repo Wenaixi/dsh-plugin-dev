@@ -1,5 +1,18 @@
 # DSH 插件开发技术参考目录
 
+## 通用经验优先
+
+新插件先读以下通用专题；它们只描述可迁移的机制和验证判据，不承载任何单一仓库的包名、版本、路径或事故叙述。
+
+- [dependency-injection.md](./dependency-injection.md)：显式依赖、服务契约和缺失依赖。
+- [lifecycle.md](./lifecycle.md)：可逆副作用、异步取消和卸载竞态。
+- [discovery-cache-invalidation.md](./discovery-cache-invalidation.md)：动态发现、缓存分层和失效传播。
+- [dual-face-ui.md](./dual-face-ui.md)：Host/Browser 数据流、插槽和真实 UI 验收。
+- [patch-packaging-release.md](./patch-packaging-release.md)：补丁、构建、打包、安装和发布真值。
+- [silent-failure-debugging.md](./silent-failure-debugging.md)：零报错失效的证据驱动排查。
+
+通用专题与具体版本资料冲突时，以目标运行时和源码为准。
+
 > **核心定位声明**
 > **本目录是用于辅助开发 DeepSeek Harness（DSH）插件的参考知识库（Agent Skill 参考集）。**
 > **本项目本身是一个 Skill，绝不是 DSH 插件本身！**

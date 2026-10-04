@@ -3,7 +3,7 @@
 
 ## 一、人类斜杠命令核心架构 (`ctx.commands`)
 
-在 DSH Web GUI 和交互式终端中，用户在输入框中键入以斜杠开头的指令（如 `/plan`、`/compact`、`/clear`），会被前端输入触发器捕获并交由核心命令注册表 `ctx.commands`（所属包 `@deepseek-ai/dsh-commands`）统一调度。
+在 DSH Web GUI 和交互式终端中，用户在输入框中键入以斜杠开头的指令（如 `/plan`、`/compact`、`/goal`），会被前端输入触发器捕获并交由核心命令注册表 `ctx.commands`（所属包 `@deepseek-ai/dsh-commands`）统一调度。
 
 ### 1. 命令与工具 (Tool) 的本质区别
 - **面向模型工具 (`ctx.tools`)**：由 LLM 决定何时调用，参数由模型生成，执行结果返回给模型作为上下文；

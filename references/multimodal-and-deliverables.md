@@ -63,7 +63,7 @@
 DSH 提供了强大的多模态附件存储抽象：`@deepseek-ai/dsh-attachment-local`：
 
 ### 1. 附件规范化与安全落盘
-- 用户拖入输入框的图片文件，会自动进入本地存储池（位于 `$DSH_HOME/attachments`）；
+- 用户拖入输入框的图片文件，会自动进入本地存储池（位于 `$DSH_HOME/attachments/v1`，对象按 sha256 内容寻址，形如 `objects/<前两位>/<sha256>`）；
 - 系统根据 `normalizationPolicy` 配置（maxPixels/maxDimension/maxBytes）自动校验文件大小、分辨率，并归一化为单帧 8-bit sRGB/sRGBA（有 alpha 走 WebP 否则 JPEG，GIF 坍单帧）；
 - 生成带类型的不可变引用标识（`ImageAttachmentRef`），并在会话事件日志中持久化；
 - 请求组装时由提供方适配器调 `AttachmentStore.readImageRequest` 解析引用为 LLM 原生视觉块（块类型是 `Image`，无 `ImageContentBlock` 之名）。
@@ -78,8 +78,8 @@ DSH 提供了强大的多模态附件存储抽象：`@deepseek-ai/dsh-attachment
 
 ### 1. 剪枝策略与标记替换
 - 剪枝器通过纯算法监控每个历史 `tool/result` 消息的字符长度；
-- 距离当前轮次超过阈值的早期陈旧工具结果，系统自动将其文本内容安全替换为结构化摘要：
+- 任何 `tool/result` 消息的文本字符数超过 `thresholdChars`（默认 8192）即剪（保留 head 4096 + 标记 + tail 1024），与结果的新旧程度无关；系统自动将其中段文本安全替换为：
   ```
-  [tool result pruned: 42,150 bytes truncated to conserve context window]
+  [... tool result middle pruned ...]
   ```
 - **核心收益**：无需调用昂贵的大模型做二次摘要，毫秒级释放数万 Token 窗口，彻底杜绝超长上下文导致的 Context Window Exceeded 报错！

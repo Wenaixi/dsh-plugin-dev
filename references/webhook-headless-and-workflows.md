@@ -35,8 +35,8 @@ export function apply(ctx) {
     id: 'github-issue-handler',
     kind: 'github', // 提供方类型字段名是 kind，不是 providerKind
     async run(delivery, signal) {
-      // delivery 快照字段：kind / source / deliveryId / receivedAt + JSON；第二参是 AbortSignal
-      const payload = delivery.payload;
+      // delivery 快照字段：kind / source / deliveryId / event{name,payload} / receivedAt；第二参是 AbortSignal
+      const payload = delivery.event.payload;
       if (payload.action === 'opened' && payload.issue) {
         // 返回会话初始化参数即创建 root Session 并 followup；返回 null 表示不创建
         return {

@@ -9,7 +9,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 >
 > **【必须调用要求与事实核验指引】**
 > - **必须调用**：进行任何 DeepSeek Harness (DSH) 插件开发、调试、审查或配置任务时，**必须调用本 Skill**；API、服务挂载属性与配置字段一律以本技能文档与官方类型声明为准，不要凭印象推断；
-> - **参考路由**：进行具体插件设计与编码前，先通过第六节【场景决策与开发导引矩阵】路由到对应专题文档（[`references/*.md`](./references/README.md)），全景主题导航见 [`references/README.md`](./references/README.md)；
+> - **参考路由**：进行具体插件设计与编码前，先通过第六节【场景决策与开发导引矩阵】路由到对应专题文档（[`references/*.md`](./references/README.md)），全景主题导航见 [`references/README.md`](./references/README.md)；涉及跨模块变更、能力删除、兼容迁移或契约影响面时，额外查阅 [`cross-cutting-engineering-practices.md`](./references/cross-cutting-engineering-practices.md)。
 > - **鼓励并要求核验真实细节**：涉及具体服务契约、参数类型、Schema 结构或版本行为时，**强烈鼓励并要求查验真实细节**（官方上游仓库 `deepseek-ai/deepseek-harness`、本地已安装官方包的 `lib/*.js` 实现（含 JSDoc）与 `package.json` 声明、以及运行时 `ctx.tools.schemas()` 等真源，详见 [`references/official-upstream-and-docs.md`](./references/official-upstream-and-docs.md)），拒绝盲目断言。
 
 ---

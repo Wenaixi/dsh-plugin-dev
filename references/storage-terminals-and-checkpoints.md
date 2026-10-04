@@ -1,4 +1,4 @@
-# DSH 领域存储 (Storage Domain)、持续伪终端 (PTY) 与检查点策略权威指南 (DSH 0.2.0-rc.2)
+# DSH 领域存储 (Storage Domain)、持续伪终端 (PTY) 与检查点策略权威指南
 ---
 
 ## 一、领域数据存储体系 (`ctx.storage.domain`)

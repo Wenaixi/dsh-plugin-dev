@@ -1,6 +1,6 @@
-# Typert Remote RPC 跨端通信开发指南 (DSH 0.2.0-rc.2)
+# Typert Remote RPC 跨端通信参考指南
 
-本文件是辅助开发 DeepSeek Harness (DSH 0.2.0-rc.2) 双面插件（Dual-Face Plugin）中 **Browser 前端 ↔ Host 服务端跨端 RPC 通信** 的权威实战指南。
+本文件辅助开发 DeepSeek Harness（DSH）双面插件（Dual-Face Plugin）中的 **Browser 前端 ↔ Host 服务端跨端 RPC 通信** 的权威实战指南。
 
 ---
 

@@ -67,7 +67,7 @@ clearai 用 `dsh.bundle.patch: ["./cordis.patch.yml", "./presets/clearai/clearai
 ## 二、版本兼容层：高迭代宿主下的存活术
 
 ### 2.1 能力探测优先于版本号分支
-- 事件名新旧并存：0.1.6 起 agent 就绪事件是 `agent/created（payload 携带 source，类型为 'startup'|'resume'|'clear'|'compact'（0.2.0 运行时实际驱动方仅 startup 与 resume，clear/compact 属预留枚举），按 source 值判而非 'source' in payload）；SessionStartSource = 'startup'|'resume'|'clear'|'compact'）——agent/session/created 是旧版事件名，0.2.0 全包 0 命中
+- 事件名和载荷会随版本演进：先按目标版本的事件声明与实际派发点确认名称，再按已知字段值分支；不要用“存在某字段”替代事件版本兼容判断。
 - 方法探测：较新版本可能移除旧的 session.events 接口（用 snapshotEvents；eventAt/ownEvents deprecated）；Settings 无 register 方法（用 describe/update/replace/configure）；官方无 WEB_SERVER_KEYS 常量（服务名就是 ctx.webServer）。
 - 版本号分支只用在"补丁/配置键名"这类真的按版本变化的场景（dsh-TUI 的 persona→personaPrefix）。
 
@@ -76,7 +76,7 @@ Symbol.for('dsh.subagent.queuePrompt') 等进程级 Symbol + 能力探测，替�
 
 ### 2.3 peerDependencies 的三种写法
 - **精确枚举**（最可控）：`"@deepseek-ai/dsh-agent": "<已验证版本范围>"`（agent-teams、dsh-TUI）。
-- **范围 + 兼容性矩阵**：`dsh.compatibility.dshReleases: { "0.1.5-rc.1": "compatible", ... }` 声明"测过的版本"（dsh-context、dsh-im 还加 `profiles: ['web']`）。
+- **范围 + 兼容性矩阵**：在包元数据中声明已实际验证的宿主版本范围和适用 profile；未验证版本保持未知，不要写成不兼容。
 - **rc 期区间**：`">=x-rc <下一主版本"`（ANOLISA 经验）。
 - 注意：peer 声明是**启动期硬约束**，caret 跨 minor 不成立；写清单只列实际验证过的宿主版本，"未测"不要写成"不支持"。
 

@@ -39,7 +39,7 @@ registerProvider(create: (control: SkillProviderControl) => SkillProvider): () =
 同名技能由 rank 小者胜，**只在同一层内比较**；跨层由层优先级先决。项目条目 > 运行时条目 > 用户条目。
 
 官方常量（从 `dsh-skill` 源码读出，随版本漂移，写代码前以本地 `lib/index.js` 为准）：
-官方 filesystem 提供方扫描的六类根（`dsh-skill-filesystem`，0.2.0-rc.2）：
+以下是某个核验版本中 filesystem 提供方的默认根示例；根目录、rank 和 source 会随版本变化，写代码前先读目标 `dsh-skill-filesystem` 的实际实现：
 
 | rank | 根 | source |
 | --- | --- | --- |

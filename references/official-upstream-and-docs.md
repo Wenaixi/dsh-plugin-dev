@@ -1,6 +1,6 @@
-# 官方上游源码与官方文档核验指引 (DSH 0.2.0-rc.2)
+# 官方上游源码与官方文档核验指引
 
-本技能库所有架构结论均来自官方一手来源。当本地指南与官方源码冲突时，**一律以官方源码为准**，并按本文件指引的方式回溯核实。
+本技能库中的部分架构结论来自官方一手来源；使用具体契约前仍需按目标版本复核。当本地指南与官方源码冲突时，**一律以官方源码为准**，并按本文件指引的方式回溯核实。
 
 ---
 
@@ -8,7 +8,7 @@
 
 | 资源 | 地址 | 说明 |
 | :--- | :--- | :--- |
-| 主仓库 | https://github.com/deepseek-ai/deepseek-harness | 官方 monorepo，默认分支 master，发布 tag 如 v0.2.0-rc.2 |
+| 主仓库 | https://github.com/deepseek-ai/deepseek-harness | 官方 monorepo，默认分支 master，发布 tag 和版本列表以官方仓库为准 |
 | 包清单 | https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/README.md | 全量官方包命名、分组与职责的第一手索引 |
 | 模块依赖图 | https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/module-graph.md | 包与包之间的依赖边，用于判断该依赖谁、绝不该依赖谁 |
 | Cordis 教程 | https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cordis-tutorial/index.md | 仓库内的 Cordis 入门教程源文件 |

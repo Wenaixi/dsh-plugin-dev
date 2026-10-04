@@ -1,4 +1,4 @@
-# DSH Webhook 外部触发、无头模式 (Headless) 与 PTC 长工作流权威指南 (DSH 0.2.0-rc.2)
+# DSH Webhook 外部触发、无头模式 (Headless) 与 PTC 长工作流权威指南
 ---
 
 ## 一、Webhook 外部自动化触发架构 (`ctx.webhookRuntime`)

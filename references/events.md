@@ -50,7 +50,7 @@ export function isBailed(value: any) {
 | `workspace/session-stop` | **parallel** | 会话归档或强制停止时并发派发。各子系统以用户自身的停止方式取消当前活跃活动（如丢弃排队收件箱，记录 inbox splice）。宿主捕获 `AggregateError` 后逐条 `logger.warn`，归档不被中止，不向调用方抛出。 |
 | `plan/mode` | **双重机制** | 持久化层为仅记日志的 SessionEvent `plan/mode`（整值替换）；运行时通过 `ctx.sessionProjections`（SessionProjectionRegistry）注册的 `plan` 单元推导 `{ active, pending }` 视图。注：`plan/mode` 事件本身不进模型 transcript，但带消息后缀的 `/plan <text>` 会经 `agent.steer()` 成为一条用户消息进入历史（不带附件的 `/plan` / `/plan off` 留在历史之外）。 |
 | `skills/change` | **emit** | 技能注册表发生变动（增删改）时的全局失效广播，不带 diff。消费方收到后应重新调用 `ctx.skills.list()`。 |
-| `agent/created` | **serial** | 活动 Agent 实例创建时广播（真实生命周期事件；`ready` 事件在 0.2.0-rc.2 中不存在）。 |
+| `agent/created` | **serial** | 活动 Agent 实例创建时广播（真实生命周期事件；当前核验版本未发现 `ready` 事件；使用前请按目标版本复核）。 |
 | `agent/disposed` | **emit** | Agent 实例销毁时广播（宿主防御性隔离，监听器抛错仅记日志）。 |
 
 ---

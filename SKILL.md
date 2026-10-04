@@ -76,11 +76,11 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 
 在进行自动化开发或自主推进时，遇到以下情况**必须触发暂停确认**，防止破坏宿主生产环境：
 
-- **⚠️ 检查点 1（修改全局 Profile 配置前）**：
+- **检查点 1（修改全局 Profile 配置前）**：
   在向当前活跃 profile 的 `cordis.patch.yml` 写入永久改动前，必须确认备份原文件（如 `cordis.patch.yml.bak`），防止配置错误导致整个 Web 宿主无法启动；
-- **⚠️ 检查点 2（执行高危系统调用与写文件前）**：
+- **检查点 2（执行高危系统调用与写文件前）**：
   在调用 `ctx.subprocess.spawn` 执行破坏性文件删除或外部安装时，必须明确参数为扁平数组（严格零 Shell 解释），并提示用户确认当前沙箱模式（`read-only` / `workspace-write`）；
-- **⚠️ 检查点 3（添加带有未适配 peerDependencies 的插件时）**：
+- **检查点 3（添加带有未适配 peerDependencies 的插件时）**：
   若遇到第三方包报 peer 不兼容，必须暂停提示用户并明确告知风险，再执行 `allow-version ... --accept-risk` 豁免。
 
 ---

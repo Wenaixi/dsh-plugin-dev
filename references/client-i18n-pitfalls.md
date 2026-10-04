@@ -1,6 +1,6 @@
 # 客户端 i18n 实战：双语字典与构建产物的六条铁律
 
-> 适用于：双面 UI 插件、`ctx.locale` 接入、构建脚本内嵌字典。官方参考实现：`@deepseek-ai/dsh-client-ui-plugin-manager`、`@deepseek-ai/dsh-client-locale@0.2.0-rc.2`。
+> 适用于：双面 UI 插件、`ctx.locale` 接入、构建脚本内嵌字典。官方参考实现：`@deepseek-ai/dsh-client-ui-plugin-manager`。
 
 ## 一、接入三件套（官方姿势）
 

@@ -1,7 +1,7 @@
 # DSH 插件开发技术参考目录
 
-> **⚠️ 核心定位声明**  
-> **本目录是用于【辅助开发 DeepSeek Harness (DSH) 插件】的权威架构规范与知识库（Agent Skill 参考集）。**  
+> **核心定位声明**
+> **本目录是用于辅助开发 DeepSeek Harness（DSH）插件的参考知识库（Agent Skill 参考集）。**
 > **本项目本身是一个 Skill，绝不是 DSH 插件本身！**
 
 ---
@@ -10,14 +10,14 @@
 
 ### 一、官方上游源码与官方文档核验指引 (Upstream & Docs)
 - [official-upstream-and-docs.md](./official-upstream-and-docs.md)：
-  官方一手资料索引——上游仓库 (`deepseek-ai/deepseek-harness`) 包清单与模块依赖图、本地已安装官方包的目录结构与类型声明速读法、官方文档站页面索引（中英双语入口）、事实核验三级证据强度与版本升级回溯流程。
+  官方一手资料索引——上游仓库包清单与模块依赖图、实际安装包的目录结构与类型声明速读法、官方文档站页面索引、事实核验的证据分级与版本升级回溯流程。
   **任何架构结论与官方源码冲突时，一律以源码为准。**
 
 ### 二、微内核与服务架构 (Microkernel & Spine)
 - **[cordis-context-internals.md](./cordis-context-internals.md)**：
   Cordis 微内核底层的三个隔离原语——`ctx.isolate(key)` 服务作用域物理隔离槽、`ctx.intercept(key, config)` 动态拦截代理、`Context.is(value)` 全局 Symbol 品牌跨 Realm 检验。
 - **[skill-provider.md](./skill-provider.md)**：
-  自定义技能发现 (SkillProvider) 权威指南——`registerProvider` 注册契约与同步工厂语义、`list`/`get` 两方法与 `locator` 往返句柄、`rank` 取值与重名裁决规则、`complete: false` 的"发现未完成"表达、AbortSignal 贯穿规范与吞 abort 造成的卡顿，以及生产侧 SKILL.md 发现器的 BOM/CRLF/闭栏/目录名四坑、frontmatter 解析的性能陷阱与失效链路。
+  自定义技能发现（SkillProvider）参考指南——`registerProvider` 注册契约与同步工厂语义、`list`/`get` 两方法与 `locator` 往返句柄、`rank` 取值与重名裁决规则、`complete: false` 的"发现未完成"表达、AbortSignal 贯穿规范与吞 abort 造成的卡顿，以及生产侧 SKILL.md 发现器的 BOM/CRLF/闭栏/目录名四坑、frontmatter 解析的性能陷阱与失效链路。
 - **[services.md](./services.md)**：
   The Core Spine 核心大动脉服务单复数绝对铁律（`ctx.sessions`、`ctx.agents`、`ctx.agentTeams`、`ctx.tools` 为复数；`ctx.schedule`、`ctx.planMode`、`ctx.workspaceRegistry` 为单数；`ctx.llm` 为 Seam）、终端服务挂载键是复数 `ctx.terminals`、不存在 `dsh-approval` 包（审批是 `dsh-user-approval`）、Service 类定义规范与依赖注入契约。
 - **[plugin-anatomy.md](./plugin-anatomy.md)**：
@@ -31,13 +31,13 @@
 - **[events.md](./events.md)**：
   Cordis 五大派发模式源码剖析（`emit` 同步广播、`waterfall` 同步环绕中间件与 `next()` 拦截、`parallel` 并发与 `AggregateError`、`serial` 串行短路与 bail 判定、`bail` 同步短路）、宿主运行事件族、Persistence Catalog 事件与 SurfaceEventType 兼容性、5 类 SurfaceEventType 与 `ignorable` 契约。
 - **[tools.md](./tools.md)**：
-  ToolRuntime 架构、工具执行时序（六段官方管线）、单调安全守卫法则、全量官方工具归属包对照表与 `defineTool` 编写规范。
+  ToolRuntime 架构、工具执行时序、单调安全守卫法则与工具归属核验方法与 `defineTool` 编写规范。
 
-### 五、前端双面 UI 插件与全量插槽体系 (Client UI & Slots)
+### 五、前端双面 UI 插件与插槽体系（Client UI & Slots）
 - **[settings-and-plugin-ui.md](./settings-and-plugin-ui.md)**：
-  全局设置窗口 (Settings) 与插件管理中心 UI 深度指南——`settings.section` 与 `plugins.bundle.config` 插槽机制、源码级解密三大明星插件（终端输入、侧边卡片、壁纸引擎）的真实注入代码、导航图标 (Nav Glyph) 替换技法、React 设置面板的本地 vs 补丁持久化、左侧“插件”管理中心卡片呈现、**`readPluginMeta` 的 exports 白名单契约（卡片空白根因与修法）**、图标 256 KiB 上限与路径约束、**改完必跑的两道验证（`npm pack --dry-run` + 直接调 `readPluginMeta`）**与开发决策树。
+  全局设置窗口 (Settings) 与插件管理中心 UI 深度指南——`settings.section` 与 `plugins.bundle.config` 插槽机制、源码样本与真实注入代码、导航图标 (Nav Glyph) 替换技法、React 设置面板的本地 vs 补丁持久化、左侧“插件”管理中心卡片呈现、**`readPluginMeta` 的 exports 白名单契约（卡片空白根因与修法）**、图标 256 KiB 上限与路径约束、**改完必跑的两道验证（`npm pack --dry-run` + 直接调 `readPluginMeta`）**与开发决策树。
 - **[web-ui-slots-and-styling.md](./web-ui-slots-and-styling.md)**：
-  Web GUI 全量插槽树实战——右侧边栏（`sidebar.right.pane.tab`）、会话顶部工具栏（`conversation.session.header.utilities`）、输入框挂件（`conversation.input.right`）、消息流拦截（`conversation.chat.node`）、全局外壳（`shell.*`）；官方主题 CSS 变量（以当前主题包导出为准，含常见误写对照）；样式安全注入与 HMR 回收铁律；**官方 primitives 组件族优先策略**（SegmentedControl / Switch / StateDot / Tag / Button）与「客户端产物单一来源」纪律；多语言国际化（`ctx.locale` 双语注册、声明 `locale:` 注入 t 席位、缺词静默返回 key）；语言边界契约（静态文案进词典、内容数据保持单语）。
+  Web GUI 插槽树实战——右侧边栏（`sidebar.right.pane.tab`）、会话顶部工具栏（`conversation.session.header.utilities`）、输入框挂件（`conversation.input.right`）、消息流拦截（`conversation.chat.node`）、全局外壳（`shell.*`）；官方主题 CSS 变量（以当前主题包导出为准，含常见误写对照）；样式安全注入与 HMR 回收铁律；**官方 primitives 组件族优先策略**（SegmentedControl / Switch / StateDot / Tag / Button）与「客户端产物单一来源」纪律；多语言国际化（`ctx.locale` 双语注册、声明 `locale:` 注入 t 席位、缺词静默返回 key）；语言边界契约（静态文案进词典、内容数据保持单语）。
 
 - **[client-ui-placement-and-verification.md](./client-ui-placement-and-verification.md)**：
   客户端 UI **落点选择与真机取证**——「界面语义 → 插槽」完整映射表（设置窗口各级 Tab / 插件页分组条目 / 卡片内联配置区 / 右侧栏 Tab / 侧边栏底部 / 全局浮层）；**铁律「一个功能一个入口」**（多落点冗余 = UI 污染，实测需回滚）；插槽三个必知机制（spec 由父条目 `children` 表声明、四种 kind 与注册参数对应关系、**`slots.inject` 在 spec 不存在时静默不执行且零报错**）；`plugins.bundle.config` 的 **`configured` 渲染门（匹配键是包名）**；「UI 不显示」三分法（模块没进图 / apply 没跑 / 落点或渲染门不匹配）；客户端产物 **`immutable` 长缓存与「版本号先于界面更新」的假象**（桌面端必须完全重启）；**无浏览器验证法（Node 直跑 CJS factory 探针）**；CDP / browser-harness 真机取证的环境坑；**解析 Electron `app.asar` 做桌面版与 CLI 版差异比对**。
@@ -123,6 +123,6 @@
   客户端 `ctx.locale` 实战六铁律——双语键必须完全成对、值可相同（刻意单语条目也用同值占位）；字典是纯数据、**不能嵌 `t()` 调用**；构建期 Node 计算、产物只内嵌**字面量**（浏览器端执行 `readdirSync` 会 ReferenceError）；宿侧下发的诊断链中文在客户端按枚举查字典覆盖（宿侧契约零改动）；语言切换刷新用 `ctx.locale.subscribe` 而非 `locale/change` 事件；字典并入 `locale/*.json` 顶层键组与 meta 键共存；反向断言门禁清单。
 - **[architecture-refactor-experience.md](./architecture-refactor-experience.md)**：
   「入口大函数 到 深模块」重构通用经验——多实现漂移收成唯一真源 + 反向断言 + 锁定测试；用户可控枚举值写入状态前必须归一化（防垃圾态注入持久化）；HTTP 端点剥离纯工厂 + `Symbol.asyncIterator` 假 req + 普通对象假 res 单测（零为测试造抽象）；配置写盘字段级 merge 保留未知键、非法值拒绝写盘；孤儿函数全仓确认零调用再删并清理导出与记忆库；**Windows CRLF 文件编辑按行号切割替换**；**可失败自检与破坏实测的复用写法（接口即测试表面）**；**正则字符类要按真实数据域写，别抄模板**（`[w-]+` 匹配不到 kebab 名的教训、手写括号配平器零守卫陷阱）。
-  2026-10-04 增补：**删除能力要同步所有对外承诺面（SKILL.md/README/客户端文案/locale/注释，CHANGELOG 历史不改）**；**门禁计数随环境（本机 85 / CI 84 类）文档要注明口径或直接不写数字**；**缓存收益要用 performance.now 实测裁决**（能省哪一步、量级、正确性代价三问）；**测试替身缺方法 = 生产防御必需，同一服务不同能力面（describe vs configure）分别探测不要收敛**；**文件级拆分判据 = 第二消费方 + 行为面已覆盖**（否则是纯位移的门禁盲区）。
+  维护提示：删除能力时同步检查所有对外承诺面；门禁计数注明统计口径或不写数字；缓存收益用实际测量裁决；测试替身覆盖生产防御所需的方法；文件拆分需同时考虑第二消费方与行为覆盖。
 - **[publish-npm-verification.md](./publish-npm-verification.md)**：
   发布验证通用经验——npm 镜像（npmmirror）会让 `npm view` 假阴性，直查官方 registry API 验 `versions` 与 `dist-tags.latest`；幂等发布「已发布跳过」只跳 npm 不跳 Release，需 `gh release view` 单独验证；tag 指向错误的修正流程（删 tag、补提交、重打、force push）；PowerShell 不支持 `&&` 的拼接坑；发布五步 checklist（bump、CHANGELOG、门禁、commit/tag/push、双真源验证）。

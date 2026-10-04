@@ -1,6 +1,6 @@
 # 插件打包、分发与工作区开发 (Packaging, Distribution & Workspace)
 
-在 DeepSeek Harness (DSH 0.2.0-rc.2) 中，可安装与可分发的插件单元被称为**组合包（Bundle）**。Bundle 通过携带配置补丁向指定的**装配体（Profile）**贡献能力。本文件覆盖打包、安装、Profile 组合、git 安装授权与 Monorepo 工作区多包联调。
+在 DeepSeek Harness（DSH）中，可安装与可分发的插件单元被称为**组合包（Bundle）**。Bundle 通过携带配置补丁向指定的**装配体（Profile）**贡献能力。本文件覆盖打包、安装、Profile 组合、git 安装授权与 Monorepo 工作区多包联调。
 
 ## 核心概念：Bundle vs Profile（互斥）
 

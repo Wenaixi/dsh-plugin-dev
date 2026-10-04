@@ -1,4 +1,4 @@
-# Cordis 4.0.4 Context Proxy 隔离内核剖析
+# Cordis Context Proxy 隔离内核参考
 
 在 DSH 中，`Context` 对象本质是一个受保护的 JavaScript Proxy，属性访问通过服务解析器（Service Resolver）动态分发。本文件是 `plugin-anatomy.md` 第三节的底层补充，只讲三个隔离原语。
 

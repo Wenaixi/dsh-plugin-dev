@@ -1,6 +1,6 @@
 # 贡献指南 (Contributing Guide)
 
-感谢你关注并愿意为 **dsh-plugin-dev** 做出贡献！本项目是用于辅助开发 DeepSeek Harness (DSH 0.2.0-rc.2) 插件的权威 Agent Skill（技能知识库与工程规范），**其本身是一个技能指南而非 DSH 插件**。为了保持知识库的高精度与工业级严谨性，请在提交贡献前阅读以下指南。
+感谢你关注并愿意为 **dsh-plugin-dev** 做出贡献！本项目是用于辅助开发 DeepSeek Harness（DSH）插件的权威 Agent Skill（技能知识库与工程规范），**其本身是一个技能指南而非 DSH 插件**。为了保持知识库的高精度与工业级严谨性，请在提交贡献前阅读以下指南。
 
 ---
 

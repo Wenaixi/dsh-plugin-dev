@@ -1,4 +1,4 @@
-# DSH 子智能体引擎 (Subagents)、文件观察策略与 ACP 协议权威指南 (DSH 0.2.0-rc.2)
+# DSH 子智能体引擎 (Subagents)、文件观察策略与 ACP 协议权威指南
 ---
 
 ## 一、子智能体能力切面架构 (`ctx.subagents`)
@@ -12,7 +12,7 @@
 - **`spawn`（插件 `@deepseek-ai/dsh-subagent-spawn-in-process`）**：在当前进程中拉起全新的独立子智能体，完全不继承父会话历史，用于全新无污染的独立任务（如全网背景调研）；
 - **`fork`（插件 `@deepseek-ai/dsh-subagent-fork-in-process`）**：分叉继承父会话当前已完成的全部轮次历史，用于需要上下文背景的后续分析与审查；
 - 以上两个插件的注册名均可通过各自 `Config.providerName` 覆盖（默认 `spawn` / `fork`）；
-- **ACP（`@deepseek-ai/dsh-acp` + `dsh-acp-app`）**：基于 `@agentclientprotocol/sdk` 的 Agent Client Protocol **服务端适配层**（JSON-RPC stdio，启动入口 `dsh --profile acp`，由 `dsh-acp-app` 解析），**不注册为 `ctx.subagents` 的 provider**：`dsh-acp` 未实现 SubagentProvider 接口（`registerProvider`/`start`/`prepareContinuable` 全库 0 命中，仅经 `drainContinuableDescendants` 消费既有 continuable 子代理）；`dsh-subagent-acp` 客户端包亦未随 0.2.0-rc.2 发布集安装（asar 包清单中不存在）。
+- **ACP（`@deepseek-ai/dsh-acp` + `dsh-acp-app`）**：基于 `@agentclientprotocol/sdk` 的 Agent Client Protocol **服务端适配层**（JSON-RPC stdio，启动入口 `dsh --profile acp`，由 `dsh-acp-app` 解析），**不注册为 `ctx.subagents` 的 provider**：`dsh-acp` 未实现 SubagentProvider 接口（`registerProvider`/`start`/`prepareContinuable` 全库 0 命中，仅经 `drainContinuableDescendants` 消费既有 continuable 子代理）；`dsh-subagent-acp` 客户端包亦未随 当前核验的发布集未安装（具体以目标运行时包清单为准）。
 
 ### 2. 单次运行 (One-Shot) vs 可持续会话 (Continuable)
 `ctx.subagents` 明确区分了两种调用者意图：

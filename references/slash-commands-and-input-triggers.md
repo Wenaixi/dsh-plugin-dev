@@ -1,4 +1,4 @@
-# DSH 斜杠命令 (Slash Commands)、输入触发器与交互扩展权威指南 (DSH 0.2.0-rc.2)
+# DSH 斜杠命令 (Slash Commands)、输入触发器与交互扩展权威指南
 ---
 
 ## 一、人类斜杠命令核心架构 (`ctx.commands`)

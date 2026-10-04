@@ -1,4 +1,4 @@
-# DSH 沙箱底层隔离 (Windows ACL / Landlock)、图像转储与出站网络代理权威指南 (DSH 0.2.0-rc.2)
+# DSH 沙箱底层隔离 (Windows ACL / Landlock)、图像转储与出站网络代理权威指南
 ---
 
 ## 一、沙箱底层物理隔离原理 (Windows ACL 与 Linux Landlock)

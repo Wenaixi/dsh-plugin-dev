@@ -47,7 +47,7 @@ git push origin v1.2.3 --force   # 强制更新远端 tag
 
 ## 五、发布前 checklist
 
-1. 递增版本：官方包用裸 SemVer 预发布（如 0.2.0-rc.2；`-dsh.N` 后缀只是社区第三方包约定，官方 289 包 0 命中）；`npm version 0.2.0-rc.3`（前置 `git add -A`）；
+1. 递增版本：使用目标发布规范要求的 SemVer 形式；不要从某次官方或社区发布样本推断永久版本格式；发布前先用包管理器和注册表核对版本及 tag；
 2. CHANGELOG 补段（Added/Changed/Removed/Migration，含行为变更声明）；
 3. 门禁用仓库真实存在的命令（如 `pnpm typecheck` / `pnpm build`；不存在同名脚本就删该项，官方发包 scripts 无 typecheck/verify/behavior）；
 4. commit（version + changelog；lib/ 是构建时产物不提交，版本号是 package.json 的 manifest 字段）→ tag → `git push origin main --tags`；

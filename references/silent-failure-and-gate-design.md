@@ -58,6 +58,8 @@ DSH 大量契约校验失败后只写 `meta.error` 或直接 `return undefined`�
 | 官方 provider 脚本「找不到模块」 | isolated 布局下那个包不在 profile 直连依赖里，只在 dsh 本体依赖树中 | 按 profile 入口、pnpm store `.pnpm`、全局本体三档找 |
 | `dsh --profile web "..."` 报「too many arguments」 | **web** app 的参数解析器收 0 个位置参数（只吃 `--host`/`--port`/`--trusted-host`/`--no-open`）；headless 的 `[task...]` 是位置参数（多词 join、`-` 读 stdin），不会报该错 | 一次性任务走 `dsh --profile headless "…"` |
 | 某能力在 `ctx.get()` 里是 undefined | 契约包装了但没有实现方 | 契约包与实现包成对安装 |
+| 长驻进程复用「目录 mtime」做缓存快照判据，编辑子文件后目录 mtime 不变，返回旧内容 | mtime 对「子层文件内容编辑 / 先建目录后写文件」失明；跨层（子目录内）新建/删除不更新父目录 mtime | 失效判据取「目录 mtime + 根级目录名集合 + 各关键文件 mtime」多键聚合指纹；快照自检必须覆盖「编辑正文后重扫」与「增量新建可见」两条可失败用例 |
+| 清单比对按索引（declared[i] vs disk[i]），两侧都换序且内容全等时 0 报错 | 比对隐含「两侧顺序一致」假设；顺序差异被当作内容差异误报，或顺序全错被当作正确放行 | 改成按唯一键（如 name）建 Map 比对；只报真实内容差异，不报顺序差异 |
 | 界面文案变裸 key / 单语孤岛 | 面板词典缺词（漏同步任一册）或渲染路径有未走 `t()` 的硬编码字符串 | 查字典 key 集双语对称；门禁正则扫渲染路径裸字面量并断言每个 key 双语声明 |
 
 ---

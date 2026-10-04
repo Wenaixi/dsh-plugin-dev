@@ -182,6 +182,7 @@ description: "Use when creating, modifying, reviewing, or debugging DeepSeek Har
 | **V** | 装插件解析到过时的旧版本、被 incompatible 拒绝、版本选择与预期不符 | 安装解析排障：读 `.plugin-manager/logs/` 确认解析版本，识别 pnpm 冷却期与 semver 预发布排序，配置 `minimumReleaseAge: 0` 或改用精确版本 | [install-resolution-traps.md](./references/install-resolution-traps.md) |
 | **W2** | 自定义技能失效不生效、UI 开关后模型目录不刷新、怀疑 skills/change 误用 | 失效链路与 invalidate 正确姿势：`provider-catalog-invalidation.md`（消费方通知缝 vs 提供者直调、registerProvider 捕获实例、反模式两例） | [provider-catalog-invalidation.md](./references/provider-catalog-invalidation.md) |
 | **W3** | 双面插件接入 ctx.locale 双语、构建产物内嵌字典、宿侧文案客户端覆盖、发布后 npm 验证假阴性 | i18n 六铁律 + 发布验证：`client-i18n-pitfalls.md` / `publish-npm-verification.md` / `architecture-refactor-experience.md` | [client-i18n-pitfalls.md](./references/client-i18n-pitfalls.md) · [publish-npm-verification.md](./references/publish-npm-verification.md) · [architecture-refactor-experience.md](./references/architecture-refactor-experience.md) |
+| **W4** | 长驻缓存/清单比对/正则守卫三类静默失明（快照 mtime 判据、按索引比对、字符类不符） | 多键聚合指纹 + Map 比对 + 数据域正则 + 可失败自检：`silent-failure-and-gate-design.md` / `architecture-refactor-experience.md` | [silent-failure-and-gate-design.md](./references/silent-failure-and-gate-design.md) · [architecture-refactor-experience.md](./references/architecture-refactor-experience.md) |
 
 > **通用工程经验（社区图谱）**：开发任何形态插件前，先查
 > [community-patterns.md](./references/community-patterns.md)——高星插件共性做法与高频坑

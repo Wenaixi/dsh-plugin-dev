@@ -122,6 +122,6 @@
 - **[client-i18n-pitfalls.md](./client-i18n-pitfalls.md)**：
   客户端 `ctx.locale` 实战六铁律——双语键必须完全成对、值可相同（刻意单语条目也用同值占位）；字典是纯数据、**不能嵌 `t()` 调用**；构建期 Node 计算、产物只内嵌**字面量**（浏览器端执行 `readdirSync` 会 ReferenceError）；宿侧下发的诊断链中文在客户端按枚举查字典覆盖（宿侧契约零改动）；语言切换刷新用 `ctx.locale.subscribe` 而非 `locale/change` 事件；字典并入 `locale/*.json` 顶层键组与 meta 键共存；反向断言门禁清单。
 - **[architecture-refactor-experience.md](./architecture-refactor-experience.md)**：
-  「入口大函数 到 深模块」重构通用经验——多实现漂移收成唯一真源 + 反向断言 + 锁定测试；用户可控枚举值写入状态前必须归一化（防垃圾态注入持久化）；HTTP 端点剥离纯工厂 + `Symbol.asyncIterator` 假 req + 普通对象假 res 单测（零为测试造抽象）；配置写盘字段级 merge 保留未知键、非法值拒绝写盘；孤儿函数全仓确认零调用再删并清理导出与记忆库；**Windows CRLF 文件编辑按行号切割替换**。
+  「入口大函数 到 深模块」重构通用经验——多实现漂移收成唯一真源 + 反向断言 + 锁定测试；用户可控枚举值写入状态前必须归一化（防垃圾态注入持久化）；HTTP 端点剥离纯工厂 + `Symbol.asyncIterator` 假 req + 普通对象假 res 单测（零为测试造抽象）；配置写盘字段级 merge 保留未知键、非法值拒绝写盘；孤儿函数全仓确认零调用再删并清理导出与记忆库；**Windows CRLF 文件编辑按行号切割替换**；**可失败自检与破坏实测的复用写法（接口即测试表面）**；**正则字符类要按真实数据域写，别抄模板**（`[w-]+` 匹配不到 kebab 名的教训、手写括号配平器零守卫陷阱）。
 - **[publish-npm-verification.md](./publish-npm-verification.md)**：
   发布验证通用经验——npm 镜像（npmmirror）会让 `npm view` 假阴性，直查官方 registry API 验 `versions` 与 `dist-tags.latest`；幂等发布「已发布跳过」只跳 npm 不跳 Release，需 `gh release view` 单独验证；tag 指向错误的修正流程（删 tag、补提交、重打、force push）；PowerShell 不支持 `&&` 的拼接坑；发布五步 checklist（bump、CHANGELOG、门禁、commit/tag/push、双真源验证）。

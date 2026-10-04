@@ -138,7 +138,7 @@ dsh plugin --profile <profile> allow-version <pkg>@<exact-version> --dsh-version
   cordis.patch.yml       # 该 profile 的配置补丁层
   cordis.yml             # 空根 entry list（Loader Include 锚点，每次启动被重写为空 []，勿手改）；看组合用 `dsh --profile <name> --dump-config`
   compatibility.json     # 精确版本豁免表（缺省不存在 = 无豁免且不自动创建，grant 时才生成）
-  # 注意：cfg.log / cfg.err 不是通用 profile 产物（desktop profile 无、全部 289 个官方包零命中，仅个别 web 类 profile 出现）；启动日志在宿主 logs/ 目录
+  # 注意：cfg.log / cfg.err 不是通用 profile 产物（desktop profile 无、全部官方包零命中，仅个别 web 类 profile 出现）；启动日志在宿主 logs/ 目录
   .plugin-manager/logs/operation-*/pnpm.log   # 每次插件安装的完整 pnpm 输出
 ```
 

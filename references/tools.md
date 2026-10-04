@@ -199,3 +199,37 @@ for (const callback of callbacks) {
   1. 若当前环境未加载审批服务插件（如无头环境），系统**自动降级为 `deny`**（报错 `requires approval (not yet supported)`）；
   2. 若当前调用未绑定 Agent 句柄（Agent-less），无法审计且无前端 UI，系统同样**自动降级为 `deny`**；
   3. 唯有具备完整 Agent 且已挂载审批服务的调用，才会弹出真实的人类确认弹窗。
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+packages/core/agent-loop  <-  @deepseek-ai/dsh-agent-loop@0.2.0-rc.2
+packages/experimental/tool-agent-team  <-  @deepseek-ai/dsh-experimental-tool-agent-team@0.2.0-rc.2
+packages/plan/plan-mode  <-  @deepseek-ai/dsh-plan-mode@0.2.0-rc.2
+packages/schedule/schedule  <-  @deepseek-ai/dsh-schedule@0.2.0-rc.2
+packages/skill/skill  <-  @deepseek-ai/dsh-skill@0.2.0-rc.2
+packages/skill/skill-filesystem  <-  @deepseek-ai/dsh-skill-filesystem@0.2.0-rc.2
+packages/interaction/tool-ask-user  <-  @deepseek-ai/dsh-tool-ask-user@0.2.0-rc.2
+packages/shell/tool-bash  <-  @deepseek-ai/dsh-tool-bash@0.2.0-rc.2
+packages/guard/timeout-policy  <-  @deepseek-ai/dsh-tool-call-timeout-policy@0.2.0-rc.2
+packages/fs/tool-fs  <-  @deepseek-ai/dsh-tool-fs@0.2.0-rc.2
+packages/fs/tool-fs-search  <-  @deepseek-ai/dsh-tool-fs-search@0.2.0-rc.2
+packages/goal/tool-goal  <-  @deepseek-ai/dsh-tool-goal@0.2.0-rc.2
+packages/jobs/tool-jobs  <-  @deepseek-ai/dsh-tool-jobs@0.2.0-rc.2
+packages/deliverables/tool-present  <-  @deepseek-ai/dsh-tool-present@0.2.0-rc.2
+packages/shell/tool-pwsh  <-  @deepseek-ai/dsh-tool-pwsh@0.2.0-rc.2
+packages/workflow/tool-ralph  <-  @deepseek-ai/dsh-tool-ralph@0.2.0-rc.2
+packages/skill/tool-skill  <-  @deepseek-ai/dsh-tool-skill@0.2.0-rc.2
+packages/subagent/tool-subagent  <-  @deepseek-ai/dsh-tool-subagent@0.2.0-rc.2
+packages/subagent/tool-subagent-control  <-  @deepseek-ai/dsh-tool-subagent-control@0.2.0-rc.2
+packages/todo/tool-todo  <-  @deepseek-ai/dsh-tool-todo@0.2.0-rc.2
+packages/web/tool-web  <-  @deepseek-ai/dsh-tool-web@0.2.0-rc.2
+packages/core/tools  <-  @deepseek-ai/dsh-tools@0.2.0-rc.2
+packages/web/web-fetch-http  <-  @deepseek-ai/dsh-web-fetch-http@0.2.0-rc.2
+packages/web/web-search-deepseek  <-  @deepseek-ai/dsh-web-search-deepseek@0.2.0-rc.2
+```

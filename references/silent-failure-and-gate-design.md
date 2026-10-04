@@ -262,3 +262,15 @@ CI 通常校验 `tag == package.json.version`，不一致直接失败。发版�
 - [skill-provider.md](./skill-provider.md)：技能屏蔽的唯一通道是 invocation 覆盖
 - [install-resolution-traps.md](./install-resolution-traps.md)：版本解析陷阱
 - [packaging.md](./packaging.md)：打包、pnpm 陷阱、发布纪律
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
+packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.0-rc.2
+```

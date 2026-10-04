@@ -91,3 +91,19 @@ dsh --profile headless --json "分析提交历史" > events.ndjson
 - **工作流状态持久化**：支持的编排原语：agent/parallel/pipeline/phase/log/args 六个脚本 hooks；**无 ChildPort、无断点快照**——工作流不检查点（README「No journaling or resume」），进程重启无法续跑；
 - **进程侧配额（Node PTC 提供方）**：maxOldGenerationSizeMb(512)/maxOutputBytes(64MB)/maxPendingCalls(128)/timeoutMs(120s, max 600s)；引擎侧是 maxConcurrentAgents/maxTotalAgents/maxItemsPerCall/syncTimeoutMs 的协作式计数。**无 CPU 执行时限（timeout 不是 CPU meter）、无文件写入上限**（配额是协作式非宿主强制）；
 - **文件策略继承**：Worker 按 Calling Session 解析出的文件策略执行（`read-only` / `workspace-write`，workflow-ptc 用 sandboxPolicy.resolve({session})）。注意：VM 不是安全边界——进入 Node 后 Node API 仍可用（受所选 OS 文件策略限制），**网络不受文件策略限制**。
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+packages/bundle/base  <-  @deepseek-ai/dsh-base@0.2.0-rc.2
+packages/bundle/headless  <-  @deepseek-ai/dsh-headless@0.2.0-rc.2
+packages/webhook/webhook  <-  @deepseek-ai/dsh-webhook@0.2.0-rc.2
+packages/webhook/webhook-github  <-  @deepseek-ai/dsh-webhook-github@0.2.0-rc.2
+packages/workflow/workflow  <-  @deepseek-ai/dsh-workflow@0.2.0-rc.2
+packages/workflow/workflow-ptc  <-  @deepseek-ai/dsh-workflow-ptc@0.2.0-rc.2
+```

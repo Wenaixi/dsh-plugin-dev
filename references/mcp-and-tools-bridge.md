@@ -121,3 +121,15 @@ export function apply(ctx) {
 - **工具公开名规范化**：公开名超过 64 字符或含非 `[A-Za-z0-9_-]` 字符时，做确定性规范化（非法字符替换为 `_`、超长截断），并追加 12 位十六进制 SHA-256 哈希（对 `serverName\0rawName` 取摘要），保证不同 MCP 身份不会塌缩成同名。
 - **reconnect 指数退避**：默认为 `enabled: true`、`initialDelayMs: 500`、`maxDelayMs: 30000`、`maxAttempts: 10`；连续失败达到上限后注销已注册工具，需重载插件或重启宿主。
 - **serverName 正则**：必须匹配 `^[A-Za-z0-9_-]{1,32}$`，超出会被配置校验拒绝。
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
+packages/mcp/mcp-client  <-  @deepseek-ai/dsh-mcp-client@0.2.0-rc.2
+```

@@ -227,3 +227,24 @@ pnpm link --global dsh-plugin-foo
 - 认为 bundle 可以同时是 profile——两者 manifest 互斥。
 - 认为 git 安装拿来即用——需要 prepare 脚本与 allowBuilds 授权。
 - 认为多行挂载的组合包每行都带半侧——半侧只在裸包名行。
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
+apps/cli  <-  @deepseek-ai/dsh@0.2.0-rc.2
+packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.0-rc.2
+packages/bundle/base  <-  @deepseek-ai/dsh-base@0.2.0-rc.2
+packages/client/hmr  <-  @deepseek-ai/dsh-client-hmr@0.2.0-rc.2
+packages/boot/cmdline  <-  @deepseek-ai/dsh-cmdline@0.2.0-rc.2
+packages/boot/hmr  <-  @deepseek-ai/dsh-hmr@0.2.0-rc.2
+packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@0.2.0-rc.2
+packages/session/session-projection  <-  @deepseek-ai/dsh-session-projection@0.2.0-rc.2
+packages/terminal/terminal-bash  <-  @deepseek-ai/dsh-terminal-bash@0.2.0-rc.2
+packages/workspace/workspace  <-  @deepseek-ai/dsh-workspace@0.2.0-rc.2
+```

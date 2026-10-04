@@ -130,3 +130,54 @@ export function apply(ctx) {
   const cached = ctx.memoryCache.get('my-key')
 }
 ```
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
+packages/core/agent  <-  @deepseek-ai/dsh-agent@0.2.0-rc.2
+packages/core/agent-loop  <-  @deepseek-ai/dsh-agent-loop@0.2.0-rc.2
+packages/preset/agent-preset  <-  @deepseek-ai/dsh-agent-preset@0.2.0-rc.2
+packages/preset/agent-preset-registry  <-  @deepseek-ai/dsh-agent-preset-registry@0.2.0-rc.2
+packages/client/modules  <-  @deepseek-ai/dsh-client-modules@0.2.0-rc.2
+packages/compaction/compaction  <-  @deepseek-ai/dsh-compaction@0.2.0-rc.2
+packages/compaction/compaction-basic  <-  @deepseek-ai/dsh-compaction-basic@0.2.0-rc.2
+packages/compaction/compaction-image-offload  <-  @deepseek-ai/dsh-compaction-image-offload@0.2.0-rc.2
+packages/compaction/compaction-tool-result-pruner  <-  @deepseek-ai/dsh-compaction-tool-result-pruner@0.2.0-rc.2
+packages/boot/config-editor  <-  @deepseek-ai/dsh-config-editor@0.2.0-rc.2
+packages/credentials/credentials  <-  @deepseek-ai/dsh-credentials@0.2.0-rc.2
+packages/credentials/credentials-local  <-  @deepseek-ai/dsh-credentials-local@0.2.0-rc.2
+packages/experimental/agent-team  <-  @deepseek-ai/dsh-experimental-agent-team@0.2.0-rc.2
+packages/experimental/agent-team-profile  <-  @deepseek-ai/dsh-experimental-agent-team-profile@0.2.0-rc.2
+packages/experimental/tool-agent-team  <-  @deepseek-ai/dsh-experimental-tool-agent-team@0.2.0-rc.2
+packages/fs/fs  <-  @deepseek-ai/dsh-fs@0.2.0-rc.2
+packages/fs/fs-local  <-  @deepseek-ai/dsh-fs-local@0.2.0-rc.2
+packages/runtime-diagnostics/invariants  <-  @deepseek-ai/dsh-invariants@0.2.0-rc.2
+packages/llm/llm  <-  @deepseek-ai/dsh-llm@0.2.0-rc.2
+packages/plan/plan-mode  <-  @deepseek-ai/dsh-plan-mode@0.2.0-rc.2
+packages/sandbox/sandbox  <-  @deepseek-ai/dsh-sandbox@0.2.0-rc.2
+packages/sandbox/sandbox-local  <-  @deepseek-ai/dsh-sandbox-local@0.2.0-rc.2
+packages/schedule/schedule  <-  @deepseek-ai/dsh-schedule@0.2.0-rc.2
+packages/core/scope  <-  @deepseek-ai/dsh-scope@0.2.0-rc.2
+packages/core/session  <-  @deepseek-ai/dsh-session@0.2.0-rc.2
+packages/session/session-persistence  <-  @deepseek-ai/dsh-session-persistence@0.2.0-rc.2
+packages/session/session-persistence-jsonl  <-  @deepseek-ai/dsh-session-persistence-jsonl@0.2.0-rc.2
+packages/session-query/session-query  <-  @deepseek-ai/dsh-session-query@0.2.0-rc.2
+packages/session-query/session-query-sqlite  <-  @deepseek-ai/dsh-session-query-sqlite@0.2.0-rc.2
+packages/settings/settings  <-  @deepseek-ai/dsh-settings@0.2.0-rc.2
+packages/skill/skill  <-  @deepseek-ai/dsh-skill@0.2.0-rc.2
+packages/skill/skill-filesystem  <-  @deepseek-ai/dsh-skill-filesystem@0.2.0-rc.2
+packages/subprocess/subprocess  <-  @deepseek-ai/dsh-subprocess@0.2.0-rc.2
+packages/subprocess/subprocess-local  <-  @deepseek-ai/dsh-subprocess-local@0.2.0-rc.2
+packages/core/system-prompt  <-  @deepseek-ai/dsh-system-prompt@0.2.0-rc.2
+packages/terminal/terminal  <-  @deepseek-ai/dsh-terminal@0.2.0-rc.2
+packages/terminal/terminal-bash  <-  @deepseek-ai/dsh-terminal-bash@0.2.0-rc.2
+packages/core/tools  <-  @deepseek-ai/dsh-tools@0.2.0-rc.2
+packages/interaction/user-approval  <-  @deepseek-ai/dsh-user-approval@0.2.0-rc.2
+packages/workspace/workspace  <-  @deepseek-ai/dsh-workspace@0.2.0-rc.2
+```

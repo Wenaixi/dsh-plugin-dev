@@ -71,3 +71,19 @@ export function apply(ctx) {
 - 官方核心包 `@deepseek-ai/dsh-client-shortcuts` 提供快捷键服务（ShortcutsService，`ctx.shortcuts`）；`stopSequenceMs`（默认 500ms）是 ui-conversation 停止快捷键的连续两次 Esc 最大间隔（StopSequence.press 按 performance.now 计算 deadline），属固定输入序列而非通用按键时序 API；
 - 支持在不同操作系统下自动适配 `Cmd` (macOS) 与 `Ctrl` (Windows/Linux)；
 - 功能插件通过 `ctx.shortcuts.register({id,label,aliases,defaults,regions,modals,resolve})`（defaults 按 desktop/web×macos/windows/linux 六 profile 声明物理 code+modifiers，'primary' 按设备展开为 meta/control）注册命令，固定序列用 `registerFixed({id,keys,bindings,group})`，观察输入用 `observeFixedInput`。输入框唤出由 ui-conversation 的 fixed.slash（物理 Slash 键）承担，Mod+/（Slash+primary）由 dsh-client-ui-shortcuts 打开快捷键参考面板。
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
+packages/client/shortcuts  <-  @deepseek-ai/dsh-client-shortcuts@0.2.0-rc.2
+packages/client/ui-commands  <-  @deepseek-ai/dsh-client-ui-commands@0.2.0-rc.2
+packages/client/ui-input-trigger  <-  @deepseek-ai/dsh-client-ui-input-trigger@0.2.0-rc.2
+packages/client/ui-shortcuts  <-  @deepseek-ai/dsh-client-ui-shortcuts@0.2.0-rc.2
+packages/interaction/commands  <-  @deepseek-ai/dsh-commands@0.2.0-rc.2
+```

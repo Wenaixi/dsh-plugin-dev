@@ -19,3 +19,16 @@
 ## UI 特别规则
 
 宿主状态正常不等于浏览器渲染正常；DOM 存在不等于事件命中；点击完成不等于写入成功；截图正常不等于持久化成功。每次写操作后读取真实接口或文件，并在失败时收集浏览器控制台、网络、模块加载图和错误节点证据。
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
+packages/client/modules  <-  @deepseek-ai/dsh-client-modules@0.2.0-rc.2
+packages/extensions/cordis-client-runner  <-  @deepseek-ai/dsh-cordis-client-runner@0.2.0-rc.2
+```

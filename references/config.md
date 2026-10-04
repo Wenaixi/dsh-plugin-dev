@@ -282,3 +282,23 @@ export function resolvePriority(input: {
 | 未设置语义没被 Schema 吃掉 | 该字段无 `.default()`，或判定用 raw config |
 | 自有数据根跟随宿主 | 改 `$DSH_HOME` 后插件读写随之改变 |
 | 兼容读不产生双真值 | 全仓 grep 旧路径，只有只读分支命中 |
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
+vendor/loader  <-  @deepseek-ai/cordis-plugin-loader@1.0.5
+apps/cli  <-  @deepseek-ai/dsh@0.2.0-rc.2
+packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.0-rc.2
+packages/bundle/base  <-  @deepseek-ai/dsh-base@0.2.0-rc.2
+packages/boot/config-editor  <-  @deepseek-ai/dsh-config-editor@0.2.0-rc.2
+packages/experimental/voice-input-bundle  <-  @deepseek-ai/dsh-experimental-voice-input-bundle@0.2.0-rc.2
+packages/mcp/mcp-client  <-  @deepseek-ai/dsh-mcp-client@0.2.0-rc.2
+packages/settings/settings  <-  @deepseek-ai/dsh-settings@0.2.0-rc.2
+packages/bundle/web-app  <-  @deepseek-ai/dsh-web-app@0.2.0-rc.2
+```

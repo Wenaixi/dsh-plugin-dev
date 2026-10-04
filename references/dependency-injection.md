@@ -25,3 +25,15 @@
 - 把宿主能力直接带入浏览器运行面。
 
 验收重点是消费者拿到的行为正确，而不是插件入口曾经执行过。
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
+vendor/loader  <-  @deepseek-ai/cordis-plugin-loader@1.0.5
+```

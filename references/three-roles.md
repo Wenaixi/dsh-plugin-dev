@@ -233,3 +233,19 @@ Cardinality 选错会导致重复渲染或完全不渲染；调试实时插槽�
 - 把 slot 组件做成直接拿 `ctx`——组件绝不收到 ctx。
 - 以为 `SandboxMode` 管控网络——它只管文件效果。
 - 误以为全部 browser↔host 通信或事件广播都依赖一个通用的 WebSocket 事件总线（如臆造的 events.mux / events.host）——当前官方架构是：一元 RPC 严格走 HTTP POST `/api/<namespace>/<method>`；只有标记为流式的方法（@Remote({mode:'stream'})）才通过 `/api/remote.mux` 长连接传输；架构中绝对不存在 Client Runtime、HostFrame、events.mux、events.host 或通用 resync()。
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
+apps/cli  <-  @deepseek-ai/dsh@0.2.0-rc.2
+packages/client/modules  <-  @deepseek-ai/dsh-client-modules@0.2.0-rc.2
+packages/client/ui-settings  <-  @deepseek-ai/dsh-client-ui-settings@0.2.0-rc.2
+packages/subprocess/subprocess  <-  @deepseek-ai/dsh-subprocess@0.2.0-rc.2
+packages/subprocess/subprocess-local  <-  @deepseek-ai/dsh-subprocess-local@0.2.0-rc.2
+```

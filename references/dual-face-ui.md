@@ -24,3 +24,17 @@
 - 组件崩溃被宿主转换为空节点。
 - 样式只定义未注入。
 - UI 显示成功但实际配置未改变。
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+packages/client/modules  <-  @deepseek-ai/dsh-client-modules@0.2.0-rc.2
+packages/client/ui-primitives  <-  @deepseek-ai/dsh-client-ui-primitives@0.2.0-rc.2
+packages/client/ui-renderer  <-  @deepseek-ai/dsh-client-ui-renderer@0.2.0-rc.2
+packages/client/ui-slots  <-  @deepseek-ai/dsh-client-ui-slots@0.2.0-rc.2
+```

@@ -163,3 +163,22 @@ DSH 迭代频繁，出现与本库描述不符的行为时，按此顺序处理�
 | 把 src/ 当作发布产物 | 运行时加载的是 lib/，src/ 仅用于 TypeScript 源码与官方仓库查阅 |
 | 用 --dump-config 证明插件可用 | 该命令不加载插件，只能证明配置被解析 |
 | 依赖 dsh-agent-loop 扩展 | ctx.agentLoop 是唯一具体循环实现（全库仅 dsh-agent-loop 挂载）；扩展循环驱动需直接依赖 dsh-session/dsh-llm/dsh-system-prompt/dsh-tools 等服务，dsh-agent 本体零运行时依赖，不能经由它拿到循环能力 |
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
+apps/cli  <-  @deepseek-ai/dsh@0.2.0-rc.2
+packages/core/agent  <-  @deepseek-ai/dsh-agent@0.2.0-rc.2
+packages/core/agent-loop  <-  @deepseek-ai/dsh-agent-loop@0.2.0-rc.2
+packages/credentials/credentials  <-  @deepseek-ai/dsh-credentials@0.2.0-rc.2
+packages/llm/llm  <-  @deepseek-ai/dsh-llm@0.2.0-rc.2
+packages/core/session  <-  @deepseek-ai/dsh-session@0.2.0-rc.2
+packages/core/system-prompt  <-  @deepseek-ai/dsh-system-prompt@0.2.0-rc.2
+packages/core/tools  <-  @deepseek-ai/dsh-tools@0.2.0-rc.2
+```

@@ -66,3 +66,16 @@ Linux 平台采用**探测制链**：`PLATFORM_CHAINS.linux = ["bwrap", "landloc
 1. 从启动环境（`launch-environment`）中解析用户配置的代理策略（支持 `HTTP_PROXY`、`HTTPS_PROXY`、`ALL_PROXY` 与 `NO_PROXY` 白名单）；
 2. 将代理策略安装为底层 HTTP 引擎 **Undici 的全局调度器 (Global Dispatcher)**；
 3. **透明覆盖效果**：由于全局 `fetch` 底层由 Undici 驱动，因此系统内所有的 LLM 适配器、网页搜索、MCP over HTTP、以及**第三方插件内部调用的原生 `fetch()`**，全部自动、无感知地享受代理网络加持，插件开发者零代码侵入！
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+packages/compaction/compaction-image-offload  <-  @deepseek-ai/dsh-compaction-image-offload@0.2.0-rc.2
+packages/util/http-proxy  <-  @deepseek-ai/dsh-http-proxy@0.2.0-rc.2
+packages/sandbox/sandbox-windows-acl  <-  @deepseek-ai/dsh-sandbox-windows-acl@0.2.0-rc.2
+```

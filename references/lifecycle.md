@@ -17,3 +17,15 @@
 ## 最小测试
 
 覆盖重复激活不叠加资源、修改后得到新状态、快速连续修改最终收敛、卸载期间任务被取消、卸载后无写入/广播/回调、底层资源确实关闭。
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
+vendor/timer  <-  @deepseek-ai/cordis-plugin-timer@1.1.6
+```

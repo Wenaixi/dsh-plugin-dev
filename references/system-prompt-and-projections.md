@@ -124,3 +124,16 @@ export function apply(ctx) {
   });
 }
 ```
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+packages/core/session  <-  @deepseek-ai/dsh-session@0.2.0-rc.2
+packages/core/system-prompt  <-  @deepseek-ai/dsh-system-prompt@0.2.0-rc.2
+packages/deliverables/workspace-changes  <-  @deepseek-ai/dsh-workspace-changes@0.2.0-rc.2
+```

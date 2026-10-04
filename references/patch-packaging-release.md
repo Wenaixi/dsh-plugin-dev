@@ -20,3 +20,17 @@
 ## 发布后
 
 从独立 registry API、dist-tag、下载 tarball 和干净环境安装结果回读版本与内容。版本、能力描述、入口文档和包清单必须一致。涉及 push、publish 或永久 profile 修改的操作，都要有明确权限和回滚路径。
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+vendor/loader  <-  @deepseek-ai/cordis-plugin-loader@1.0.5
+packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.0-rc.2
+packages/bundle/base  <-  @deepseek-ai/dsh-base@0.2.0-rc.2
+packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@0.2.0-rc.2
+```

@@ -18,13 +18,20 @@
 
 ---
 
-本项目是开发、审查、调试 DeepSeek Harness（DSH）插件与生态扩展的参考知识库（Agent Skill）。具体 API、服务挂载名、配置字段和版本行为必须按目标环境的运行时、实际发布物和源码重新核对；证据优先级为运行时行为 > 发布物实现与 JSDoc > 包内 README > 文档站散文。
+本项目是开发、审查、调试与验收 DeepSeek Harness（DSH）插件与生态扩展的参考知识库（Agent Skill）。**本项目自身也属于线索级材料**：任何 API、服务挂载名、配置字段和版本行为，都必须再回到目标环境的真实源码与运行时核对后才可使用。证据优先级为运行时行为 > 发布物实现与 JSDoc > 包内 README > 文档站散文 > 本技能库正文。
 
 DSH 是基于 Cordis 微内核构建的高可扩展 Agent Harness。在 DSH 架构中，**一切皆为插件 (Everything is a Plugin)**：会话日志、工具注册表、系统提示词装配、模型适配器、UI 界面以及执行循环驱动器均作为平等、可插拔的插件运行。
 
 ---
 
-## 一、核心架构原则
+## 一、两条不可协商的工作前置
+
+1. **源码至上**：读完参考文档只是起点。动手写插件前必须打开目标运行时的真实源码——本机已安装源码优先，其次桌面版解包到缓存目录，最后云端上游仓库——并能指出每个契约出自哪个包的哪个文件。三层来源、跨平台定位方式与缓存目录约定见 [source-verification-and-caches.md](./references/source-verification-and-caches.md)。
+2. **隔离验收**：插件完成的标志是在只装了基础插件与目标插件的全新实例上，冷装、热装、热更新、卸载四态全过，并在真实浏览器里逐项点击、回读真值；测试模型必须由用户选定。流程见 [isolated-instance-acceptance.md](./references/isolated-instance-acceptance.md)。
+
+---
+
+## 二、核心架构原则
 
 1. **零特权微内核**：不存在固化的特权逻辑。所有业务与平台能力均通过向共享 `Context` 挂载服务或监听事件提供。
 2. **核心服务大动脉 (The Core Spine)**：**单复数是硬约束**——`ctx.sessions`、`ctx.agents`、`ctx.agentTeams`、`ctx.tools` 为复数；`ctx.systemPrompt`、`ctx.configEditor`、`ctx.schedule`、`ctx.planMode`、`ctx.llm` 为单数。`ctx.agentLoop` 是唯一的具体循环包（bundle），扩展插件依赖 `dsh-agent` 的事件与服务即可。完整 core/seam/bundle 角色矩阵见 [services.md](./references/services.md)。
@@ -34,7 +41,7 @@ DSH 是基于 Cordis 微内核构建的高可扩展 Agent Harness。在 DSH 架�
 
 ---
 
-## 二、三角色物理架构模型
+## 三、三角色物理架构模型
 
 | 角色 | 运行环境 | 核心职责 | 安全与隔离机制 |
 | --- | --- | --- | --- |
@@ -46,17 +53,17 @@ UI 插件必须遵循**双面插件 (Dual-Face)** 规范：Node 端 `lib/index.j
 
 ---
 
-## 三、技术参考文档索引 (References)
+## 四、技术参考文档索引 (References)
 
-完整参考目录见 [references/README.md](./references/README.md)。新插件先读其中的通用专题，再按具体需求进入 DSH API 专题；通用专题覆盖依赖、生命周期、发现缓存、双面 UI、补丁与发布、静默失效和跨模块治理。具体服务、事件、工具、Remote、MCP、存储、沙箱、子智能体等专题也均在索引中维护。
+完整参考目录见 [references/README.md](./references/README.md)。新插件先读其中的通用专题，再按具体需求进入 DSH API 专题；通用专题覆盖依赖、生命周期、发现缓存、双面 UI、补丁与发布、静默失效、跨模块治理、源码核验与隔离验收。**每篇专题末尾都有「相关 DSH 源码」清单**，列出上游仓库相对路径与版本号，可据此直接打开真实源码。
 
 ---
 
-## 四、交付前自检
+## 五、交付前自检
 
-本技能是**纯文本规范集**，不含脚本、脚手架或示例工程。按 [SKILL.md](./SKILL.md) 的路由和交付清单逐项自检：先核对真实服务与版本，再核对插件入口、依赖注入、生命周期、双面插件隔离、构建产物、打包清单和运行时真值。
+本技能是**纯文本规范集**，不含脚本、脚手架或示例工程。按 [SKILL.md](./SKILL.md) 的路由和交付清单逐项自检：先核对真实服务与版本，再核对插件入口、依赖注入、生命周期、双面插件隔离、构建产物、打包清单和运行时真值，最后在隔离新实例上完成四态安装与浏览器逐项验证。
 
-## 五、快速开始
+## 六、快速开始
 
 ```bash
 # 1. 向目标 profile 添加插件组合包（plugin 子命令必须带 --profile）

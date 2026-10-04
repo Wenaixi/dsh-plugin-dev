@@ -215,3 +215,21 @@ DSH 把每种能力切分为抽象契约（seam），实现以不同包名注册
 - **严禁依赖具体实现包**：绝不直接 `import` 具体提供方实现（例如不要在业务代码中直接 `import { DefaultAgentLoop } from '@deepseek-ai/dsh-agent-loop'`），以确保底座在更换驱动器或沙箱环境时业务逻辑完全不受影响。
 - **命名规则**：单数 ctx 键用于 engine/runtime/policy/controller/resolver/store 等；复数键用于 registry 或拥有多个具名成员的服务（如 `ctx.sessions`、`ctx.agents`）。
 - **host 与 client 不得复用同一 Cordis Context 键**：TS 声明合并会同时看到两种类型。
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
+packages/core/agent  <-  @deepseek-ai/dsh-agent@0.2.0-rc.2
+packages/core/agent-loop  <-  @deepseek-ai/dsh-agent-loop@0.2.0-rc.2
+packages/bundle/base  <-  @deepseek-ai/dsh-base@0.2.0-rc.2
+packages/core/scope  <-  @deepseek-ai/dsh-scope@0.2.0-rc.2
+packages/bundle/sdk-minimal  <-  @deepseek-ai/dsh-sdk-minimal@0.2.0-rc.2
+packages/core/tools  <-  @deepseek-ai/dsh-tools@0.2.0-rc.2
+vendor/schemastery  <-  @deepseek-ai/schemastery@3.18.4
+```

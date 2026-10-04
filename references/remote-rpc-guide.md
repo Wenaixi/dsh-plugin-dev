@@ -195,3 +195,15 @@ export function apply(ctx) {
 
 ### 2. 错误与中断处理
 - 客户端传递 `signal: controller.signal`，调用 `controller.abort()` 会同步断开该路流式链接，并在 Host 端触发管道终止，绝不泄漏句柄。
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+packages/api/gateway  <-  @deepseek-ai/dsh-api-gateway@0.2.0-rc.2
+packages/typert/protocol  <-  @deepseek-ai/dsh-typert-protocol@0.2.0-rc.2
+```

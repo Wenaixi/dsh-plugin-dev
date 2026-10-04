@@ -105,3 +105,23 @@ export function apply(ctx) {
 
 - `dsh-jobs` 是抽象注册表接缝（抽象类 `JobRegistry`，直接构造抛错），实现包为 `dsh-jobs-local`；注册名 `jobs`；
 - 模型侧工具由 `dsh-tool-jobs` 注册：`job_output` / `job_list` / `job_kill`。
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+packages/jobs/jobs  <-  @deepseek-ai/dsh-jobs@0.2.0-rc.2
+packages/jobs/jobs-local  <-  @deepseek-ai/dsh-jobs-local@0.2.0-rc.2
+packages/schedule/schedule  <-  @deepseek-ai/dsh-schedule@0.2.0-rc.2
+packages/session/session-checkpoint-policy  <-  @deepseek-ai/dsh-session-checkpoint-policy@0.2.0-rc.2
+packages/storage/storage  <-  @deepseek-ai/dsh-storage@0.2.0-rc.2
+packages/storage/storage-domain  <-  @deepseek-ai/dsh-storage-domain@0.2.0-rc.2
+packages/storage/storage-json  <-  @deepseek-ai/dsh-storage-json@0.2.0-rc.2
+packages/terminal/terminal  <-  @deepseek-ai/dsh-terminal@0.2.0-rc.2
+packages/terminal/terminal-bash  <-  @deepseek-ai/dsh-terminal-bash@0.2.0-rc.2
+packages/jobs/tool-jobs  <-  @deepseek-ai/dsh-tool-jobs@0.2.0-rc.2
+```

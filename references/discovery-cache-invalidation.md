@@ -19,3 +19,16 @@
 ## 验收
 
 验证新增可见、修改生效、删除最后一项得到空结果、快速变更不被旧结果覆盖、重名裁决稳定、失效只广播一次、卸载后 watcher 和扫描停止。
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+packages/skill/skill  <-  @deepseek-ai/dsh-skill@0.2.0-rc.2
+packages/skill/skill-filesystem  <-  @deepseek-ai/dsh-skill-filesystem@0.2.0-rc.2
+packages/skill/tool-skill  <-  @deepseek-ai/dsh-tool-skill@0.2.0-rc.2
+```

@@ -52,7 +52,6 @@ registerProvider(create: (control: SkillProviderControl) => SkillProvider): () =
 
 其中 `projectRoot` 是最近含 `.git` 的祖先目录；技能既可以是目录 bundle `<name>/SKILL.md`，也可以是根下平铺 `<name>.md`；发现深度只有一层。
 
-
 | 常量 | 值 | 含义 |
 | --- | --- | --- |
 | `RUNTIME_RANK` | 250 | 运行时 `ctx.skills.register()` 直接注入的技能 |
@@ -208,3 +207,17 @@ candidate.invocation = { ...candidate.invocation, modelInvocable: false }
 | `locator` 会被宿主解析 | 它是不透明往返凭据，只有 provider 自己知道含义 |
 | 只要 peer 依赖 `@deepseek-ai/dsh-skill` 即可 | 宿主还需要有**实现方**（如 `dsh-skill-filesystem`）；契约包与实现包分离，只装契约包服务存在但无提供方 |
 | skill 描述写长一点更安全 | description 是路由依据，不是说明文档；写清触发条件比堆字数有用得多 |
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+packages/bundle/base  <-  @deepseek-ai/dsh-base@0.2.0-rc.2
+packages/skill/skill  <-  @deepseek-ai/dsh-skill@0.2.0-rc.2
+packages/skill/skill-filesystem  <-  @deepseek-ai/dsh-skill-filesystem@0.2.0-rc.2
+packages/skill/tool-skill  <-  @deepseek-ai/dsh-tool-skill@0.2.0-rc.2
+```

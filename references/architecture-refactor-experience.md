@@ -165,3 +165,16 @@ Windows 上源码文件常为 CRLF。`old_string` 用 `\n` 分隔的精确匹配
 - **有效拆分判据**：第二消费方出现（两处共用同一语义）；或存在共享可变状态需要在函数间协调（拆 apply() 正是为此）；或需要在进程外对某契约做独立回归（如对 vendored 快照做兼容性测试）。
 - **无效判据**：行数多、看着乱、想加可测性但行为面已被集成测试覆盖——「换抽屉」不是「换行为」，门禁按纪律不读源码文本，纯位移的改动是门禁盲区。
 - 判定动作：grep 全仓该函数的直接引用数（消费者数）+ 检查现有测试是否已覆盖其行为面（集成路径也算覆盖）；两者都满足「1 个消费者 + 集成已覆盖」时，拆分建议应标记 Reject 并记录判据，供未来评审不再重提。
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
+packages/settings/settings  <-  @deepseek-ai/dsh-settings@0.2.0-rc.2
+packages/skill/skill  <-  @deepseek-ai/dsh-skill@0.2.0-rc.2
+```

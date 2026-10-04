@@ -59,3 +59,23 @@
 ### 1. 协议边界与分工
 - **承载内容**：标准化配置协商、MCP 工具动态挂载、提示词内容传递、已提交语义更新的流式推送、任务取消、以及一次性权限审批决策；
 - **隔离边界**：图形界面的富交互呈现保留在 Web 模块中，ACP 纯粹专注于轻量、稳定、低开销的跨进程自动化对等通信。
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+packages/acp/acp  <-  @deepseek-ai/dsh-acp@0.2.0-rc.2
+packages/bundle/acp-app  <-  @deepseek-ai/dsh-acp-app@0.2.0-rc.2
+packages/experimental/tool-agent-team  <-  @deepseek-ai/dsh-experimental-tool-agent-team@0.2.0-rc.2
+packages/fs/fs-local  <-  @deepseek-ai/dsh-fs-local@0.2.0-rc.2
+packages/fs/fs-observation-policy  <-  @deepseek-ai/dsh-fs-observation-policy@0.2.0-rc.2
+packages/subagent/subagent  <-  @deepseek-ai/dsh-subagent@0.2.0-rc.2
+packages/subagent/subagent-fork-in-process  <-  @deepseek-ai/dsh-subagent-fork-in-process@0.2.0-rc.2
+packages/subagent/subagent-spawn-in-process  <-  @deepseek-ai/dsh-subagent-spawn-in-process@0.2.0-rc.2
+packages/subagent/tool-subagent  <-  @deepseek-ai/dsh-tool-subagent@0.2.0-rc.2
+packages/subagent/tool-subagent-control  <-  @deepseek-ai/dsh-tool-subagent-control@0.2.0-rc.2
+```

@@ -18,7 +18,6 @@ export abstract class LlmAdapter {
 }
 ```
 
-
 - **`LlmRuntime`（`ctx.llm`）**：提供方路由解析、流分发、`llm/*` 事件、共享的 `BlockAssembler` 折叠、模型元数据归一化。**不做库级重试**：一次适配器调用等于一次提供方尝试。
 - **`LlmAdapter`**：把标准 `GenerateOptions` 转成厂商载荷，再把厂商流式响应映射为统一的 `StreamChunk` 序列。唯一必需实现的方法是 `stream()`。
 
@@ -273,3 +272,22 @@ interface TokenUsage {
 - 认为 `replayState` 只要 provider/model 名称对得上就会传递——必须先满足"同一适配器实例"条件。
 - 把 `reasoningTokens` 加进总输出——它已包含在 `outputTokens` 内。
 - 静默忽略不支持的请求字段——必须显式拒绝：字段用 `UNSUPPORTED_OPTION`、推理强度用 `UNSUPPORTED_REASONING_EFFORT`、内容用 `UNSUPPORTED_CONTENT`。
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
+packages/llm/llm  <-  @deepseek-ai/dsh-llm@0.2.0-rc.2
+packages/llm/llm-deepseek-account  <-  @deepseek-ai/dsh-llm-deepseek-account@0.2.0-rc.2
+packages/llm/llm-deepseek-api-key  <-  @deepseek-ai/dsh-llm-deepseek-api-key@0.2.0-rc.2
+packages/llm/llm-pi-ai  <-  @deepseek-ai/dsh-llm-pi-ai@0.2.0-rc.2
+packages/llm/llm-retry  <-  @deepseek-ai/dsh-llm-retry@0.2.0-rc.2
+packages/session/session-title-first-prompt-llm  <-  @deepseek-ai/dsh-session-title-first-prompt-llm@0.2.0-rc.2
+packages/session/session-title-llm  <-  @deepseek-ai/dsh-session-title-llm@0.2.0-rc.2
+vendor/schemastery  <-  @deepseek-ai/schemastery@3.18.4
+```

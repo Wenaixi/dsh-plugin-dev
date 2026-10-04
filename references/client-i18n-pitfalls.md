@@ -81,3 +81,16 @@ const content = `const SKILL_META = ${JSON.stringify(SKILL_META_BUILD)};`;
 - 必须含 `ctx.locale.register(NS` 与 `exports.inject` 含 `locale`；
 - 覆盖展示的 `t("level." + source.level)` 必须存在。
 - 每条断言做过破坏实测（删掉后确认会红，再还原）。
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+packages/client/locale  <-  @deepseek-ai/dsh-client-locale@0.2.0-rc.2
+packages/client/ui-plugin-manager  <-  @deepseek-ai/dsh-client-ui-plugin-manager@0.2.0-rc.2
+packages/schedule/schedule  <-  @deepseek-ai/dsh-schedule@0.2.0-rc.2
+```

@@ -4,6 +4,12 @@
 
 新插件先读以下通用专题；它们只描述可迁移的机制和验证判据，不承载任何单一仓库的包名、版本、路径或事故叙述。
 
+**动手前的第一道门**：本目录所有正文都属于线索级材料，任何 API、字段与默认行为都必须再回到真实源码核对。流程见 [source-verification-and-caches.md](./source-verification-and-caches.md)。
+
+**交付前的最后一道门**：功能写完不等于可用，必须在隔离新实例上完成四态安装与浏览器逐项验证。流程见 [isolated-instance-acceptance.md](./isolated-instance-acceptance.md)。
+
+- [source-verification-and-caches.md](./source-verification-and-caches.md)：源码至上的三层来源（本机安装 / 桌面版解包 / 上游仓库）、跨平台定位、缓存目录约定与冲突裁决顺序。
+- [isolated-instance-acceptance.md](./isolated-instance-acceptance.md)：隔离新实例的创建与配置复用、四种安装形态、浏览器逐项验证、模型选择与 debug 循环。
 - [dependency-injection.md](./dependency-injection.md)：显式依赖、服务契约和缺失依赖。
 - [lifecycle.md](./lifecycle.md)：可逆副作用、异步取消和卸载竞态。
 - [discovery-cache-invalidation.md](./discovery-cache-invalidation.md)：动态发现、缓存分层和失效传播。
@@ -11,7 +17,7 @@
 - [patch-packaging-release.md](./patch-packaging-release.md)：补丁、构建、打包、安装和发布真值。
 - [silent-failure-debugging.md](./silent-failure-debugging.md)：零报错失效的证据驱动排查。
 
-通用专题与具体版本资料冲突时，以目标运行时和源码为准。
+通用专题与具体版本资料冲突时，以目标运行时和源码为准。**每篇专题末尾都有「相关 DSH 源码」清单**，列出上游仓库相对路径与版本号，版本升级后必须重新读源码核对。
 
 > **核心定位声明**
 > **本目录是用于辅助开发 DeepSeek Harness（DSH）插件的参考知识库（Agent Skill 参考集）。**
@@ -52,6 +58,10 @@
 - **[web-ui-slots-and-styling.md](./web-ui-slots-and-styling.md)**：
   Web GUI 插槽树实战——右侧边栏（`sidebar.right.pane.tab`）、会话顶部工具栏（`conversation.session.header.utilities`）、输入框挂件（`conversation.input.right`）、消息流拦截（`conversation.chat.node`）、全局外壳（`shell.*`）；官方主题 CSS 变量（以当前主题包导出为准，含常见误写对照）；样式安全注入与 HMR 回收铁律；**官方 primitives 组件族优先策略**（SegmentedControl / Switch / StateDot / Tag / Button）与「客户端产物单一来源」纪律；多语言国际化（`ctx.locale` 双语注册、声明 `locale:` 注入 t 席位、缺词静默返回 key）；语言边界契约（静态文案进词典、内容数据保持单语）。
 
+- **[plugin-config-card-architecture.md](./plugin-config-card-architecture.md)**：
+  插件自带配置界面的**三层架构**——插槽位置（`plugins.bundle.config` / `settings.plugin.item`）、宿主 Settings 命名空间注册、客户端 ConfigForms 生命周期；**最关键的硬判据：ConfigForms 写入只接受 volatile 字段，持久化配置写不进去**；静态注入与动态 `ctx.inject` 的语义差别；只搬 `whileServed` 外壳而不搬 `forms.get(ns)` 与数据面会把卡片降级成空壳；数据性质分类（持久化 / 进程内 / 运行时推导 / 动作）与对应实现路径。
+- **[plugin-config-ui-decision.md](./plugin-config-ui-decision.md)**：
+  配置界面的**选型与否决**——「DSH 有 Settings 就该交给它」是误解；重启后是否需要保留这一条判定直接决定走自有存储还是 Settings；三种实现形态（自有端点 / Settings 持久化字段写入抛错 / Settings volatile 重启丢失）的对照表；**迁移前五条否决条件**（视觉不变、卡片以运行时推导值为主、已有稳定落盘路径、现有实现已通过门禁、需要改成 volatile 才能跑通）；最小可行迁移路径与六条验收清单。
 - **[client-ui-placement-and-verification.md](./client-ui-placement-and-verification.md)**：
   客户端 UI **落点选择与真机取证**——「界面语义 → 插槽」完整映射表（设置窗口各级 Tab / 插件页分组条目 / 卡片内联配置区 / 右侧栏 Tab / 侧边栏底部 / 全局浮层）；**铁律「一个功能一个入口」**（多落点冗余 = UI 污染，实测需回滚）；插槽三个必知机制（spec 由父条目 `children` 表声明、四种 kind 与注册参数对应关系、**`slots.inject` 在 spec 不存在时静默不执行且零报错**）；`plugins.bundle.config` 的 **`configured` 渲染门（匹配键是包名）**；「UI 不显示」三分法（模块没进图 / apply 没跑 / 落点或渲染门不匹配）；客户端产物 **`immutable` 长缓存与「版本号先于界面更新」的假象**（桌面端必须完全重启）；**无浏览器验证法（Node 直跑 CJS factory 探针）**；CDP / browser-harness 真机取证的环境坑；**解析 Electron `app.asar` 做桌面版与 CLI 版差异比对**。
 
@@ -143,3 +153,17 @@
 ### 十九、实战深挖沉淀：失效链路 / i18n 坑 / 重构经验 / 发布验证 (Field Experience)
 - **[publish-npm-verification.md](./publish-npm-verification.md)**：
   发布验证通用经验——镜像 registry 可能让 `npm view` 假阴性，直查官方 registry API 验 `versions` 与 `dist-tags.latest`；幂等发布「已发布跳过」只跳 npm 不跳 Release，需 `gh release view` 单独验证；tag 指向错误的修正流程（删 tag、补提交、重打、force push）；PowerShell 不支持 `&&` 的拼接坑；发布五步 checklist（bump、CHANGELOG、门禁、commit/tag/push、双真源验证）。
+
+### 二十、源码核验与交付验收 (Source Verification & Acceptance)
+
+- **[source-verification-and-caches.md](./source-verification-and-caches.md)**：
+  源码至上的强制流程——三层来源与固定顺序（本机 pnpm/npm 已安装源码优先，其次桌面版 asar 按需解包到工作目录里被 git 忽略的缓存目录，最后云端上游仓库浅克隆）、跨平台定位方法（Windows/macOS/Linux 的用户数据根、npm 全局根、asar 与自带 CLI 位置差异，一律先探测再使用，不静默回退到猜测路径）、冲突裁决顺序（运行时行为 > 已安装源码 > 包内 README > 文档站散文 > 本技能库正文）、以及“仓库相对路径与版本号由各包 manifest 的 directory 与 version 字段生成、不靠推测”这一取数纪律。
+
+- **[isolated-instance-acceptance.md](./isolated-instance-acceptance.md)**：
+  交付验收流程——只装基础插件与目标插件的隔离新实例创建、复用其他实例配置的安全追加法（凭据全局共享但引用必须存在）、冷装/热装/热更新/卸载四种形态各自的验收点与读源码判据（应用状态三态、没有 HMR 服务时一律要求重启、客户端产物长缓存需完全重启）、模型必须问用户选定并建议选便宜的、真实浏览器逐项点击与回读真值清单、浏览器环境坑、debug-修复-验证循环。
+
+- **[plugin-config-card-architecture.md](./plugin-config-card-architecture.md)**：
+  插件自带配置界面的三层架构——插槽位置、Settings 命名空间与客户端生命周期观察者的职责切分，以及任一层缺失导致的界面静默消失。
+
+- **[plugin-config-ui-decision.md](./plugin-config-ui-decision.md)**：
+  配置界面的选型决策——哪些字段适合走 Settings 的 volatile 写入，哪些必须落到自有存储；每种选择各自的断言集与卸载残留风险。

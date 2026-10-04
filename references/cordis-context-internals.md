@@ -29,3 +29,14 @@ Context.is[Symbol.toPrimitive] = () => Symbol.for("cordis.is");
 ```
 
 即便在多包 Monorepo、不同 npm 副本或不同 iframe / Worker Realm 下，跨环境的 Context 对象依然能被准确识别。
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
+```

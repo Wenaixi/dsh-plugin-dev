@@ -464,3 +464,14 @@ P.Button({ variant: "outline", size: "sm", onClick: reset }, "恢复默认")
 - 可交互元素必须有 `:focus-visible` 焦点环，用 `--dsw-focus-ring-width` + `--dsw-focus-ring-color`；
 - 官方多数过渡组件包 `@media (prefers-reduced-motion: reduce)` 降级（SegmentedControl/Modal/Toast/DisclosureRow）；Switch 的 120ms 过渡是未降级的例外，自绘时仍应降级；
 - 开关/勾选这类控件的视觉状态要绑 `aria-checked` 而不是平行 class，让「看到的」和「辅助技术读到的」不可能不一致。
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+packages/client/ui-primitives  <-  @deepseek-ai/dsh-client-ui-primitives@0.2.0-rc.2
+```

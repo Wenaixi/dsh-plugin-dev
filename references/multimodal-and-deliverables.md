@@ -83,3 +83,19 @@ DSH 提供了强大的多模态附件存储抽象：`@deepseek-ai/dsh-attachment
   [... tool result middle pruned ...]
   ```
 - **核心收益**：无需调用昂贵的大模型做二次摘要，毫秒级释放数万 Token 窗口，彻底杜绝超长上下文导致的 Context Window Exceeded 报错！
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+packages/attachment/attachment-local  <-  @deepseek-ai/dsh-attachment-local@0.2.0-rc.2
+packages/client/ui-deliverables  <-  @deepseek-ai/dsh-client-ui-deliverables@0.2.0-rc.2
+packages/compaction/compaction-tool-result-pruner  <-  @deepseek-ai/dsh-compaction-tool-result-pruner@0.2.0-rc.2
+packages/interaction/tool-ask-user  <-  @deepseek-ai/dsh-tool-ask-user@0.2.0-rc.2
+packages/deliverables/tool-present  <-  @deepseek-ai/dsh-tool-present@0.2.0-rc.2
+packages/interaction/user-questions  <-  @deepseek-ai/dsh-user-questions@0.2.0-rc.2
+```

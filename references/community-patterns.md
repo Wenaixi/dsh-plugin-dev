@@ -258,7 +258,6 @@ cc-safety-net：守卫插件是跨宿主薄适配（每个宿主一个入口）�
 - superdesign-skill/treg：纯 ctx.skills 分发的最小技能提供方（无构建链、纯 ESM、frontmatter 单源解析）。
 - WeKnora：结构性类型免运行时依赖（纯 JSON Schema 拒绝 schemastery 实例）+ config 全环境注入。
 
-
 ---
 
 ## 十一、社区沉淀的进阶细节（补充条目）
@@ -1065,3 +1064,29 @@ PROTECTED_MODULE_PATTERNS：基础设施行大名单 + 原因链（timer→HMR �
 - `PreToolDecision = allow | deny(reason,info) | cancel | ask(reason,displayReason)`。
 - `approval.request({agent, toolName, callId?, reason?, signal?})` 非 `allowed-once` 即 deny；无 approval 服务时 fail-closed deny。
 - defineTool 入参是 DSL spec（ParameterSchemaSpec/ValueSchemaSpec），运行时转 JSON Schema（z.object 被拒）；转发子集应经 assertSupportedJsonSchema。
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
+apps/cli  <-  @deepseek-ai/dsh@0.2.0-rc.2
+packages/core/agent  <-  @deepseek-ai/dsh-agent@0.2.0-rc.2
+packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.0-rc.2
+packages/bundle/base  <-  @deepseek-ai/dsh-base@0.2.0-rc.2
+packages/client/ui-settings  <-  @deepseek-ai/dsh-client-ui-settings@0.2.0-rc.2
+packages/util/home-paths  <-  @deepseek-ai/dsh-home-paths@0.2.0-rc.2
+packages/llm/llm  <-  @deepseek-ai/dsh-llm@0.2.0-rc.2
+packages/mcp/mcp-client  <-  @deepseek-ai/dsh-mcp-client@0.2.0-rc.2
+packages/core/session  <-  @deepseek-ai/dsh-session@0.2.0-rc.2
+packages/settings/settings  <-  @deepseek-ai/dsh-settings@0.2.0-rc.2
+packages/skill/skill-badge  <-  @deepseek-ai/dsh-skill-badge@0.2.0-rc.2
+packages/core/system-prompt  <-  @deepseek-ai/dsh-system-prompt@0.2.0-rc.2
+packages/core/tools  <-  @deepseek-ai/dsh-tools@0.2.0-rc.2
+packages/web/web  <-  @deepseek-ai/dsh-web@0.2.0-rc.2
+packages/bundle/web-app  <-  @deepseek-ai/dsh-web-app@0.2.0-rc.2
+```

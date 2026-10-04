@@ -61,3 +61,19 @@
 - 每个核心包除了主入口 `lib/index.js` 外，通常提供一个同级的 `./invariant` 导出（如 `dsh-session/invariant`、`dsh-schedule/invariant`）；
 - 主入口只承载业务运行时代号，绝不包含笨重的自检逻辑；
 - 诊断与启动检查时，由 `dsh-invariants` 服务根据 `package_allowlist` 动态拉起这些伴生检查规则，验证系统关键状态（如服务单例性、接口实现完备性），在开发阶段提前掐灭隐蔽 Bug！
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+packages/runtime-diagnostics/invariants  <-  @deepseek-ai/dsh-invariants@0.2.0-rc.2
+packages/feedback/message-feedback  <-  @deepseek-ai/dsh-message-feedback@0.2.0-rc.2
+packages/guard/repeat-tool-reminder  <-  @deepseek-ai/dsh-repeat-tool-reminder@0.2.0-rc.2
+packages/schedule/schedule  <-  @deepseek-ai/dsh-schedule@0.2.0-rc.2
+packages/core/session  <-  @deepseek-ai/dsh-session@0.2.0-rc.2
+packages/context/time-context  <-  @deepseek-ai/dsh-time-context@0.2.0-rc.2
+```

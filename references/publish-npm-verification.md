@@ -54,3 +54,16 @@ git push origin v1.2.3 --force   # 强制更新远端 tag
 5. 发布即 npm tarball，官方发布物不带 GitHub Actions/Release（.github/workflows 0 命中）——`gh run watch` 仅在仓库确配 Workflow 时用；
 6. 官方 registry API 验证版本与 dist-tags；`gh release view <tag>` 才是 Release 真值（npm 发布成功不代表 Release 存在）；
 7. 本地/远端 git 一致（`git rev-parse HEAD` == `git ls-remote origin main`）。
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+apps/cli  <-  @deepseek-ai/dsh@0.2.0-rc.2
+packages/boot/config-editor  <-  @deepseek-ai/dsh-config-editor@0.2.0-rc.2
+packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@0.2.0-rc.2
+```

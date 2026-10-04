@@ -352,3 +352,17 @@ console.log(extract('/dsh/node_modules/@deepseek-ai/<pkg>/lib/client.js')?.lengt
 - [silent-failure-and-gate-design.md](./silent-failure-and-gate-design.md)：静默失效的三类根因与门禁写法
 - [debugging-and-troubleshooting.md](./debugging-and-troubleshooting.md)：调试回路、伪 API 黑名单、免启动反证法
 - [three-roles.md](./three-roles.md)：双面插件的角色与包结构
+
+---
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+packages/client/modules  <-  @deepseek-ai/dsh-client-modules@0.2.0-rc.2
+packages/client/ui-plugin-manager  <-  @deepseek-ai/dsh-client-ui-plugin-manager@0.2.0-rc.2
+packages/client/ui-renderer  <-  @deepseek-ai/dsh-client-ui-renderer@0.2.0-rc.2
+packages/extensions/cordis-client-runner  <-  @deepseek-ai/dsh-cordis-client-runner@0.2.0-rc.2
+```

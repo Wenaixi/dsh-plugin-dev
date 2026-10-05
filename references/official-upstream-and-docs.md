@@ -14,7 +14,7 @@
 | Cordis 教程 | https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cordis-tutorial/index.md | 仓库内的 Cordis 入门教程源文件 |
 | 子系统文档 | https://github.com/deepseek-ai/deepseek-harness/tree/master/docs/subsystems | 每个子系统一篇，例如 attachment.md |
 | 包内 README | packages/域/包名/README.md | **单包最权威的说明**：组合规则、配置项、设计理由都写在包里 |
-| 类型声明 | 发布物 lib/index.js 内联 JSDoc 与 lib/types/*.js；多数包无 .d.ts（types 字段指向不存在的 lib/types/*.d.ts） | 运行时真实契约，含 inject、Config、declare module 扩展 |
+| 类型声明 | 发布物 `lib/index.js` 内联 JSDoc 与 `lib/types/**/*.d.ts`（实测已安装包的 types 字段指向的文件全部存在） | 运行时真实契约，含 inject、Config、declare module 扩展 |
 
 ### 1. 优先读包内 README，而非汇总文档
 
@@ -92,17 +92,19 @@ npm 全局根（`npm root -g` 查询；Windows 默认 %APPDATA%\npm\node_modules
 
 ```
 包名/
-├── package.json      # name / inject / dsh.client / exports（插件身份与声明）
+├── package.json      # name / version / exports / files / repository.directory（身份与仓库位置）
 ├── README.md         # 组合规则、配置语义、设计理由（最权威说明）
 └── lib/
-    ├── index.js       # 打包产物（顶部注释写明服务角色与挂载名；内联 JSDoc 即类型契约，发布物无独立 index.d.ts）
-    ├── index.js      # 运行时实现（已打包，含完整注释头）
-    └── types/        # 细分类型定义与品牌类型（Branded Types）
+    ├── index.js       # 打包产物（顶部注释写明服务角色与挂载名；内联 JSDoc 是运行时真实契约）
+    ├── client.js      # 仅双面插件的浏览器半侧
+    └── types/        # 细分 .d.ts 声明与品牌类型（Branded Types），逐模块对应运行时实现
 ```
+
+**没混淆，但也没有 `src/`**：真实标识符、导出名与注释全部保留（可直接读），但类型已擦除、模块被内联重排并用 `//#region lib/<模块>.js` 标记来源。查契约读 `lib/index.js` 与 `lib/types/*.d.ts` 就够；只有想看 TypeScript 原始写法才需要云端仓库。
 
 ### 2. 从类型声明头部直接读出插件身份
 
-官方每个包的 lib/index.js（打包产物）顶部注释写明服务角色与挂载名，**这是最快速的身份判定方式**（发布物无独立 index.d.ts；declare module 声明合并在源码 TS 层，文档站 cordis-api 页由 gen-cordis-catalog 生成）：
+官方每个包的 lib/index.js（打包产物）顶部注释写明服务角色与挂载名，**这是最快速的身份判定方式**（Context 上的挂载名由 `lib/types/*.d.ts` 里的 declare module 声明合并给出，可直接查；文档站 cordis-api 页由 gen-cordis-catalog 生成）：
 
 ```ts
 /**
@@ -129,7 +131,7 @@ declare module '@deepseek-ai/cordis' {
         ↓ 若与下层冲突则弃用
 [中等] 官方仓库 packages/包名/README.md
         ↓ 若与下层冲突则弃用
-[最强] 本地 lib/*.js 真实实现（含内联 JSDoc；多数包无 .d.ts）
+[最强] 本机已安装源码（lib/*.js 实现 + 内联 JSDoc，以及 lib/types/*.d.ts 声明）
         ↓ 若与运行时不符则弃用
 [运行时] 宿主真实行为
 ```

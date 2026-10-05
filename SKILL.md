@@ -12,7 +12,7 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 **本技能库的正文是导航，不是答案。** 动手前必须完成三件事：
 
 1. 确认目标运行时与版本（CLI 形态还是桌面版形态、哪个版本、哪个 profile）。
-2. 按 [source-verification-and-caches.md](references/source-verification-and-caches.md) 的三层顺序打开真实源码：先 pnpm、再 npm、命中即停；两者都没有才解包桌面版；本机完全没有才克隆云端上游仓库。
+2. 按 [source-verification-and-caches.md](references/source-verification-and-caches.md) 的三层顺序打开真实源码：先 pnpm、再 npm、命中即停；本机安装的源码未混淆、读到了就不要解包桌面版；只有想看 TypeScript 原始写法才克隆云端上游仓库。
 3. 把读到的契约写下来——包名、注入名、字段、返回结构、路径。
 
 可失败检验：**能否指出某个契约出自哪个包的哪个文件。指不出来，就等于没读。**

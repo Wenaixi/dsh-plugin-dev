@@ -21,25 +21,25 @@
 
 上层的存在意味着下层只是交叉验证；只有上层全部缺失才下沉。
 
-**判定纪律**：第 1 层里 **pnpm 命中即停**。只要 pnpm 里读到了目标包的源码，就直接用它，**不要再去解包桌面版**——同机两份实现可能版本不同，混读会得出错误结论。
+**核心纪律：先读本机安装的源码，读到了就不要解包。** 这是"这台机器上真正会被执行的那份代码"，与目标运行时版本完全一致，且**没有混淆**——真实标识符、导出名与注释全部保留，可直接读。解包桌面版不只是多余动作，还会引入版本不一致的风险。
 
-### 第 1 层：本机已安装的源码（最优先，pnpm 在前 npm 在后）
+### 第 1 层：本机已安装的源码（首选，命中即停，不再解包）
 
-这是"这台机器上真正会被执行的那份代码"，与目标运行时版本完全一致。
+按顺序探测，**命中即停**：
+
+| 序 | 来源 | 探测命令 |
+| --- | --- | --- |
+| 1a | pnpm 全局安装 | `pnpm root -g` |
+| 1b | npm 全局安装 | `npm root -g` |
+| 1c | profile 内直连依赖 | `<dshHome>/profiles/<profile>/node_modules/<pkg>/` |
+| 1d | profile 内 isolated 实体 | `<dshHome>/profiles/<profile>/node_modules/.pnpm/<转义名>/node_modules/<pkg>/` |
 
 ```bash
 pnpm root -g     # 先问 pnpm
 npm root -g      # pnpm 没有再问 npm
 ```
 
-按顺序探测，**命中即停**：
-
-| 序 | 来源 | 探测命令 | 命中即用 |
-| --- | --- | --- | --- |
-| 1a | pnpm 全局安装 | `pnpm root -g` | 是 |
-| 1b | npm 全局安装 | `npm root -g` | 是 |
-| 1c | profile 内直连依赖 | `<dshHome>/profiles/<profile>/node_modules/<pkg>/` | 是 |
-| 1d | profile 内 isolated 实体 | `<dshHome>/profiles/<profile>/node_modules/.pnpm/<转义名>/node_modules/<pkg>/` | 是 |
+dsh 本体与全部官方包在 ``<全局根>/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/<pkg>/``，本体自身的 CLI 入口在 ``<全局根>/node_modules/@deepseek-ai/dsh/lib/`。
 
 pnpm 全局根各平台形态不同，且带版本目录，必须以实际输出为准：
 
@@ -51,11 +51,18 @@ pnpm 全局根各平台形态不同，且带版本目录，必须以实际输出
 
 **isolated 布局的目录名转义**：pnpm 把包名压成扁平目录名，`@scope/name@版本` 变成 `@scope+name@版本`，并可能追加 peer 依赖哈希后缀。例如 `@deepseek-ai/dsh-agent@0.2.0-rc.2` 在 profile 里是 `<profile>/node_modules/.pnpm/@deepseek-ai+dsh-agent@<版本>_<peer哈希>/node_modules/@deepseek-ai/dsh-agent/`。**不要把转义后的名字当包名**，读它的 `package.json` 取真实 `name`。
 
-**最小阅读入口**：`<pkg>/package.json`（身份、版本、`exports`、`files`、`repository.directory`）→ `<pkg>/lib/index.js`（真实实现与内联 JSDoc；官方包普遍没有独立 `.d.ts`，`types` 字段常指向不存在的文件）→ `<pkg>/README.md`（组合规则与设计理由）。
+**阅读入口，从便宜到贵**：
+
+1. `<pkg>/package.json`：`name`、`version`、`exports`、`files`、`repository.directory`（仓库相对路径的唯一真源）、`inject`、`dsh.client`。
+2. `<pkg>/lib/types/*.d.ts`：契约签名、Config 类型、Context 挂载的 declare module 声明。**先查这里**——查签名比读实现快得多。
+3. `<pkg>/lib/index.js`：真实实现与内联 JSDoc。**未混淆**，标识符与导出名原样保留，注释占比通常两成以上。
+4. `<pkg>/README.md`：组合规则与设计理由（官方各包配 `README.md` 与 `README.zh.md`，中英双语）。
+
+**只有一种情况才需要云端仓库**：想看 TypeScript 原始写法（本层是编译后的 `lib/`，没有 `src/`，类型已擦除、模块被内联重排）。查契约永远不需要。
 
 ### 第 2 层：桌面版解包到缓存目录
 
-**前提**：第 1 层的 pnpm 与 npm **都没有**装 dsh，本机只装了桌面版。这才需要解包。桌面版的 dsh 本体在 asar 容器内：
+**唯一触发条件**：第 1 层四个来源全部落空——pnpm 与 npm 都没装 dsh，profile 里也没有，本机只装了桌面版。**只要第 1 层命中，就不要解包**：多解一份只会引入版本不一致的风险，没有任何额外收益。桌面版的 dsh 本体在 asar 容器内：
 
 ```text
 <应用根>/resources/app.asar/dsh/node_modules/@deepseek-ai/<pkg>/lib/index.js
@@ -143,7 +150,7 @@ vendor/cordis/lib/index.js        <-  @deepseek-ai/cordis@<版本>
 
 ```text
 1. 运行时真实行为（探针、启动日志、接口回读）
-2. 本机已安装源码 / 解包源码（lib/index.js 实现 + 内联 JSDoc）
+2. 本机已安装源码（lib/index.js 实现 + 内联 JSDoc，以及 lib/types/*.d.ts 声明）；本机没有时才用解包源码
 3. 包内 README.md
 4. 官方文档站散文
 5. 社区实现与本技能库正文
@@ -186,7 +193,9 @@ DSH 的用户数据根是跨平台统一的——源码里只有 `homedir()/.dsh
 | 知道目标运行时与版本 | 能说出形态、版本号、从哪读到的 |
 | 来源顺序没走错 | 先 pnpm 再 npm；pnpm 命中就没有再去解包桌面版 |
 | 没混读两份实现 | 同机 pnpm 与桌面版可能版本不同，只用命中那一层 |
+| 没多此一举解包 | 第 1 层命中就没去解包桌面版，也就没引入第二份实现 |
 | 读过目标包源码 | 能指出"包名 + 文件 + 行号" |
+| 查过类型声明 | 契约问题先查 `lib/types/*.d.ts`，没有靠读实现猜 |
 | 版本号有来源 | 从 `package.json` 的 `version` 或运行时版本清单读出 |
 | 路径写对 | 用 `repository.directory` 或实际目录列表验证过 |
 | 冲突已裁决 | 与文档站冲突时以源码为准，并已回写本库 |

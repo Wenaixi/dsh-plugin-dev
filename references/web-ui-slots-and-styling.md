@@ -379,7 +379,7 @@ P.Tag({ tone: "success" }, "生效中")                        // outline|solid|
 P.Button({ variant: "outline", size: "sm", onClick: reset }, "恢复默认")
 ```
 
-常用契约（取自 `lib/index.js` 实现与 JSDoc（发布物无 lib/types 目录，types 字段指向不存在的 .d.ts））：
+常用契约（取自 `lib/index.js` 实现与 JSDoc，或直接查 `lib/types/` 下同名 `.d.ts`，两者一致）：
 
 - `SegmentedControl`：`options` 至少两项；每段 id 为 `<id>-<value>`。
 - `Switch`：`label` 必填（无障碍），`title` 用于说明为何被锁。

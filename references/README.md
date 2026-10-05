@@ -8,7 +8,7 @@
 
 **交付前的最后一道门**：功能写完不等于可用，必须在隔离新实例上完成四态安装与浏览器逐项验证。流程见 [isolated-instance-acceptance.md](./isolated-instance-acceptance.md)。
 
-- [source-verification-and-caches.md](./source-verification-and-caches.md)：源码至上的三层来源（本机安装先 pnpm 后 npm且命中即停 / 桌面版解包 / 上游仓库）、pnpm isolated 目录名转义、跨平台定位、缓存目录约定与冲突裁决顺序。
+- [source-verification-and-caches.md](./source-verification-and-caches.md)：源码至上的三层来源（本机安装先 pnpm 后 npm、命中即停且未混淆不必解包 / 桌面版解包 / 上游仓库）、`lib/types/*.d.ts` 优先于读实现的阅读入口、pnpm isolated 目录名转义、跨平台定位、缓存目录约定与冲突裁决顺序。
 - [isolated-instance-acceptance.md](./isolated-instance-acceptance.md)：隔离新实例的创建与配置复用、四种安装形态、浏览器逐项验证、模型选择与 debug 循环。
 - [dependency-injection.md](./dependency-injection.md)：显式依赖、服务契约和缺失依赖。
 - [lifecycle.md](./lifecycle.md)：可逆副作用、异步取消和卸载竞态。

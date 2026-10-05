@@ -26,7 +26,7 @@ DSH 是基于 Cordis 微内核构建的高可扩展 Agent Harness。在 DSH 架�
 
 ## 一、两条不可协商的工作前置
 
-1. **源码至上**：读完参考文档只是起点。动手写插件前必须打开目标运行时的真实源码——先查 pnpm 再查 npm、命中即停，两者都没有才解包桌面版，本机完全没有才克隆云端上游仓库——并能指出每个契约出自哪个包的哪个文件。三层来源、跨平台定位方式与缓存目录约定见 [source-verification-and-caches.md](./references/source-verification-and-caches.md)。
+1. **源码至上**：读完参考文档只是起点。动手写插件前必须打开目标运行时的真实源码——先查 pnpm 再查 npm、命中即停；本机安装的源码没有混淆，读到了就不必解包桌面版；并能指出每个契约出自哪个包的哪个文件。三层来源、跨平台定位方式与缓存目录约定见 [source-verification-and-caches.md](./references/source-verification-and-caches.md)。
 2. **隔离验收**：插件完成的标志是在只装了基础插件与目标插件的全新实例上，冷装、热装、热更新、卸载四态全过，并在真实浏览器里逐项点击、回读真值；测试模型必须由用户选定。流程见 [isolated-instance-acceptance.md](./references/isolated-instance-acceptance.md)。
 
 ---

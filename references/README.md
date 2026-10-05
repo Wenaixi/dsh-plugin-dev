@@ -8,7 +8,7 @@
 
 **交付前的最后一道门**：功能写完不等于可用，必须在隔离新实例上完成四态安装与浏览器逐项验证。流程见 [isolated-instance-acceptance.md](./isolated-instance-acceptance.md)。
 
-- [source-verification-and-caches.md](./source-verification-and-caches.md)：源码至上的三层来源（本机安装 / 桌面版解包 / 上游仓库）、跨平台定位、缓存目录约定与冲突裁决顺序。
+- [source-verification-and-caches.md](./source-verification-and-caches.md)：源码至上的三层来源（本机安装先 pnpm 后 npm且命中即停 / 桌面版解包 / 上游仓库）、pnpm isolated 目录名转义、跨平台定位、缓存目录约定与冲突裁决顺序。
 - [isolated-instance-acceptance.md](./isolated-instance-acceptance.md)：隔离新实例的创建与配置复用、四种安装形态、浏览器逐项验证、模型选择与 debug 循环。
 - [dependency-injection.md](./dependency-injection.md)：显式依赖、服务契约和缺失依赖。
 - [lifecycle.md](./lifecycle.md)：可逆副作用、异步取消和卸载竞态。
@@ -157,7 +157,7 @@
 ### 二十、源码核验与交付验收 (Source Verification & Acceptance)
 
 - **[source-verification-and-caches.md](./source-verification-and-caches.md)**：
-  源码至上的强制流程——三层来源与固定顺序（本机 pnpm/npm 已安装源码优先，其次桌面版 asar 按需解包到工作目录里被 git 忽略的缓存目录，最后云端上游仓库浅克隆）、跨平台定位方法（Windows/macOS/Linux 的用户数据根、npm 全局根、asar 与自带 CLI 位置差异，一律先探测再使用，不静默回退到猜测路径）、冲突裁决顺序（运行时行为 > 已安装源码 > 包内 README > 文档站散文 > 本技能库正文）、以及“仓库相对路径与版本号由各包 manifest 的 directory 与 version 字段生成、不靠推测”这一取数纪律。
+  源码至上的强制流程——三层来源与固定顺序（本机已安装源码先查 pnpm 再查 npm且命中即停，同机两份实现版本不同不得混读；两者都没有才把桌面版 asar 按需解包到工作目录里被 git 忽略的缓存目录；本机完全没有才浅克隆云端上游仓库）、跨平台定位方法（Windows/macOS/Linux 的用户数据根、npm 全局根、asar 与自带 CLI 位置差异，一律先探测再使用，不静默回退到猜测路径）、冲突裁决顺序（运行时行为 > 已安装源码 > 包内 README > 文档站散文 > 本技能库正文）、以及“仓库相对路径与版本号由各包 manifest 的 directory 与 version 字段生成、不靠推测”这一取数纪律。
 
 - **[isolated-instance-acceptance.md](./isolated-instance-acceptance.md)**：
   交付验收流程——只装基础插件与目标插件的隔离新实例创建、复用其他实例配置的安全追加法（凭据全局共享但引用必须存在）、冷装/热装/热更新/卸载四种形态各自的验收点与读源码判据（应用状态三态、没有 HMR 服务时一律要求重启、客户端产物长缓存需完全重启）、模型必须问用户选定并建议选便宜的、真实浏览器逐项点击与回读真值清单、浏览器环境坑、debug-修复-验证循环。

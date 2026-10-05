@@ -21,22 +21,41 @@
 
 上层的存在意味着下层只是交叉验证；只有上层全部缺失才下沉。
 
-### 第 1 层：本机 pnpm / npm 已安装的源码（最优先）
+**判定纪律**：第 1 层里 **pnpm 命中即停**。只要 pnpm 里读到了目标包的源码，就直接用它，**不要再去解包桌面版**——同机两份实现可能版本不同，混读会得出错误结论。
+
+### 第 1 层：本机已安装的源码（最优先，pnpm 在前 npm 在后）
 
 这是"这台机器上真正会被执行的那份代码"，与目标运行时版本完全一致。
 
 ```bash
-npm root -g     # npm 全局根
-pnpm root -g     # pnpm 全局根
+pnpm root -g     # 先问 pnpm
+npm root -g      # pnpm 没有再问 npm
 ```
 
-dsh 本体与全部官方包在 ``<全局根>/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/<pkg>/``，profile 侧按布局可能在 ``<dshHome>/profiles/<profile>/node_modules/<pkg>/`` 或 ``<profile>/node_modules/.pnpm/<pkg>@<版本>/node_modules/<pkg>/``（isolated 的真实位置）。
+按顺序探测，**命中即停**：
+
+| 序 | 来源 | 探测命令 | 命中即用 |
+| --- | --- | --- | --- |
+| 1a | pnpm 全局安装 | `pnpm root -g` | 是 |
+| 1b | npm 全局安装 | `npm root -g` | 是 |
+| 1c | profile 内直连依赖 | `<dshHome>/profiles/<profile>/node_modules/<pkg>/` | 是 |
+| 1d | profile 内 isolated 实体 | `<dshHome>/profiles/<profile>/node_modules/.pnpm/<转义名>/node_modules/<pkg>/` | 是 |
+
+pnpm 全局根各平台形态不同，且带版本目录，必须以实际输出为准：
+
+| 平台 | pnpm 全局根形态 |
+| --- | --- |
+| Windows | `<pnpm home>\\global\\v<大版本>/`（可能没有 `node_modules` 子目录） |
+| macOS | `~/Library/pnpm/global/<大版本>/` |
+| Linux | `<XDG data home>/pnpm/global/<大版本>/` |
+
+**isolated 布局的目录名转义**：pnpm 把包名压成扁平目录名，`@scope/name@版本` 变成 `@scope+name@版本`，并可能追加 peer 依赖哈希后缀。例如 `@deepseek-ai/dsh-agent@0.2.0-rc.2` 在 profile 里是 `<profile>/node_modules/.pnpm/@deepseek-ai+dsh-agent@<版本>_<peer哈希>/node_modules/@deepseek-ai/dsh-agent/`。**不要把转义后的名字当包名**，读它的 `package.json` 取真实 `name`。
 
 **最小阅读入口**：`<pkg>/package.json`（身份、版本、`exports`、`files`、`repository.directory`）→ `<pkg>/lib/index.js`（真实实现与内联 JSDoc；官方包普遍没有独立 `.d.ts`，`types` 字段常指向不存在的文件）→ `<pkg>/README.md`（组合规则与设计理由）。
 
 ### 第 2 层：桌面版解包到缓存目录
 
-**前提**：本机没有通过 pnpm/npm 安装 dsh，只装了桌面版。桌面版的 dsh 本体在 asar 容器内：
+**前提**：第 1 层的 pnpm 与 npm **都没有**装 dsh，本机只装了桌面版。这才需要解包。桌面版的 dsh 本体在 asar 容器内：
 
 ```text
 <应用根>/resources/app.asar/dsh/node_modules/@deepseek-ai/<pkg>/lib/index.js
@@ -141,6 +160,7 @@ DSH 的用户数据根是跨平台统一的——源码里只有 `homedir()/.dsh
 | 差异点 | Windows | macOS | Linux |
 | --- | --- | --- | --- |
 | 默认用户数据根 | `%USERPROFILE%\.dsh` | `~/.dsh` | `~/.dsh` |
+| pnpm 全局根 | `<pnpm home>\global\v<大版本>/` | `~/Library/pnpm/global/<大版本>/` | `<XDG data home>/pnpm/global/<大版本>/` |
 | npm 全局根 | `%APPDATA%\npm\node_modules` | `<npm prefix>/lib/node_modules` | `<npm prefix>/lib/node_modules` |
 | 桌面版 asar | `<安装目录>\resources\app.asar` | `<App>.app/Contents/Resources/app.asar` | 无官方桌面版 |
 | 桌面版自带 CLI | `resources\runtime\cli\bin\dsh.cmd` | `Contents/Resources/runtime/cli/bin/dsh` | 无 |
@@ -164,6 +184,8 @@ DSH 的用户数据根是跨平台统一的——源码里只有 `homedir()/.dsh
 | 检查项 | 判定动作 |
 | --- | --- |
 | 知道目标运行时与版本 | 能说出形态、版本号、从哪读到的 |
+| 来源顺序没走错 | 先 pnpm 再 npm；pnpm 命中就没有再去解包桌面版 |
+| 没混读两份实现 | 同机 pnpm 与桌面版可能版本不同，只用命中那一层 |
 | 读过目标包源码 | 能指出"包名 + 文件 + 行号" |
 | 版本号有来源 | 从 `package.json` 的 `version` 或运行时版本清单读出 |
 | 路径写对 | 用 `repository.directory` 或实际目录列表验证过 |

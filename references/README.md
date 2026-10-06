@@ -16,6 +16,9 @@
 - [dual-face-ui.md](./dual-face-ui.md)：Host/Browser 数据流、插槽和真实 UI 验收。
 - [patch-packaging-release.md](./patch-packaging-release.md)：补丁、构建、打包、安装和发布真值。
 - [silent-failure-debugging.md](./silent-failure-debugging.md)：零报错失效的证据驱动排查。
+- [host-semantic-gates.md](./host-semantic-gates.md)：静态断言测不到的宿主语义门禁清单——写入闸门、表单处置态、注册表仲裁、缓存失效实时性、产物缓存时序、生命周期、插槽静默注册、只读态；附真机判据的组织方式与验收矩阵。
+- [config-field-lifecycle.md](./config-field-lifecycle.md)：配置字段的新增（三态表达、volatile 与否）、废弃（声明与 volatile 标注两个都不能动）、迁移（启动期/惰性/只读兼容三选一）与批次失败范围。
+- [config-field-migration-selfcheck.md](./config-field-migration-selfcheck.md)：迁移逻辑的自检写法——语义转换表穷举、新旧优先双向断言、幂等断言、批次形状自检、负向样例，以及「漏了一个场景」为何破坏实测抓不到。
 
 通用专题与具体版本资料冲突时，以目标运行时和源码为准。**每篇专题末尾都有「相关 DSH 源码」清单**，列出上游仓库相对路径与版本号，版本升级后必须重新读源码核对。
 

@@ -273,6 +273,8 @@ CI 通常校验 `tag == package.json.version`，不一致直接失败。发版�
 | 写操作都回读 | 每个按钮与开关点完都读回配置或接口，值没变即判定失败 |
 | 等待禁用解除再点 | 所有控件点击前轮询 `aria-disabled` |
 | 收敛判定要两帧 | `predicate(current) and current == last` |
+| 宿主语义门禁已排期 | 写入闸门、注册表仲裁、缓存实时性、产物时序、生命周期、插槽注册、只读态逐条列判据；清单见 [host-semantic-gates.md](./host-semantic-gates.md) |
+| 配置字段的两个面都改了 | schema 声明面与写入面同时动过，废弃字段仍保留声明与 volatile 标注；见 [config-field-lifecycle.md](./config-field-lifecycle.md) |
 | 图标真透明底 | 图标文件不能带白底与圆角，否则卡片上出现双层边缘 |
 | 深浅色都验过 | 强制 `data-ds-dark-theme` 后关键颜色确实变化 |
 | manifest 无自动规范化告警 | `repository.url` 已写成 `git+https://...` 形态 |
@@ -287,6 +289,8 @@ CI 通常校验 `tag == package.json.version`，不一致直接失败。发版�
 - [skill-provider.md](./skill-provider.md)：技能屏蔽的唯一通道是 invocation 覆盖
 - [install-resolution-traps.md](./install-resolution-traps.md)：版本解析陷阱
 - [packaging.md](./packaging.md)：打包、pnpm 陷阱、发布纪律
+- [host-semantic-gates.md](./host-semantic-gates.md)：静态断言测不到的宿主语义门禁清单与真机判据组织方式
+- [config-field-lifecycle.md](./config-field-lifecycle.md)：配置字段的两面、废弃字段的两个例外、迁移策略与批次失败范围
 
 ---
 

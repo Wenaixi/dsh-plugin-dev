@@ -157,6 +157,7 @@ function createVolatile(value) {
 - **持久化配置不能走 ConfigForms 写入。** 强行接上后卡片能显示，但点击写入会抛 `has no volatile fields`。
 - 把持久化字段改成 volatile 会让用户配置在进程重启后丢失。
 - 运行时推导值（诊断链、生效来源、优先级判定、实时统计）本质上不是配置，更不能进 Settings。
+- **校验粒度是路径，且逐条执行**：一次 `mutate` 提交的每个 op 各自受检，`set` 与 `unset` 一视同仁，任一条不合法则**整批不落盘**。这条推论直接决定了废弃字段的处理方式——为「不再写入」而去掉 volatile 标注，会连带让清掉它的 `unset` 也被拒，于是「写新字段 + 清旧字段」的迁移批连主写入一起失败。完整后果与修法见 [config-field-lifecycle.md](./config-field-lifecycle.md)。
 
 ## 五、参考实现的完整接线
 
@@ -229,10 +230,13 @@ function apply(ctx) {
 
 ## 相关文档
 
+- [config-field-lifecycle.md](./config-field-lifecycle.md)：本节两道闸门的完整后果、废弃字段为何必须保留声明与 volatile 标注、三种迁移策略与批次失败范围。
+- [config-field-migration-selfcheck.md](./config-field-migration-selfcheck.md)：迁移逻辑的可失败自检与批次形状断言。
 - [settings-and-plugin-ui.md](./settings-and-plugin-ui.md)：设置窗口 Tab 与插件管理中心元数据契约。
 - [client-ui-placement-and-verification.md](./client-ui-placement-and-verification.md)：插槽静默失效三分法与真机取证。
 - [web-ui-slots-and-styling.md](./web-ui-slots-and-styling.md)：插槽树、主题变量与国际化。
 - [silent-failure-and-gate-design.md](./silent-failure-and-gate-design.md)：零报错失效的根因分类与门禁设计。
+- [host-semantic-gates.md](./host-semantic-gates.md)：写入闸门等静态测不到的宿主语义门禁清单。
 
 ---
 

@@ -197,6 +197,12 @@ if (manifestOnly && bundles === lastBundles) return;
    （window.__DSH_BOOT__ 的 entry + 请求产物 URL 验证新代码）。
 3. **产物层的验证可以完全绕开浏览器**：直接请求 /plugins/??<pkg>/client.js&rev=... 看是否含新代码特征
    （如新增字典键），这比在 UI 里找更快、不受 DOM 时序影响。
+4. **接口回读只能证伪，不能证成**：返回 false 与返回 true 都不告诉你失败发生在哪一层。
+   判据必须是可观察的状态转移（值确实变了、确实没变），不是接口的成功返回值。
+   一个「保存成功」提示加上零变化的配置文件，是典型的假成功。
+5. **四态之外还有一类必测**：热重载后不刷新页面直接操作。宿主会处置旧的表单对象，
+   写操作静默失败而读操作全部正常——症状与「遮罩吞点击」几乎一样，但成因完全不同。
+   界面必须把这种失败显式呈现出来。判据见 [host-semantic-gates.md](./host-semantic-gates.md)。
 
 ---
 
@@ -227,6 +233,9 @@ if (manifestOnly && bundles === lastBundles) return;
 | 面板只渲染一份 | 目标元素 DOM 计数为 1 |
 | 控制台干净 | error 数为 0 |
 | 深浅色都验过 | 强制深色后关键颜色确实变化 |
+| 卸载是三件事分别取证 | 界面元素消失、宿主资源释放、配置文件无残留，三者分别判，任一不成立即未通过 |
+| 热重载后不刷新页面 | 在旧标签页里操作一次，确认写入失败被界面显式呈现而不是静默 |
+| 宿主语义门禁已排期 | 写入闸门、注册表仲裁、缓存实时性、产物时序、生命周期、插槽注册、只读态逐条有判据，清单见 host-semantic-gates |
 
 ---
 
@@ -234,6 +243,7 @@ if (manifestOnly && bundles === lastBundles) return;
 
 - [source-verification-and-caches.md](./source-verification-and-caches.md)：动手前先读源码的强制流程与三层来源
 - [silent-failure-and-gate-design.md](./silent-failure-and-gate-design.md)：零报错失效的三类根因、门禁设计与破坏实测
+- [host-semantic-gates.md](./host-semantic-gates.md)：静态断言测不到的宿主语义门禁清单与验收矩阵
 - [debugging-and-troubleshooting.md](./debugging-and-troubleshooting.md)：调试回路、伪 API 黑名单、免启动反证法
 - [desktop-vs-cli-runtime.md](./desktop-vs-cli-runtime.md)：两种运行时的差异、配置迁移与 profile 边界
 - [install-resolution-traps.md](./install-resolution-traps.md)：版本解析陷阱与安装排障

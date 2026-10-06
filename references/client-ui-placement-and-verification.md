@@ -188,6 +188,8 @@ URL 形如 /plugins/??包id/client.js&rev=12位hex——rev 是产物文件 mtim
 
 - **刷新页面、重开面板、重开设置窗口都不够**；桌面端（Electron）必须**完全退出应用再启动**。
 - 开发期由 dev:web 重建 client bundle，client-hmr（/plugins/events SSE）自动热替换插件条目；桌面端（desktop profile 未挂 client-hmr）只能重启。
+- 开发期让界面自带一个可读的构建标识（版本号常量或构建戳）：浏览器侧读不到包清单文件，界面是判断「装的是哪一版、是不是这一版界面」的唯一现场。没有这个标识时，每次核对都要去翻产物，成本很高且容易漏。
+- 这套缓存语义属于宿主侧强制行为，静态断言测不到；完整真机判据见 [host-semantic-gates.md](./host-semantic-gates.md)。
 
 ### 2. 版本号会「先于」界面更新，制造假象
 

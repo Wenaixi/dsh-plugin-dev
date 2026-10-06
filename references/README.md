@@ -17,8 +17,10 @@
 - [patch-packaging-release.md](./patch-packaging-release.md)：补丁、构建、打包、安装和发布真值。
 - [silent-failure-debugging.md](./silent-failure-debugging.md)：零报错失效的证据驱动排查。
 - [host-semantic-gates.md](./host-semantic-gates.md)：静态断言测不到的宿主语义门禁清单——写入闸门、表单处置态、注册表仲裁、缓存失效实时性、产物缓存时序、生命周期、插槽静默注册、只读态；附真机判据的组织方式与验收矩阵。
+- [runtime-truth-and-external-contracts.md](./runtime-truth-and-external-contracts.md)：七类假来源（构建期常量、编译期写死清单、Schema 默认值、受控控件隐式下标、文档历史结论、形状错误的 schema 门禁、未解包的远程返回值）与各自的运行时真值取证位置；跨端命名空间显式挂载、codec 契约的实际宽度、远程返回值的信封形状与失败双形态、描述长度上限来自宿主配置、配置归属维度、卸载与更新的逐项覆盖面；**受控控件的选项集合跨配置状态必须恒定**（条件追加会让用户选过一次后该状态不可达；「合法配置态」与「未配置标记」两类段外观相同语义相反，不能照抄相邻控件写法）。
 - [config-field-lifecycle.md](./config-field-lifecycle.md)：配置字段的新增（三态表达、volatile 与否）、废弃（声明与 volatile 标注两个都不能动）、迁移（启动期/惰性/只读兼容三选一）与批次失败范围。
 - [config-field-migration-selfcheck.md](./config-field-migration-selfcheck.md)：迁移逻辑的自检写法——语义转换表穷举、新旧优先双向断言、幂等断言、批次形状自检、负向样例，以及「漏了一个场景」为何破坏实测抓不到。
+- [shared-contract-capability-boundaries.md](./shared-contract-capability-boundaries.md)：当「同一个数据要按调用方给出不同表现」的需求撞上一个改不动的上游时，先沿链路收敛——枚举全部消费方、追到投影函数的字段白名单、抄缓存键的构成维度、核对作用域参数能否区分调用方。四条全过才有受支持路径；不过就是上游数据模型不支持。不可行时的三条覆写路径（接受同源 / 并列注册 / 运行时改写上游对象）各自的代价、失效形态与门禁写法，含「为省条目而改可见性标志会砍掉主功能」这一常见否决项。
 
 通用专题与具体版本资料冲突时，以目标运行时和源码为准。**每篇专题末尾都有「相关 DSH 源码」清单**，列出上游仓库相对路径与版本号，版本升级后必须重新读源码核对。
 
@@ -47,7 +49,7 @@
 
 ### 三、配置系统与补丁机制 (Configuration & Patches)
 - **[config.md](./config.md)**：
-  Schemastery 强类型配置规范、代码级四层补丁生效落点（bundles -> profile -> global -> `--patch` overlays）、全量替换（Wholesale Replacement）语义、`- insert:` 分组插入机制、`!!js` 动态表达式求值沙盒、`--dump-config` 假阳性避坑与三步真实启动验证；**写入前的反向覆盖闸门**（落盘前深比较「组合结果 vs 提交值」，不等即拒写并抛 `is overridden by ...`，因此 bundle patch 必须写全字段且与 schema 默认值逐字段一致）；设置表单三种写入语义与乐观版本控制；**Volatile 字段底层判定机制**（`isVolatilePath` 递归校验与 `volatileForm` 模式提取，非 volatile 路径直接拒写）；**复合/联合字段设计与解包陷阱**（Loader 校验后 volatile 字段解析为带 `.get()` 的引用对象，宿主代码必须解包提取真实值，不设默认值保留三态语义）。
+  Schemastery 强类型配置规范、代码级四层补丁生效落点（bundles -> profile -> global -> `--patch` overlays）、全量替换（Wholesale Replacement）语义、`- insert:` 分组插入机制、`!!js` 动态表达式求值沙盒、`--dump-config` 假阳性避坑与三步真实启动验证；**写入前的反向覆盖闸门**（落盘前深比较「组合结果 vs 提交值」，不等即拒写并抛 `is overridden by ...`，因此 bundle patch 必须写全字段且与 schema 默认值逐字段一致）；设置表单三种写入语义与乐观版本控制；**Volatile 字段底层判定机制**（`isVolatilePath` 递归校验与 `volatileForm` 模式提取，非 volatile 路径直接拒写）；**复合/联合字段设计与解包陷阱**（Loader 校验后 volatile 字段解析为带 `.get()` 的引用对象，宿主代码必须解包提取真实值，不设默认值保留三态语义）；**volatile 的嵌套位置限制只在解析期生效**（构造 schema 不报错，`resolve` 才抛 `volatile fields require a fixed object path`，因此含 volatile 的 schema 必须有一条真走 `resolve` 的测试）；**解析非法值抛 `ValidationError` 而非返回错误数组**（写 `const [, errors] = Schema.resolve(...)` 会得到恒假的空门禁）；**`toJSON()` 返回引用表 `{uid, refs}` 而非展开树**（直读 `json.dict` 得到 `undefined`，形态门禁因此永远为假）。
 
 ### 四、事件总线与工具流水线 (Events & Tool Execution)
 - **[events.md](./events.md)**：
@@ -59,7 +61,7 @@
 - **[input-overlay-and-keyboard-gestures.md](./input-overlay-and-keyboard-gestures.md)**：
   输入浮层与键盘手势通用经验——双击手势判定（纯时间窗 + 第一键透传第二键消费 + 单调钟 + 组字停顿 + 必须可配置关闭）；输入框上方过滤列表必须自绘（焦点留输入框就不能用宿主 Menu，ARIA 底线，查询词从草稿推导不逐键累加，方向键修饰符语义）；内容可编辑宿主草稿写入异步需 rAF 后再放光标；浮层卸载销毁与 DOM 计数断言；DOM 归属核对（按类名前缀全页扫描，别把宿主空面板算自己头上）；peer 包类型传递依赖缺口的 `TS7006 隐式 any` 判定；全新实例自动化首启先点掉引导模态。
 - **[settings-and-plugin-ui.md](./settings-and-plugin-ui.md)**：
-  全局设置窗口 (Settings) 与插件管理中心 UI 深度指南——`settings.section` 与 `plugins.bundle.config` 插槽机制、源码样本与真实注入代码、导航图标 (Nav Glyph) 替换技法、React 设置面板的本地 vs 补丁持久化、左侧“插件”管理中心卡片呈现、**`readPluginMeta` 的 exports 白名单契约（卡片空白根因与修法）**、图标 256 KiB 上限与路径约束、**改完必跑的两道验证（`npm pack --dry-run` + 直接调 `readPluginMeta`）**与开发决策树。
+  全局设置窗口 (Settings) 与插件管理中心 UI 深度指南——`settings.section` 与 `plugins.bundle.config` 插槽机制、源码样本与真实注入代码、导航图标 (Nav Glyph) 替换技法、React 设置面板的本地 vs 补丁持久化、左侧“插件”管理中心卡片呈现、**`readPluginMeta` 的 exports 白名单契约（卡片空白根因与修法）**、**`meta` 段与面板扁平键的分工及中英同族要求**（卡片标题缺失时回退包名，只写中文而英文册无 `meta` 会导致切英文看到 `@scope/dsh-xxx`）、、图标 256 KiB 上限与路径约束、**改完必跑的两道验证（`npm pack --dry-run` + 直接调 `readPluginMeta`）**与开发决策树。
 - **[web-ui-slots-and-styling.md](./web-ui-slots-and-styling.md)**：
   Web GUI 插槽树实战——右侧边栏（`sidebar.right.pane.tab`）、会话顶部工具栏（`conversation.session.header.utilities`）、输入框挂件（`conversation.input.right`）、消息流拦截（`conversation.chat.node`）、全局外壳（`shell.*`）；官方主题 CSS 变量（以当前主题包导出为准，含常见误写对照）；样式安全注入与 HMR 回收铁律；**官方 primitives 组件族优先策略**（SegmentedControl / Switch / StateDot / Tag / Button）与「客户端产物单一来源」纪律；**「焦点归谁」判据与 Menu 的适用边界**（Menu 的方向键会把焦点搬进列表，输入框上方浮层必须自绘并让 composition 期间的按键归 IME）；多语言国际化（`ctx.locale` 双语注册、声明 `locale:` 注入 t 席位、缺词静默返回 key）；语言边界契约（静态文案进词典、内容数据保持单语）。
 
@@ -70,13 +72,14 @@
 - **[client-ui-placement-and-verification.md](./client-ui-placement-and-verification.md)**：
   客户端 UI **落点选择与真机取证**——「界面语义 → 插槽」完整映射表（设置窗口各级 Tab / 插件页分组条目 / 卡片内联配置区 / 右侧栏 Tab / 侧边栏底部 / 全局浮层）；**铁律「一个功能一个入口」**（多落点冗余 = UI 污染，实测需回滚）；插槽三个必知机制（spec 由父条目 `children` 表声明、四种 kind 与注册参数对应关系、**`slots.inject` 在 spec 不存在时静默不执行且零报错**）；`plugins.bundle.config` 的 **`configured` 渲染门（匹配键是包名）**；**组件列表里 `id` 与 `name` 相同的行会重复显示包名（宿主行为，且改 id 等于破坏性迁移）**；「UI 不显示」三分法（模块没进图 / apply 没跑 / 落点或渲染门不匹配）；客户端产物 **`immutable` 长缓存与「版本号先于界面更新」的假象**（桌面端必须完全重启）；**无浏览器验证法（Node 直跑 CJS factory 探针）**；CDP / browser-harness 真机取证的环境坑；**解析 Electron `app.asar` 做桌面版与 CLI 版差异比对**。
 - **[official-settings-form-pattern.md](./official-settings-form-pattern.md)**：
-  官方设置页 UI 体系——**`SettingsForm` 外壳（unavailable/readOnly/saveFailed/save/saving 五文案、dirty/invalid 自动禁用 Save、卸载自动 discard）**；**官方 `SettingsFormModel` 只服务文本/数字字段**，bool 与带说明的枚举必须自写 card controller（形态抄官方 settings-subagent）；`ConfigForm` 与 `SettingsFormScope` 是同形契约（configForms.get 直接当 scope）；**五条保存铁律**（冲突置 invalid、回读逐字段比对、saveGeneration 抑制迟到回执、草稿过期的相等/冲突二分、无差异保存为 no-op）与七条验收判据；**`ConfigFormController` 生命周期与热重载陷阱**（卸载时表单被 `dispose()` 置标志位，未刷新页面调用 `form.mutate` 会直接被底层短路返回 false 并不发 RPC，造成静默假死；组件需具备失败感知能力）；**`whileServed` 命名空间状态守卫机制**（按宿主真实服务列表动态激活与安全销毁注册）。
+  官方设置页 UI 体系——**`SettingsForm` 外壳（unavailable/readOnly/saveFailed/save/saving 五文案、dirty/invalid 自动禁用 Save、卸载自动 discard）**；**官方 `SettingsFormModel` 只服务文本/数字字段**，bool 与带说明的枚举必须自写 card controller（形态抄官方 settings-subagent）；`ConfigForm` 与 `SettingsFormScope` 是同形契约（configForms.get 直接当 scope）；**五条保存铁律**（冲突置 invalid、回读逐字段比对、saveGeneration 抑制迟到回执、草稿过期的相等/冲突二分、无差异保存为 no-op）与七条验收判据；**`ConfigFormController` 生命周期与热重载陷阱**（卸载时表单被 `dispose()` 置标志位，未刷新页面调用 `form.mutate` 会直接被底层短路返回 false 并不发 RPC，造成静默假死；组件需具备失败感知能力）；**`whileServed` 命名空间状态守卫机制**（按宿主真实服务列表动态激活与安全销毁注册）；**注入面形状三条**（面顶层必须是工厂函数而非对象；闭包变量不会自动出现在 props 上，`props.scope` 为 undefined 会让点击抛 TypeError 并拖死渲染树；`hooks` 的键会被转成 `use<Name>` 选择器钩子，签名是 `(selector, equal?)` 而非无参取全量）。
 - **[client-bundle-loading-and-artifact-trace.md](./client-bundle-loading-and-artifact-trace.md)**：
   客户端加载与产物取证——**`__ModuleLoader__.load` 的注册 id 必须等于包名**（scoped 改名后构建 id 没同步 = `loaded without registering`，整条 bundle 不激活）；组合 URL `/plugins/??<pkg>/client.js&rev=<hash>` 形态与 rev 的非内容哈希语义（mtime/ctime/size）；**「改了代码不生效」的实例取证三步**（resolve 真实路径 → 逐字节比对 client.js → junction 目标）；重启宿主才能越过 immutable 长缓存的硬规矩。
 
 ### 六、跨端通信与三角色物理隔离 (IPC & Remote)
 - **[remote-rpc-guide.md](./remote-rpc-guide.md)**：
   Typert Remote RPC 跨端通信开发指南——Browser 前端 ↔ Host Node.js 服务端通信规范、方法签名四大硬约束（禁止解构、禁止默认值、禁止 rest、末位 signal 协作取消）、一元 RPC 与流式 mux 通道、端到端可运行范本。
+- **[runtime-truth-and-external-contracts.md](./runtime-truth-and-external-contracts.md)**：运行时真值与外部契约——*跨端命名空间不会自动开通*（服务端只暴露端点，第三方必须在客户端显式挂载贡献，挂载失败要降级不抛错，不要写轮询）；*codec 契约的实际宽度*（strict 只校验模式字段本身，解码缺省原样透传，恒等函数即充分）；*运行时推导值三不*（不进 schema、不给 Schema 默认值否则三态归零、不落盘否则过期值遮蔽新值、不构建期内嵌否则切换配置停在旧值）；*描述长度上限来自宿主配置项*（超长被截成省略号导致触发词失效，按折叠语义计数）；*受控控件的值必须落在选项集合内*（findIndex 越界导致全段键盘不可达）；*配置归属维度*（数据根解析不含实例维度导致多实例串扰）；*卸载与更新的逐项覆盖面*（补丁条目是高频漏项，宿主能力缺口只能如实告知）；*文档漂移门禁*（退役表述不得留在模型可读正文，版本一致性断言跟随真源不写死）。
 - **[three-roles.md](./three-roles.md)**：
   Browser / Host / 隔离进程三角色物理隔离模型（源码中 Worker 专指 worker_threads，教学上避免用 Worker 指代第三角色）、子进程生成原语（`ctx.subprocess.spawn` 与 `spawnTerminal` 零 Shell 解释）、`SandboxMode`（仅限文件系统效果）与沙箱隔离。
 
@@ -100,7 +103,7 @@
 
 ### 九之二、静默失效防线与可失败门禁 (Silent Failures & Verifiable Gates)
 - **[silent-failure-and-gate-design.md](./silent-failure-and-gate-design.md)**：
-  把「代码写全了、门禁全绿、运行时毫无作用」这类零报错缺陷归纳成三类根因（代码从未被执行、契约被吞掉、解析到了别的东西），每类配可执行的判定动作；并给出**门禁设计方法论**——先按「错了会不会报错」分类，再决定写运行时回读、源码形态正则还是产物断言，**每条新断言必须做破坏实测证明它会红**；另含真机浏览器验收的环境坑速查（遮罩吞点击、导航等待超时、写入期间控件禁用）、收敛判定的「两帧相同加目标谓词」纪律、发布前后的双重复验与 manifest 自动规范化坑；**异步表单漏渲染失败状态的静默吞错（Silent Failure）**与 Fail-Loud 契约防御；**客户端版本号常量脱节漂移**的门禁对齐断言。
+  把「代码写全了、门禁全绿、运行时毫无作用」这类零报错缺陷归纳成三类根因（代码从未被执行、契约被吞掉、解析到了别的东西），每类配可执行的判定动作；并给出**门禁设计方法论**——先按「错了会不会报错」分类，再决定写运行时回读、源码形态正则还是产物断言，**每条新断言必须做破坏实测证明它会红**，**且断言对象要锚定到具体元素而不是「第一个匹配」**（同类元素多于一种时测错对象也会一直绿；修复后的回归锁要锁判定形状而非顺利路径）；另含真机浏览器验收的环境坑速查（遮罩吞点击、导航等待超时、写入期间控件禁用）、收敛判定的「两帧相同加目标谓词」纪律、发布前后的双重复验与 manifest 自动规范化坑；**异步表单漏渲染失败状态的静默吞错（Silent Failure）**与 Fail-Loud 契约防御；**客户端版本号常量脱节漂移**的门禁对齐断言。
 
 ### 九之三、跨运行时差异与迁移 (Desktop vs CLI Runtime)
 - **[desktop-vs-cli-runtime.md](./desktop-vs-cli-runtime.md)**：

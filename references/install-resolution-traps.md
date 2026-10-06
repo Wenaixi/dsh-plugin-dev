@@ -11,12 +11,12 @@
 
 ```text
 dependencies:
-+ @wenaixi/dsh-ponytail 4.9.0-dsh.5
++ <scope>/<plugin> <old-version>
 Packages: +2
 Done in 997ms using pnpm v11.7.0
 
-dsh: installation rejected: Plugin @wenaixi/dsh-ponytail@4.9.0-dsh.5 is incompatible
-with the target DSH release: peerDependencies {"@deepseek-ai/dsh-skill":"^0.1.1-rc.2"}
+dsh: installation rejected: Plugin <scope>/<plugin>@<old-version> is incompatible
+with the target DSH release: peerDependencies {"@deepseek-ai/dsh-skill":"<old-peer-range>"}
 dsh: restored package.json, pnpm-lock.yaml, and node_modules.
 ```
 
@@ -227,6 +227,14 @@ allowBuilds:
 
 放行后重跑同一条 `dsh plugin --profile <name> add <pkg>@<version>` 即可，被拦的安装会继续完成。
 
+### 7.2.2 裸 `add` 命令版本解析回退陷阱（为什么文档与脚本中必须显式带 `@x.y.z`）
+
+- **现象**：执行 `dsh plugin --profile <name> add @scope/pkg`（末尾不带版本号）时，经常出现明明最新版本刚发布成功，安装却自动装到了几个版本前的远古旧版（例如已发布 5.3.x，安装命令却输出 `+ @scope/pkg 5.0.0 (5.3.x is available)`）。
+- **根因**：pnpm 的 `minimumReleaseAge` 机制在面对裸包名时，只会把「发布时间已满足成熟期阈值」的候选纳入考量。刚发布的新版本由于发布时间不足，被自动剔除，导致版本选择算法一路向后跌落，选出了一个历史上的老版本。
+- **最佳实践硬规范**：
+  1. **文档与安装脚本中始终显式带版本号**：所有插件的 `README.md`、速查卡和部署脚本中，安装示例一律写成显式版本 `dsh plugin --profile <name> add @scope/pkg@<最新版本>`。显式指定精确版本时，pnpm 会将其自动写入 `pnpm-workspace.yaml` 的 `minimumReleaseAgeExclude` 豁免名单，直接放行安装。
+  2. **自研测试 profile 全局关闭**：测试环境中直接在 `pnpm-workspace.yaml` 声明 `minimumReleaseAge: 0`（见 §5.1）。
+
 ### 7.2.2 `dsh plugin add` 是否写 `dsh.profile.bundles`（取决于包是否声明 `dsh.bundle`）
 
 首次 `dsh plugin --profile <new> add <pkg>` 会自动脚手架出 profile 目录（`package.json` / `cordis.patch.yml` / `pnpm-workspace.yaml` / `.plugin-manager`）。分的两种情况（源码实证 `dsh-app-boot` `reconcileProfilePlugins` 与 `dsh-plugin-manager` `operations.reconcile`）：
@@ -288,7 +296,44 @@ dsh <name> --port <port> --no-open
 
 ---
 
-## 八、官方依据
+## 八、pnpm 符号链接热更新与常驻进程模块解析缓存撕裂（ESM ModuleLoader Cache Trap）
+
+### 8.1 典型症状：升级或重装后出现指向旧版本哈希路径的 ENOENT
+
+在常驻运行的 DSH 实例（例如桌面版常驻服务或特定端口常驻服务）中，通过插件管理界面或命令行执行热卸载并安装新版本后，插件列表页展示包元信息错误：
+
+```text
+包元信息错误：Plugin metadata for @scope/pkg: Error: ENOENT: no such file or directory, scandir '.../.pnpm/@scope+pkg@x.y_hash/node_modules/@scope/pkg/locale'
+```
+
+**误诊倾向**：开发者容易误以为是新包的打包不完整、漏发了文件，或者认为是插件声明的 locale 目录结构损坏，从而反复重新发布无意义的补丁版本。
+
+### 8.2 底层运行机制（源码级成因）
+
+该异常发生在 DSH 宿主读取插件展示元数据（readPluginMeta）的执行链路上：
+
+1. **元数据定位依赖 Node 内部模块解析器**：
+   在 @deepseek-ai/dsh-app-boot 内部，readPluginMeta 调用 optionalResourcePath(`${specifier}/locale/en.json`, parentURL)，其底层使用 Node.js 内部的 ModuleLoader.resolveSync 解析该资源在文件系统中的物理绝对路径。
+2. **定位语言目录后执行同步目录扫描**：
+   在解析出英文语言包物理路径后，DSH 会直接对其父级目录执行同步扫描：for (const entry of readdirSync(dirname(englishPath), { withFileTypes: true }))。
+3. **pnpm 虚拟存储与常驻进程解析缓存的生命周期撕裂**：
+   - pnpm 采用符号链接（symlink）将插件软链至 .pnpm/<name>@<version>_<hash>/node_modules/<name> 虚拟存储目录；
+   - 依赖更新或重装后，pnpm 会在磁盘上物理删除旧版本的 .pnpm 目录，并建立指向新版本的新软链；
+   - **但是，常驻运行中的 Node.js 进程在其模块加载器内存中缓存了旧模块的解析结果与真实路径（realpath）**；
+   - 当插件管理器重新触发 readPluginMeta 时，解析器依然给出了已经被物理删除的旧目录路径，导致随后的 readdirSync 立即抛出 ENOENT。
+
+### 8.3 判据与处置规程
+
+- **判据一**：报错路径中显式包含 .pnpm/ 且携带了旧版本的版本号与哈希后缀（如 @x.y_hash）。
+- **判据二**：直接检查当前 profile 的 package.json 与 node_modules/@scope/pkg 软链，确认磁盘上新版本依赖已经正确就位，且报错路径对应的物理目录在磁盘上确实已被清理。
+- **处置规程**：
+  1. 无需修改插件的 locale 文件或发布代码；
+  2. 重启该 profile 对应的常驻 DSH 服务进程，使 Node.js 模块加载器重新初始化并读取最新的物理路径；
+  3. 插件本身的 package.json 必须维持标准的 exports 配置，明确暴露 ./locale/*、./package.json 与 ./icon.*，确保模块解析器具备合法的解析入口。
+
+---
+
+## 九、官方依据
 
 - pnpm `minimumReleaseAge` 设置项与默认值：<https://pnpm.io/settings/dependency-resolution>
 - pnpm 供应链安全说明（冷却期的设计动机）：<https://pnpm.io/supply-chain-security>

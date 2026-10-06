@@ -50,12 +50,18 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 | 动态目录、Provider、缓存、失效、重名 | [skill-provider.md](references/skill-provider.md)、[provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) |
 | 设置面板、Web 插槽、Host/Client、UI 不显示 | [three-roles.md](references/three-roles.md)、[web-ui-slots-and-styling.md](references/web-ui-slots-and-styling.md)、[client-ui-placement-and-verification.md](references/client-ui-placement-and-verification.md) |
 | 设置页 UI 怎么写（官方 SettingsForm / 草稿 / 冲突栅栏） | [official-settings-form-pattern.md](references/official-settings-form-pattern.md) |
+| 输入框上方浮层、双击手势、焦点留输入框、中文输入法组字 | [input-overlay-and-keyboard-gestures.md](references/input-overlay-and-keyboard-gestures.md)、[web-ui-slots-and-styling.md](references/web-ui-slots-and-styling.md) |
 | 客户端没加载、注册 id 报错、改了代码不生效 | [client-bundle-loading-and-artifact-trace.md](references/client-bundle-loading-and-artifact-trace.md)、[silent-failure-and-gate-design.md](references/silent-failure-and-gate-design.md) |
 | 不开浏览器回读配置/状态真值、写自动化验收 | [api-truth-read-back-without-browser.md](references/api-truth-read-back-without-browser.md)、[debugging-and-troubleshooting.md](references/debugging-and-troubleshooting.md) |
 | patch、Bundle、peer 依赖、打包、发布 | [config.md](references/config.md)、[packaging.md](references/packaging.md)、[install-resolution-traps.md](references/install-resolution-traps.md) |
 | 插件改 scoped 名、改名后多处对不上 | [packaging.md](references/packaging.md)（scoped 化六件套）、[config.md](references/config.md)（patch name 引号） |
 | 搭 CI 流水线、tag 发版、npm 发布失败 | [ci-release-workflow.md](references/ci-release-workflow.md)、[publish-npm-verification.md](references/publish-npm-verification.md) |
 | 没有报错但功能不生效 | [silent-failure-and-gate-design.md](references/silent-failure-and-gate-design.md)、[debugging-and-troubleshooting.md](references/debugging-and-troubleshooting.md) |
+| 点击按钮/开关毫无反应、表单静默失败、热重载后表单 disposed 假死 | [silent-failure-and-gate-design.md](references/silent-failure-and-gate-design.md)、[official-settings-form-pattern.md](references/official-settings-form-pattern.md) |
+| 热重载/升级后报 scandir ENOENT、旧 pnpm 哈希路径丢失 | [install-resolution-traps.md](references/install-resolution-traps.md)、[debugging-and-troubleshooting.md](references/debugging-and-troubleshooting.md) |
+| volatile 字段拒写、联合字段设计、宿主端拿到引用包装需解包 | [config.md](references/config.md)、[settings-and-plugin-ui.md](references/settings-and-plugin-ui.md) |
+| 卡片版本与面板版本不一致、客户端版本常量脱节漂移 | [silent-failure-and-gate-design.md](references/silent-failure-and-gate-design.md)、[client-bundle-loading-and-artifact-trace.md](references/client-bundle-loading-and-artifact-trace.md) |
+| npm 发布后暂态 404/时延、E409 staged 冲突、线上产物 SHA256 验签 | [publish-npm-verification.md](references/publish-npm-verification.md)、[ci-release-workflow.md](references/ci-release-workflow.md) |
 | 跨模块变更、能力删除、兼容迁移 | [cross-cutting-engineering-practices.md](references/cross-cutting-engineering-practices.md) |
 | 具体 API 或版本结论无法确认 | 先查现有参考，再核对目标运行时和 [official-upstream-and-docs.md](references/official-upstream-and-docs.md) |
 | 找不到本机源码、桌面版解包、上游克隆 | [source-verification-and-caches.md](references/source-verification-and-caches.md) |
@@ -69,7 +75,7 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - Host：入口可加载、必需依赖可用、注册数量正确、错误和取消语义可观察。
 - 生命周期：失效后得到新状态；卸载后无监听、写入、广播或旧异步结果；重复激活不叠加资源。
 - Browser：模块确实加载，插槽语义匹配，组件只消费 props，写操作后状态重新读取。
-- 交付：构建产物可加载，tarball 文件完整，临时干净环境能安装并启动，发布后从外部真源核对版本和内容。
+- 交付：构建产物可加载，tarball 文件完整，临时干净环境能安装并启动，发布后通过权威四件套核验（Tag、Release、npm dist-tags，以及真实 tarball 解包 SHA256 逐文件数字对齐）。
 - 隔离实例：只装基础插件与目标插件，冷装、热装、热更新、卸载四态各过一遍；浏览器里每项控件点过并回读真值；测试模型由用户选定。
 
 ## Anti-Patterns
@@ -82,3 +88,5 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - 为单个调用方创建公开 adapter，或为已有深 module 再拆一层转发。
 - 只读完本技能库就动手，把正文当 API 契约而不去核对真实源码。
 - 在自己日常 profile 上验证通过就宣称功能可用，没开隔离新实例、没测热装冷装卸载。
+- 在表单异步交互中仅捕获异常而未在 UI 对应区域显式渲染失败状态，造成假死无响应的静默失败。
+- 插件热重载后不刷新页面，直接在持有已废弃（disposed）旧表单实例的前端闭包中测试异步写入。

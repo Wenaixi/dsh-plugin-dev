@@ -173,6 +173,56 @@ ctx.slots.register(
 5. **只读断言**：文档只读时显示官方只读横幅，控件全禁，Save 禁用。
 6. **卸载断言**：禁用插件后配置卡与命名空间一起消失，无残影。
 
+7. **热更新自愈断言**：插件卸载后重新安装（或热更新后），若前端页面未刷新，组件如仍持有旧表单引用，应有显式失败感知并能引导刷新，刷新后新表单实例应完全恢复可读可写。
+
+---
+
+## 七、ConfigFormController 生命周期陷阱：热重载失效、whileServed 守卫与写入队列截断
+
+### 7.1 表单控制器的生命周期与 disposed 标志
+
+DSH 客户端通过 `ctx.configForms.get(namespace)` 获取的表单控制器对象（`ConfigFormController`）拥有严格的生命周期状态：
+
+```javascript
+// 官方 dsh-client-ui-settings 源码行为
+enqueue(operation) {
+    if (this.persistence === "memory" || this.disposed) return Promise.resolve(false);
+    // ... 正常排队发起远程 RPC 写入
+}
+
+async dispose() {
+    this.disposed = true;
+    this.writeGeneration += 1;
+    this.unsubscribe?.();
+    await this.tail;
+}
+```
+
+当插件在宿主侧被热卸载（remove/unload）时，宿主注销对应的 entry，客户端配置管理器会调用该表单的 `dispose()`，将其 `this.disposed` 置为 `true`。
+
+### 7.2 热重载下的「假死短路」陷阱
+
+- **现象**：插件通过界面或命令行热更新后，用户在尚未刷新的旧前端页面中点击开关或提交修改，完全无反应，后端未收到任何网络请求，磁盘配置文件未发生任何改变。
+- **成因**：前端 SPA 页面若未重新加载，React 组件闭包中依然持有已被置为 `disposed=true` 的旧表单控制器实例。调用 `form.mutate(ops)` 时，底层的 `enqueue` 检查到 `this.disposed` 为真，**直接短路返回 `Promise.resolve(false)`**，连远程 RPC 请求都不会发出！
+- **应对规范**：
+  1. **检查返回值并暴露失败**：所有表单提交逻辑（例如封装的 `submit` 函数）不能假设 `form.mutate` 一定发送了请求，必须检查返回的 `ok / accepted` 结果。当返回 `false` 时，必须将其视同写入失败，在 UI 区域显式抛出提示；
+  2. **感知生命周期**：对于挂载到全局插槽的持久化卡片，可参考官方插件的 `whileServed` 模式；
+  3. **验收规程**：在端到端真机验收清单中，热重载后应包含页面重新加载重绑活跃表单的标准动作。
+
+### 7.3 whileServed 命名空间状态守卫机制
+
+官方多个设置卡片（如 agent-loop、shell、subagent）均采用 `ctx.configForms.whileServed` 守卫插槽注册：
+
+```javascript
+ctx.effect(() => ctx.configForms.whileServed([MY_NAMESPACE], (served) => {
+    return ctx.slots.inject("plugins.item", () => ctx.slots.register({ ... }));
+}));
+```
+
+- **运行原理**：`whileServed` 内部监听客户端的设置镜像快照（`SettingsDescribeMirror`）。只有当宿主当前真实服务的 `namespaces` 列表中包含指定命名空间时，才执行注册函数；一旦宿主卸载了该插件，它会自动触发注册时返回的清理函数（disposer），使配置项在界面上平滑退场，绝不残留未服务的死引用。
+
+---
+
 ## 相关 DSH 源码
 
 ```text

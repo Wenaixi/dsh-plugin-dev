@@ -47,6 +47,9 @@ DSH 大量契约校验失败后只写 `meta.error` 或直接 `return undefined`�
 | `icon` 字段 | 必须是包内相对路径、svg/png/jpg/jpeg/webp、**不超过 256 KiB**（`MAX_ICON_BYTES = 256 * 1024`）；绝对路径、带协议头、逃出 manifest 目录全部拒绝 | 见 [settings-and-plugin-ui.md](./settings-and-plugin-ui.md) 第二节 |
 | `locale/*.json` | 文件名必须是语言 id；缺 `meta.title` 或 `meta.description` 静默降级 | `readdirSync(locale)` 的遍历规则与宿主字典遍历一致 |
 | React 组件签名 | 插槽容器不注入 ctx，传 ctx 会在运行时报 undefined 属性 | 组件只接纯 props 或自定义 hook |
+| 异步表单漏渲染失败状态 | 提交回调捕获了错误并记录进状态，但 UI 渲染树缺少对应操作键的错误节点，**界面无报错也无视觉反馈，呈现完全假死** | 检查所有 `form.mutate` 调用点，确保每个操作键在 UI 都有对应的失败渲染分支（带 `role="alert"`），并在控制台打印详细错误 |
+| 热更新后表单实例被 disposed | 宿主侧热卸载插件会调用 `form.dispose()`，底层 `enqueue` 看到 `disposed=true` **直接返回 `Promise.resolve(false)`，连网络请求都不发** | 前端组件感知 `form.mutate` 返回值并在 false 时告警；热更新后引导刷新页面重新绑定活跃表单 |
+| 客户端版本常量脱节漂移 | 客户端内联的代码版本常量与 `package.json` 的 `version` 不一致，导致插件管理卡片显示新版而面板内部显示旧版 | 门禁静态断言客户端代码中的版本常量必须与 `package.json` 严格等值 |
 
 **根因归纳**：宿主读元数据时是「尽力而为」——能读到标题就返回标题，读到图标失败就把错误塞进 `error` 字段继续返回。**它不会抛给你**，所以你必须自己去调那个函数问真值。
 
@@ -81,6 +84,28 @@ DSH 大量契约校验失败后只写 `meta.error` 或直接 `return undefined`�
 ```
 
 ### 2. 「源码形态断言」：把契约翻译成正则
+
+#### 规则示例：防静默失败契约（Fail-Loud Contract）
+
+如果一个操作调用了 `form.mutate`，它就必须具备对应的失败展示出口。如果允许错误被静默吞掉，用户就会遭遇“按了按钮毫无反应”的黑盒现象。
+
+```javascript
+// 检查独立配置操作（如全局动作键）在 UI 渲染树中是否有失败渲染出口
+if (!source.includes("failures['myField']") || !source.includes("role: 'alert'")) {
+  issues.push("配置操作缺少 failures['myField'] 失败状态渲染，存在静默假死风险");
+}
+```
+
+#### 规则示例：客户端版本常量对齐契约
+
+```javascript
+// 确保客户端文件内联的版本常量与 package.json 绝对一致，杜绝版本号分裂
+const pkgVersion = JSON.parse(readFileSync("package.json", "utf8")).version;
+const clientMatch = source.match(/var PACKAGE_VERSION = '([\w.]+)';/);
+if (!clientMatch || clientMatch[1] !== pkgVersion) {
+  issues.push(`客户端版本常量 (${clientMatch?.[1]}) 与 package.json (${pkgVersion}) 不一致`);
+}
+```
 
 只适用于「正确写法有唯一形态」的契约。示例（按你自己的包名替换）：
 

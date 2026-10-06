@@ -224,6 +224,63 @@ if (!isDeepStrictEqual(combined, next))
 - 删除字段的完整清单：`src` schema 定义、`cordis.patch.yml` 的 config 行、已装 profile 的 patch 行、README 配置表、locale 文案、纯函数模型（默认值/字段列表/规范化/迁移计划）与对应测试。
 - 这是「能力删除承诺面」（cross-cutting 专题）在配置域的具体实例：入口、文档、配置、导出一处不同步，就是一颗随时爆炸的哑弹。
 
+### 7.7 Volatile 字段底层判定机制（isVolatilePath 与 volatileForm）
+
+DSH 官方 `@deepseek-ai/dsh-settings` 在执行 `mutate(ns, ops, expectedRevision)` 写入时，会严格执行两重静态与动态结构检验：
+
+1. **表单模式提取（volatileForm）**：
+   ```javascript
+   function volatileForm(schema) {
+       if (schema.meta.volatile) return plainSchema(schema);
+       if (schema.type === "object") {
+           const dict = Object.fromEntries(Object.entries(schema.dict ?? {}).flatMap(([key, child]) => {
+               const field = volatileForm(child);
+               return field === void 0 ? [] : [[key, field]];
+           }));
+           return Object.keys(dict).length === 0 ? void 0 : z.object(dict);
+       }
+   }
+   ```
+   如果整个插件 entry 的 Schema 内部没有任何一个字段带有 `.volatile()` 声明，`volatileForm` 返回 `undefined`，写入直接抛出 `Plugin entry "${ns}" has no volatile fields`。
+
+2. **写入路径递归校验（isVolatilePath）**：
+   ```javascript
+   function isVolatilePath(schema, path) {
+       if (schema.meta.volatile) return true;
+       const [key, ...rest] = path;
+       const child = key === void 0 ? void 0 : schema.dict?.[key];
+       return child !== void 0 && isVolatilePath(child, rest);
+   }
+   ```
+   待写入的 `ops` 中每一个 `path`，都必须使其自身节点或其最近的祖先字典节点包含 `.volatile()`。一旦任何非 volatile 路径被传入，底层立即抛出 `Config field "${path.join(".")}" is not volatile` 并拒绝写入。
+
+### 7.8 复合/联合字段的 volatile 设计与运行时解包陷阱
+
+1. **联合类型复合声明规范**：
+   对于具有多种枚举值或可选三态的字段（如需要表达“未设置/跟随宿主”与“显式覆盖”）：
+   ```typescript
+   // 正确声明：联合常量 + 可选 + 标记为 volatile
+   myOption: Schema.union(['alpha', 'beta']).required(false).volatile(),
+   ```
+   底层 Schemastery 会将其正确打包为含有 `uid` 和分支引用的复合结构，`isVolatilePath` 能够正确递归识别该属性为 volatile。
+
+2. **宿主端 volatile 引用对象的解包陷阱（unwrapValue）**：
+   - 核心事实：在宿主侧，插件的配置经过 Loader 与 Schemastery 校验后，**所有标记了 `.volatile()` 的字段会被包装为内部 volatile 引用对象**（即附带 `.get()` 方法的实体）；
+   - 常见盲区：在宿主端代码（如 Provider 或服务实现）中，直接访问 `config.myOption` 拿到的不是原始字符串或数字，而是一个包含 `get` 方法的引用包装！
+   - 防御规范：宿主代码必须提供通用解包函数：
+     ```typescript
+     function unwrapValue<T>(value: T | { get: () => T } | undefined): T | undefined {
+       if (value !== null && typeof value === 'object' && 'get' in value && typeof value.get === 'function') {
+         return (value as { get: () => T }).get();
+       }
+       return value as T | undefined;
+     }
+     ```
+     读取 volatile 配置时一律经过解包获取真实值，杜绝因持有引用包装导致类型判断失败；
+   - 客户端行为差异：客户端通过 `SettingsForms.describe` 接收到的快照，已经由后端的 `plainConfig` 自动剥离了运行时引用包装，客户端接收到的是标准 JSON 纯标量。
+
+---
+
 ## 八、多来源优先级与可诊断化 (Precedence & Diagnostics)
 
 第二节描述的是**补丁层之间**的覆盖。但同一个插件的同一项配置，往往同时来自四个彼此独立的通道：
@@ -279,6 +336,24 @@ export function resolvePriority(input: {
 1. 该字段的 `.default()` 去掉，缺省语义在插件内部表达；
 2. 保留 `.default()` 但判定时改用**原始未校验配置**（宿主保留 raw config，插件可从 `internal/config` 瀑布事件的入参拿到），而不是校验后的对象；
 3. 兜底：判定时同时输出 raw 与 resolved 两个值，让分歧可见。
+
+### 8.3b 三态配置字段：未配置 ≠ 默认值，可做「跟随其他命名空间」
+
+场景：插件有个「语言/主题/区域」类字段，希望**未配置时跟随宿主同名设置**（用户显式选了才锁定）。
+三个要点，全部来自实战踩坑：
+
+1. **去掉 Schema 默认值**（同 8.3）：默认值会让「用户没配」与「用户显式选了默认值」不可区分，跟随逻辑
+   永远不触发。未配置的可观察形态是 volatile 引用包着 undefined（`readVolatile()` 返回 undefined）。
+2. **显式值锁定，未配置现读跟随源**：每次求值时先看自己的字段，有值就锁定；没有才去读跟随源
+   （如宿主 `locale` 命名空间的 `preference` 字段）。跟随源经 `settings.describe()` 读——
+   它的返回形状随版本不同（数组 descriptors 或 `{ namespaces: [...] }`），两侧都兼容。
+3. **跟随源的变更收敛点**：另一个命名空间（`locale` 等）的 `loader/volatile-update` **只在那条插件
+   自己的 fiber 上广播**，你的插件收不到。宿主每次应用补丁后广播的 `app-boot/config-reload` 才是
+   可订阅的变更通知（官方 dsh-settings 自己也监听它重算快照）。在你的插件里收到该事件就刷新
+   （如让技能目录失效、重拉快照）。
+
+判据（验收）：跟随源为 A → 插件读 A；显式设为 B → 读 B（跟随源切回 A 不推翻）；unset 回未配置 → 恢复跟随。
+三条都要用「运行时真值回读」验证，不要只信 UI 显示。
 
 ### 8.4 面向用户的呈现
 

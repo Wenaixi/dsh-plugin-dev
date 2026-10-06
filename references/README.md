@@ -44,7 +44,7 @@
 
 ### 三、配置系统与补丁机制 (Configuration & Patches)
 - **[config.md](./config.md)**：
-  Schemastery 强类型配置规范、代码级四层补丁生效落点（bundles -> profile -> global -> `--patch` overlays）、全量替换（Wholesale Replacement）语义、`- insert:` 分组插入机制、`!!js` 动态表达式求值沙盒、`--dump-config` 假阳性避坑与三步真实启动验证；**写入前的反向覆盖闸门**（落盘前深比较「组合结果 vs 提交值」，不等即拒写并抛 `is overridden by ...`，因此 bundle patch 必须写全字段且与 schema 默认值逐字段一致）；设置表单三种写入语义与乐观版本控制。
+  Schemastery 强类型配置规范、代码级四层补丁生效落点（bundles -> profile -> global -> `--patch` overlays）、全量替换（Wholesale Replacement）语义、`- insert:` 分组插入机制、`!!js` 动态表达式求值沙盒、`--dump-config` 假阳性避坑与三步真实启动验证；**写入前的反向覆盖闸门**（落盘前深比较「组合结果 vs 提交值」，不等即拒写并抛 `is overridden by ...`，因此 bundle patch 必须写全字段且与 schema 默认值逐字段一致）；设置表单三种写入语义与乐观版本控制；**Volatile 字段底层判定机制**（`isVolatilePath` 递归校验与 `volatileForm` 模式提取，非 volatile 路径直接拒写）；**复合/联合字段设计与解包陷阱**（Loader 校验后 volatile 字段解析为带 `.get()` 的引用对象，宿主代码必须解包提取真实值，不设默认值保留三态语义）。
 
 ### 四、事件总线与工具流水线 (Events & Tool Execution)
 - **[events.md](./events.md)**：
@@ -53,6 +53,8 @@
   ToolRuntime 架构、工具执行时序、单调安全守卫法则与工具归属核验方法与 `defineTool` 编写规范。
 
 ### 五、前端双面 UI 插件与插槽体系（Client UI & Slots）
+- **[input-overlay-and-keyboard-gestures.md](./input-overlay-and-keyboard-gestures.md)**：
+  输入浮层与键盘手势通用经验——双击手势判定（纯时间窗 + 第一键透传第二键消费 + 单调钟 + 组字停顿 + 必须可配置关闭）；输入框上方过滤列表必须自绘（焦点留输入框就不能用宿主 Menu，ARIA 底线，查询词从草稿推导不逐键累加，方向键修饰符语义）；内容可编辑宿主草稿写入异步需 rAF 后再放光标；浮层卸载销毁与 DOM 计数断言；DOM 归属核对（按类名前缀全页扫描，别把宿主空面板算自己头上）；peer 包类型传递依赖缺口的 `TS7006 隐式 any` 判定；全新实例自动化首启先点掉引导模态。
 - **[settings-and-plugin-ui.md](./settings-and-plugin-ui.md)**：
   全局设置窗口 (Settings) 与插件管理中心 UI 深度指南——`settings.section` 与 `plugins.bundle.config` 插槽机制、源码样本与真实注入代码、导航图标 (Nav Glyph) 替换技法、React 设置面板的本地 vs 补丁持久化、左侧“插件”管理中心卡片呈现、**`readPluginMeta` 的 exports 白名单契约（卡片空白根因与修法）**、图标 256 KiB 上限与路径约束、**改完必跑的两道验证（`npm pack --dry-run` + 直接调 `readPluginMeta`）**与开发决策树。
 - **[web-ui-slots-and-styling.md](./web-ui-slots-and-styling.md)**：
@@ -65,7 +67,7 @@
 - **[client-ui-placement-and-verification.md](./client-ui-placement-and-verification.md)**：
   客户端 UI **落点选择与真机取证**——「界面语义 → 插槽」完整映射表（设置窗口各级 Tab / 插件页分组条目 / 卡片内联配置区 / 右侧栏 Tab / 侧边栏底部 / 全局浮层）；**铁律「一个功能一个入口」**（多落点冗余 = UI 污染，实测需回滚）；插槽三个必知机制（spec 由父条目 `children` 表声明、四种 kind 与注册参数对应关系、**`slots.inject` 在 spec 不存在时静默不执行且零报错**）；`plugins.bundle.config` 的 **`configured` 渲染门（匹配键是包名）**；**组件列表里 `id` 与 `name` 相同的行会重复显示包名（宿主行为，且改 id 等于破坏性迁移）**；「UI 不显示」三分法（模块没进图 / apply 没跑 / 落点或渲染门不匹配）；客户端产物 **`immutable` 长缓存与「版本号先于界面更新」的假象**（桌面端必须完全重启）；**无浏览器验证法（Node 直跑 CJS factory 探针）**；CDP / browser-harness 真机取证的环境坑；**解析 Electron `app.asar` 做桌面版与 CLI 版差异比对**。
 - **[official-settings-form-pattern.md](./official-settings-form-pattern.md)**：
-  官方设置页 UI 体系——**`SettingsForm` 外壳（unavailable/readOnly/saveFailed/save/saving 五文案、dirty/invalid 自动禁用 Save、卸载自动 discard）**；**官方 `SettingsFormModel` 只服务文本/数字字段**，bool 与带说明的枚举必须自写 card controller（形态抄官方 settings-subagent）；`ConfigForm` 与 `SettingsFormScope` 是同形契约（configForms.get 直接当 scope）；**五条保存铁律**（冲突置 invalid、回读逐字段比对、saveGeneration 抑制迟到回执、草稿过期的相等/冲突二分、无差异保存为 no-op）与六条验收判据。
+  官方设置页 UI 体系——**`SettingsForm` 外壳（unavailable/readOnly/saveFailed/save/saving 五文案、dirty/invalid 自动禁用 Save、卸载自动 discard）**；**官方 `SettingsFormModel` 只服务文本/数字字段**，bool 与带说明的枚举必须自写 card controller（形态抄官方 settings-subagent）；`ConfigForm` 与 `SettingsFormScope` 是同形契约（configForms.get 直接当 scope）；**五条保存铁律**（冲突置 invalid、回读逐字段比对、saveGeneration 抑制迟到回执、草稿过期的相等/冲突二分、无差异保存为 no-op）与七条验收判据；**`ConfigFormController` 生命周期与热重载陷阱**（卸载时表单被 `dispose()` 置标志位，未刷新页面调用 `form.mutate` 会直接被底层短路返回 false 并不发 RPC，造成静默假死；组件需具备失败感知能力）；**`whileServed` 命名空间状态守卫机制**（按宿主真实服务列表动态激活与安全销毁注册）。
 - **[client-bundle-loading-and-artifact-trace.md](./client-bundle-loading-and-artifact-trace.md)**：
   客户端加载与产物取证——**`__ModuleLoader__.load` 的注册 id 必须等于包名**（scoped 改名后构建 id 没同步 = `loaded without registering`，整条 bundle 不激活）；组合 URL `/plugins/??<pkg>/client.js&rev=<hash>` 形态与 rev 的非内容哈希语义（mtime/ctime/size）；**「改了代码不生效」的实例取证三步**（resolve 真实路径 → 逐字节比对 client.js → junction 目标）；重启宿主才能越过 immutable 长缓存的硬规矩。
 
@@ -81,7 +83,7 @@
 - **[llm-adapter.md](./llm-adapter.md)**：
   `ctx.llm`（LlmRuntime Seam）抽象协议、`LlmAdapter` 继承与 `stream()` 实现、7 种 `StreamChunk` 封闭判别联合完整定义代码。
 - **[packaging.md](./packaging.md)**：
-  Bundle 与 Profile 互斥模型、`package.json` 规约、npm `--legacy-peer-deps` 规避 OOM 实战、`allow-version` 风险豁免机制、多包 Monorepo 工作区联调。
+  Bundle 与 Profile 互斥模型、`package.json` 规约、npm `--legacy-peer-deps` 规避 OOM 实战、`allow-version` 风险豁免机制、多包 Monorepo 工作区联调；**[publish-npm-verification.md](./publish-npm-verification.md)**（npm 发布验证权威指南——本地镜像假阴性避坑、npm 跨区域分发 1-2 分钟时延与 **E409 Staged 冲突锁死防御**、以及发布真源四件套核验标准与真实 Tarball 解包 SHA256 逐文件数字验签）。
 
 ### 八、系统提示词注入、会话事件流与状态投影 (Prompt & Projections)
 - **[system-prompt-and-projections.md](./system-prompt-and-projections.md)**：
@@ -91,11 +93,11 @@
 - **[debugging-and-troubleshooting.md](./debugging-and-troubleshooting.md)**：
   本地开发调试三大极速回路（`--patch` 覆盖、本地路径添加、临时沙盒）、双面插件前端排查技巧（`__DSH_BOOT__`、`__ModuleLoader__`、Combo 404）、Top 9 高频故障排查速查表（PENDING 挂起、配置冲掉、组件传 ctx 报错、安装解析到旧版本等）、安装失败排障六步路径、**免启动反证法（直接调宿主公开函数问真值，附 Windows `pathToFileURL` 坑与可跑对照探针、`npm pack --dry-run` 打包清单核对）**、插件管理器目录结构与黑匣子日志分析。
 - **[install-resolution-traps.md](./install-resolution-traps.md)**：
-  插件安装版本解析三大陷阱的权威排查手册——pnpm 自身的发布冷却期配置（v11 起默认 `minimumReleaseAge: 1440`，属包管理器行为，非 DSH 代码实现；DSH 侧兼容闸门是 peer 预检 + allow-version 豁免）、semver 预发布排序（`-tag.N` 后缀被范围解析默认排除，`maxSatisfying(vers,'*')` 返回旧正式版）、DSH 兼容性闸门两段式预检与后检语义与精确版本豁免机制、profile 目录结构与 `minimumReleaseAge: 0` 配置落点、desktop profile 的 Electron 独占守卫。附可复现的参数实验、时间指纹判定法与排障决策表；并覆盖**全新 profile 首次安装的三大坑**：`dsh plugin add` 不写 `dsh.profile.bundles` 需手动补、原生依赖的 `ERR_PNPM_IGNORED_BUILDS` 需在 `pnpm-workspace.yaml` 里加 `allowBuilds` 放行、以及从零到可跑的五步落地顺序。
+  插件安装版本解析三大陷阱的权威排查手册——pnpm 自身的发布冷却期配置（v11 起默认 `minimumReleaseAge: 1440`，属包管理器行为，非 DSH 代码实现；DSH 侧兼容闸门是 peer 预检 + allow-version 豁免）、semver 预发布排序（`-tag.N` 后缀被范围解析默认排除，`maxSatisfying(vers,'*')` 返回旧正式版）、DSH 兼容性闸门两段式预检与后检语义与精确版本豁免机制、profile 目录结构与 `minimumReleaseAge: 0` 配置落点、desktop profile 的 Electron 独占守卫。附可复现的参数实验、时间指纹判定法与排障决策表；并覆盖**全新 profile 首次安装的三大坑**：`dsh plugin add` 不写 `dsh.profile.bundles` 需手动补、原生依赖的 `ERR_PNPM_IGNORED_BUILDS` 需在 `pnpm-workspace.yaml` 里加 `allowBuilds` 放行、从零到可跑的五步落地顺序；以及 **pnpm 符号链接热更新与常驻进程模块解析缓存撕裂（ESM ModuleLoader Cache Trap）**（热更新后 Node 常驻进程缓存模块 realpath 导致扫描旧路径抛 `ENOENT: scandir ... locale`，标准处置动作为重启常驻进程）。
 
 ### 九之二、静默失效防线与可失败门禁 (Silent Failures & Verifiable Gates)
 - **[silent-failure-and-gate-design.md](./silent-failure-and-gate-design.md)**：
-  把「代码写全了、门禁全绿、运行时毫无作用」这类零报错缺陷归纳成三类根因（代码从未被执行、契约被吞掉、解析到了别的东西），每类配可执行的判定动作；并给出**门禁设计方法论**——先按「错了会不会报错」分类，再决定写运行时回读、源码形态正则还是产物断言，**每条新断言必须做破坏实测证明它会红**；另含真机浏览器验收的环境坑速查（遮罩吞点击、导航等待超时、写入期间控件禁用）、收敛判定的「两帧相同加目标谓词」纪律、发布前后的双重复验与 manifest 自动规范化坑。
+  把「代码写全了、门禁全绿、运行时毫无作用」这类零报错缺陷归纳成三类根因（代码从未被执行、契约被吞掉、解析到了别的东西），每类配可执行的判定动作；并给出**门禁设计方法论**——先按「错了会不会报错」分类，再决定写运行时回读、源码形态正则还是产物断言，**每条新断言必须做破坏实测证明它会红**；另含真机浏览器验收的环境坑速查（遮罩吞点击、导航等待超时、写入期间控件禁用）、收敛判定的「两帧相同加目标谓词」纪律、发布前后的双重复验与 manifest 自动规范化坑；**异步表单漏渲染失败状态的静默吞错（Silent Failure）**与 Fail-Loud 契约防御；**客户端版本号常量脱节漂移**的门禁对齐断言。
 
 ### 九之三、跨运行时差异与迁移 (Desktop vs CLI Runtime)
 - **[desktop-vs-cli-runtime.md](./desktop-vs-cli-runtime.md)**：

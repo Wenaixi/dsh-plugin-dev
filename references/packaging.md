@@ -198,6 +198,11 @@ pnpm link --global dsh-plugin-foo
 2. **peerDependencies 严格解耦**：只把 `@deepseek-ai/cordis` 与 `@deepseek-ai/dsh-*` 系列声明为 peerDependencies；`react` 一律放 devDependencies——官方包全部如此（57 个含 react 的包 peer 计数为 0），浏览器运行时 react 由 Web 壳引导时注入的平台种子表（staticModules）提供，插件侧只需在自己的 devDependencies 声明 react。
 3. **发布前校验**：`files` 显式包含编译后的 `lib/` 与 `cordis.patch.yml`，避免遗漏关键补丁。
 4. **client 半侧挂载规则**：浏览器半侧**只挂在说明符恰为裸包名的那一行上**；子路径导出挂载的行永远不带半侧。拆成多行的组合包，其半侧留在根行，注册的每个页面随根行关闭而消失；需在其他行关闭时仍保留页面的子插件应作为**独立包**发布。`./client` 必须是客户端模块系统的 lazy-CJS factory 格式；生成它的 tsdown client 预设属于官方仓库内部构建产物，npm 包内不带源码；仓库之外需自行复刻同构配置。
+5. **产物注册的 id 必须等于包名**：客户端产物那句 `window.__ModuleLoader__.load({ id, factory })` 的 `id` 要与 `exports["./client"]`
+   所属的裸包名逐字一致。不一致时组合批次跑完但没注册成功，启动遮罩报
+   `loaded without registering "<id>"` / `already executed without registering "<id>"`，整条 client bundle 不激活。
+   门禁：构建后从产物 grep 出 `load({ id:` 的字面量，与 `package.json` 的 `name` 断言相等。完整取证见
+   [client-bundle-loading-and-artifact-trace.md](./client-bundle-loading-and-artifact-trace.md)。
 
 ## 安装与依赖陷阱避坑指南 (npm & pnpm Pitfalls)
 
@@ -220,6 +225,21 @@ pnpm link --global dsh-plugin-foo
   2. **避免盲目全局 pnpm link**：优先采用基于 `pnpm-workspace.yaml` 的 Monorepo 相对路径安装或 `pnpm add ./packages/<pkg>`，利用 pnpm 的硬链接与虚拟 store 机制节省内存。
   3. **定向过滤构建 (Filtered Build)**：使用 `pnpm --filter <pkg> run build` 精准针对目标包构建，严禁在根目录无脑并发打包整个 monorepo。
   4. **pnpm 11 构建脚本授权**：依赖构建脚本被 pnpm 默认忽略时报 `ERR_PNPM_IGNORED_BUILDS`（这是构建授权问题，**不是 OOM 对策**），需在 Profile 的 `pnpm-workspace.yaml` 显式配置 `allowBuilds: { "<package-name>": true }`；键必须是精确包名、拒绝通配符。
+
+## scoped 化改名清单（`name` 改 `@scope/pkg` 时六处必须同步）
+
+把插件包名从裸名改成 scoped（或反过来）时，包名会出现在六个独立位置，**任何一处漏改都是静默失效**，且症状各不相同：
+
+| # | 位置 | 漏改的症状 |
+| --- | --- | --- |
+| 1 | `cordis.patch.yml` 的 `name:` | 整文件 YAML 解析失败（裸 `@` 开头），`dsh plugin add` 回滚、`pnpm add` 报错（见 config.md 1.5） |
+| 2 | 客户端构建脚本的注册 id（tsdown `ID` / 产物 `id:`） | 浏览器报 `loaded without registering`，整条 client bundle 不激活（见 client-bundle-loading-and-artifact-trace.md） |
+| 3 | `plugins.bundle.config` 插槽注册的 `key` | 插件页配置区**连容器都不渲染**且零报错（配置区渲染门按包名匹配） |
+| 4 | profile 的 `dsh.profile.bundles` | 启动时 `cannot resolve profile bundle`，插件整条跳过 |
+| 5 | `exports` / `files` / peer 声明里的旧名 | 组合 URL 404 或安装链解析到旧包 |
+| 6 | README 徽章/安装命令/`plugin add` 文档 | 用户照文档装到不存在的包名（镜像里旧包还在，误导更强） |
+
+改名后逐项核对：`npm pack --dry-run` 看 tarball 里的 `package.json` 与 `cordis.patch.yml`，再在隔离 profile 里走一遍「add → 启动 → 浏览器看注册 id」三查。六处全部一致才算 scoped 化完成。
 
 ## 常见误解
 

@@ -136,7 +136,28 @@ configured ? renderSlot("plugins.bundle.config", { view: "page" }, { entryKey: p
 - **注册的 key 必须与包名逐字一致**，否则 configured 为 false，整块区域连容器都不渲染。
 - 该区域**只在插件页卡片详情内**出现，且用户须先点开对应卡片。用户报「没有面板」时，先确认他点的是哪个列表的哪张卡片。
 
-### 3. 用户说「UI 不显示」时的三分法
+### 3. 组件列表里行 id 与模块名相同时会重复一行（宿主行为，不是插件 bug）
+
+插件详情页的「包含的组件」区块把每行画成：标题 → 描述 → 行 id → 模块名，
+后两项各自带一条「与标题不相等才渲染」的判断，而标题取自本地化 `meta.title`：
+
+```js
+title === row.rowId     ? null : <code>{row.rowId}</code>
+title === row.moduleName ? null : <code>{row.moduleName}</code>
+```
+
+去重只在标题等于其中一个时生效。标题是本地化文案，与包名天然不等，两条判断同时成立，
+于是 `id` 与 `name` 相同的行必然把包名画两遍；两者不同的行只出现一次。
+
+遇到时先分清责任方：这是宿主渲染缺口，不是插件缺陷。对照判据是找同一台机器上另一个插件——
+`id` 与 `name` 相同的重复、`id` 与 `name` 不同的正常，即可确认。
+
+想让重复消失只能改行 id 或把 `meta.title` 写成包名，两者都有代价：
+**行 id 同时就是 Settings 命名空间**，改了等于让已装用户的 profile 配置全部失效（详见
+[plugin-config-card-architecture.md](./plugin-config-card-architecture.md)），只能作为大版本迁移；
+把标题写成包名则丢掉本地化标题。默认选择是保持现状，等宿主修。
+
+### 4. 用户说「UI 不显示」时的三分法
 
 按顺序排除，每步都要证据：
 

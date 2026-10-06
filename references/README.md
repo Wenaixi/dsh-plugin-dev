@@ -9,7 +9,7 @@
 **交付前的最后一道门**：功能写完不等于可用，必须在隔离新实例上完成四态安装与浏览器逐项验证。流程见 [isolated-instance-acceptance.md](./isolated-instance-acceptance.md)。
 
 - [source-verification-and-caches.md](./source-verification-and-caches.md)：源码至上的三层来源（本机安装先 pnpm 后 npm、命中即停且未混淆不必解包 / 桌面版解包 / 上游仓库）、`lib/types/*.d.ts` 优先于读实现的阅读入口、pnpm isolated 目录名转义、跨平台定位、缓存目录约定与冲突裁决顺序。
-- [isolated-instance-acceptance.md](./isolated-instance-acceptance.md)：隔离新实例的创建与配置复用、四种安装形态、浏览器逐项验证、模型选择与 debug 循环。
+- [isolated-instance-acceptance.md](./isolated-instance-acceptance.md)：隔离新实例的创建与配置复用、四种安装形态、浏览器逐项验证、模型选择与 debug 循环；本地源码联调必须手工建指向仓库根的目录联接，不跑 `pnpm install`。
 - [dependency-injection.md](./dependency-injection.md)：显式依赖、服务契约和缺失依赖。
 - [lifecycle.md](./lifecycle.md)：可逆副作用、异步取消和卸载竞态。
 - [discovery-cache-invalidation.md](./discovery-cache-invalidation.md)：动态发现、缓存分层和失效传播。
@@ -44,7 +44,7 @@
 
 ### 三、配置系统与补丁机制 (Configuration & Patches)
 - **[config.md](./config.md)**：
-  Schemastery 强类型配置规范、代码级四层补丁生效落点（bundles -> profile -> global -> `--patch` overlays）、全量替换（Wholesale Replacement）语义、`- insert:` 分组插入机制、`!!js` 动态表达式求值沙盒、`--dump-config` 假阳性避坑与三步真实启动验证。
+  Schemastery 强类型配置规范、代码级四层补丁生效落点（bundles -> profile -> global -> `--patch` overlays）、全量替换（Wholesale Replacement）语义、`- insert:` 分组插入机制、`!!js` 动态表达式求值沙盒、`--dump-config` 假阳性避坑与三步真实启动验证；**写入前的反向覆盖闸门**（落盘前深比较「组合结果 vs 提交值」，不等即拒写并抛 `is overridden by ...`，因此 bundle patch 必须写全字段且与 schema 默认值逐字段一致）；设置表单三种写入语义与乐观版本控制。
 
 ### 四、事件总线与工具流水线 (Events & Tool Execution)
 - **[events.md](./events.md)**：
@@ -56,14 +56,18 @@
 - **[settings-and-plugin-ui.md](./settings-and-plugin-ui.md)**：
   全局设置窗口 (Settings) 与插件管理中心 UI 深度指南——`settings.section` 与 `plugins.bundle.config` 插槽机制、源码样本与真实注入代码、导航图标 (Nav Glyph) 替换技法、React 设置面板的本地 vs 补丁持久化、左侧“插件”管理中心卡片呈现、**`readPluginMeta` 的 exports 白名单契约（卡片空白根因与修法）**、图标 256 KiB 上限与路径约束、**改完必跑的两道验证（`npm pack --dry-run` + 直接调 `readPluginMeta`）**与开发决策树。
 - **[web-ui-slots-and-styling.md](./web-ui-slots-and-styling.md)**：
-  Web GUI 插槽树实战——右侧边栏（`sidebar.right.pane.tab`）、会话顶部工具栏（`conversation.session.header.utilities`）、输入框挂件（`conversation.input.right`）、消息流拦截（`conversation.chat.node`）、全局外壳（`shell.*`）；官方主题 CSS 变量（以当前主题包导出为准，含常见误写对照）；样式安全注入与 HMR 回收铁律；**官方 primitives 组件族优先策略**（SegmentedControl / Switch / StateDot / Tag / Button）与「客户端产物单一来源」纪律；多语言国际化（`ctx.locale` 双语注册、声明 `locale:` 注入 t 席位、缺词静默返回 key）；语言边界契约（静态文案进词典、内容数据保持单语）。
+  Web GUI 插槽树实战——右侧边栏（`sidebar.right.pane.tab`）、会话顶部工具栏（`conversation.session.header.utilities`）、输入框挂件（`conversation.input.right`）、消息流拦截（`conversation.chat.node`）、全局外壳（`shell.*`）；官方主题 CSS 变量（以当前主题包导出为准，含常见误写对照）；样式安全注入与 HMR 回收铁律；**官方 primitives 组件族优先策略**（SegmentedControl / Switch / StateDot / Tag / Button）与「客户端产物单一来源」纪律；**「焦点归谁」判据与 Menu 的适用边界**（Menu 的方向键会把焦点搬进列表，输入框上方浮层必须自绘并让 composition 期间的按键归 IME）；多语言国际化（`ctx.locale` 双语注册、声明 `locale:` 注入 t 席位、缺词静默返回 key）；语言边界契约（静态文案进词典、内容数据保持单语）。
 
 - **[plugin-config-card-architecture.md](./plugin-config-card-architecture.md)**：
-  插件自带配置界面的**三层架构**——插槽位置（`plugins.bundle.config` / `settings.plugin.item`）、宿主 Settings 命名空间注册、客户端 ConfigForms 生命周期；**最关键的硬判据：ConfigForms 写入只接受 volatile 字段，持久化配置写不进去**；静态注入与动态 `ctx.inject` 的语义差别；只搬 `whileServed` 外壳而不搬 `forms.get(ns)` 与数据面会把卡片降级成空壳；数据性质分类（持久化 / 进程内 / 运行时推导 / 动作）与对应实现路径。
+  插件自带配置界面的**三层架构**——插槽位置（`plugins.bundle.config` / `settings.plugin.item`）、Settings 命名空间（**等于 Loader 行 id，插件不能手动注册；改 id 等于要求用户重新配置**）、客户端 ConfigForms 生命周期；自带页面必须在 `ctx.inject(['settings'], ...)` 里 `configure({ auto: false }, ctx.fiber)`，否则宿主再自动生成一份、入口出现两份；**最关键的硬判据：ConfigForms 写入只接受 volatile 字段，持久化配置写不进去**；静态注入与动态 `ctx.inject` 的语义差别；只搬 `whileServed` 外壳而不搬 `forms.get(ns)` 与数据面会把卡片降级成空壳；数据性质分类（持久化 / 进程内 / 运行时推导 / 动作）与对应实现路径。
 - **[plugin-config-ui-decision.md](./plugin-config-ui-decision.md)**：
   配置界面的**选型与否决**——「DSH 有 Settings 就该交给它」是误解；重启后是否需要保留这一条判定直接决定走自有存储还是 Settings；三种实现形态（自有端点 / Settings 持久化字段写入抛错 / Settings volatile 重启丢失）的对照表；**迁移前五条否决条件**（视觉不变、卡片以运行时推导值为主、已有稳定落盘路径、现有实现已通过门禁、需要改成 volatile 才能跑通）；最小可行迁移路径与六条验收清单。
 - **[client-ui-placement-and-verification.md](./client-ui-placement-and-verification.md)**：
   客户端 UI **落点选择与真机取证**——「界面语义 → 插槽」完整映射表（设置窗口各级 Tab / 插件页分组条目 / 卡片内联配置区 / 右侧栏 Tab / 侧边栏底部 / 全局浮层）；**铁律「一个功能一个入口」**（多落点冗余 = UI 污染，实测需回滚）；插槽三个必知机制（spec 由父条目 `children` 表声明、四种 kind 与注册参数对应关系、**`slots.inject` 在 spec 不存在时静默不执行且零报错**）；`plugins.bundle.config` 的 **`configured` 渲染门（匹配键是包名）**；「UI 不显示」三分法（模块没进图 / apply 没跑 / 落点或渲染门不匹配）；客户端产物 **`immutable` 长缓存与「版本号先于界面更新」的假象**（桌面端必须完全重启）；**无浏览器验证法（Node 直跑 CJS factory 探针）**；CDP / browser-harness 真机取证的环境坑；**解析 Electron `app.asar` 做桌面版与 CLI 版差异比对**。
+- **[official-settings-form-pattern.md](./official-settings-form-pattern.md)**：
+  官方设置页 UI 体系——**`SettingsForm` 外壳（unavailable/readOnly/saveFailed/save/saving 五文案、dirty/invalid 自动禁用 Save、卸载自动 discard）**；**官方 `SettingsFormModel` 只服务文本/数字字段**，bool 与带说明的枚举必须自写 card controller（形态抄官方 settings-subagent）；`ConfigForm` 与 `SettingsFormScope` 是同形契约（configForms.get 直接当 scope）；**五条保存铁律**（冲突置 invalid、回读逐字段比对、saveGeneration 抑制迟到回执、草稿过期的相等/冲突二分、无差异保存为 no-op）与六条验收判据。
+- **[client-bundle-loading-and-artifact-trace.md](./client-bundle-loading-and-artifact-trace.md)**：
+  客户端加载与产物取证——**`__ModuleLoader__.load` 的注册 id 必须等于包名**（scoped 改名后构建 id 没同步 = `loaded without registering`，整条 bundle 不激活）；组合 URL `/plugins/??<pkg>/client.js&rev=<hash>` 形态与 rev 的非内容哈希语义（mtime/ctime/size）；**「改了代码不生效」的实例取证三步**（resolve 真实路径 → 逐字节比对 client.js → junction 目标）；重启宿主才能越过 immutable 长缓存的硬规矩。
 
 ### 六、跨端通信与三角色物理隔离 (IPC & Remote)
 - **[remote-rpc-guide.md](./remote-rpc-guide.md)**：
@@ -156,11 +160,16 @@
 
 ### 二十、源码核验与交付验收 (Source Verification & Acceptance)
 
+- **[client-bundle-loading-and-artifact-trace.md](./client-bundle-loading-and-artifact-trace.md)**：
+  客户端加载与产物取证——**注册 id 必须等于包名**（scoped 改名后构建 id 没同步 = `loaded without registering`，整条 bundle 不激活）；组合 URL `/plugins/??<pkg>/client.js&rev=<hash>` 形态与 rev 的非内容哈希语义（mtime/ctime/size）；**「改了代码不生效」的实例取证三步**（resolve 真实路径 → 逐字节比对 client.js → junction 目标）；重启宿主才能越过 immutable 长缓存。
+- **[api-truth-read-back-without-browser.md](./api-truth-read-back-without-browser.md)**：
+  不带浏览器的 API 真值回读——认证三件套（launch token → `dsh-auth-*` cookie → 带 cookie 请求 `/api/*`）；Typert RPC 报文四段形态（`type/rpcId/method/payload.args`）与三个高频报错对照；`settings/describe` 命名空间真值字段（value/base/user/revision）；**`expectedRevision` 的 null 边界**（省略=无条件，传 null 被 wire 校验拒绝）。
+
 - **[source-verification-and-caches.md](./source-verification-and-caches.md)**：
   源码至上的强制流程——三层来源与固定顺序（本机已安装源码先查 pnpm 再查 npm且命中即停，同机两份实现版本不同不得混读；两者都没有才把桌面版 asar 按需解包到工作目录里被 git 忽略的缓存目录；本机完全没有才浅克隆云端上游仓库）、跨平台定位方法（Windows/macOS/Linux 的用户数据根、npm 全局根、asar 与自带 CLI 位置差异，一律先探测再使用，不静默回退到猜测路径）、冲突裁决顺序（运行时行为 > 已安装源码 > 包内 README > 文档站散文 > 本技能库正文）、以及“仓库相对路径与版本号由各包 manifest 的 directory 与 version 字段生成、不靠推测”这一取数纪律。
 
 - **[isolated-instance-acceptance.md](./isolated-instance-acceptance.md)**：
-  交付验收流程——只装基础插件与目标插件的隔离新实例创建、复用其他实例配置的安全追加法（凭据全局共享但引用必须存在）、冷装/热装/热更新/卸载四种形态各自的验收点与读源码判据（应用状态三态、没有 HMR 服务时一律要求重启、客户端产物长缓存需完全重启）、模型必须问用户选定并建议选便宜的、真实浏览器逐项点击与回读真值清单、浏览器环境坑、debug-修复-验证循环。
+  交付验收流程——只装基础插件与目标插件的隔离新实例创建、复用其他实例配置的安全追加法（凭据全局共享但引用必须存在）、**本地源码联调手工建 junction 且必须指向仓库根（跑 pnpm install 会让宿主解析失败、整棵树一起 import 失败）**、冷装/热装/热更新/卸载四种形态各自的验收点与读源码判据（应用状态三态、没有 HMR 服务时一律要求重启、客户端产物长缓存需完全重启）、模型必须问用户选定并建议选便宜的、真实浏览器逐项点击与回读真值清单、浏览器环境坑、debug-修复-验证循环。
 
 - **[plugin-config-card-architecture.md](./plugin-config-card-architecture.md)**：
   插件自带配置界面的三层架构——插槽位置、Settings 命名空间与客户端生命周期观察者的职责切分，以及任一层缺失导致的界面静默消失。

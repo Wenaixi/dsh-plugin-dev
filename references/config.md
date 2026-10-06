@@ -63,6 +63,14 @@
 - 顶层 `- insert:` 插入根插件列表；
 - 若 `- insert:` 提供针对已有条目的插入，目标条目必须是 `group: true` 容器，新增条目会被推入该 group 的配置数组中。
 
+### 1.5 scoped 包名的 patch 行必须带引号
+
+`name` 指向包名，裸写时若包名以 `@` 开头（scoped 包）会**整个 YAML 解析失败**：`name: @scope/pkg` 报 `Plain value cannot start with reserved character @`，`dsh plugin add` 阶段就报 `dsh: restored package.json, pnpm-lock.yaml, and node_modules` 并回滚，`pnpm add` 则报 patch 解析错误直接退出。
+
+- **必须写成 `name: "@scope/pkg"`**（双引号包住整个 scoped 名）；官方 `@deepseek-ai/*` 包的 patch 全部如此。
+- 常见误区：以为「@ 开头会被当成 YAML 指令或 comment」——实际是 reserved character 报错，比指令更硬，整个文件不可解析。
+- 判定动作：改完用 `yaml` 库解析一次（`yaml.parse('name: @scope/pkg')` 必然抛错、带引号则通过）；或用 `pnpm pack` 出 tarball 后解包核对 patch 内容。
+
 ### 2. 修改已有插件配置：`- id:`
 直接通过 `id` 索引已有条目并提供全量替换的 `config`：
 ```yaml
@@ -192,8 +200,29 @@ profile 实际挂载哪些 bundle 以 `profiles/<name>/package.json` 的 `dsh.pr
 4. **HMR 自动触发**：写入完成后文件监听器检测到补丁变动，执行增量重载而无需重启应用。
 5. **即时字段 (Volatile)**：`Volatile<T>` + `Schema.xxx().volatile()` 声明即时字段，运行时用 `.get()` 读取——不进表单 schema。跨字段校验由 `resolveConfig` 在 volatile 提交路径完成（`cordis-plugin-loader` 的 `_commitVolatile`：校验失败记 `logger.warn` 并保留运行中的旧值，raw 配置留待下次激活）；校验通过后变更经 `loader/volatile-update` 事件推送给所属 fiber；`role('secret')` 阻止值进入表单响应，凭据域值用凭据引用。
 
----
+### 7.5 反向覆盖闸门：写入前会验证「组合结果 == 提交值」
 
+落盘前有一道深比较，任何不等都会被拒绝并原样抛出，不写文件：
+
+```js
+const combined = flatten(composeEntries([patches])).find((row) => row.id === entry.options.id)?.config ?? {}
+if (!isDeepStrictEqual(combined, next))
+  throw new Error(`Configuration for "${entry.options.id}" is overridden by a home patch or command-line overlay`)
+```
+
+`combined` 是**组合所有层之后**该条目的最终 `config`，`next` 是客户端提交的完整新值。由此推出两条硬约束：
+
+- **组合包里 `insert` 的那条目必须写全所有用户可改字段**，且逐字段等于 schema 默认值。只写部分字段时，组合结果缺少其余字段，客户端提交补齐后的值必然与之不等——**用户第一次改动就失败**，且失败是异步 reject，表面上看不出原因。
+- 提交的值与「组合结果」必须逐字段相等，所以默认值不能只在 schema 里声明，补丁里也要写同一份。schema 与 patch 两处默认值漂移，等价于给整个插件配置功能埋一颗哑弹。
+
+判别方法：报错消息里出现 `is overridden by ...` 就属于这一类，不是并发冲突。修法是补齐 bundle patch 的 `config`，而不是让用户重试。
+
+### 7.6 删除配置字段 = patch 与 schema 双向同步
+
+反向同样成立：从 schema 里**删除**一个字段时，必须同步从 bundle patch 的 `config` 里删掉同一键。patch 里残留一个 schema 已不认识的键，组合结果与用户提交值永远不等，**该命名空间所有设置写入被拒**（`settings/rejected`），用户会以为整个配置功能坏了。
+
+- 删除字段的完整清单：`src` schema 定义、`cordis.patch.yml` 的 config 行、已装 profile 的 patch 行、README 配置表、locale 文案、纯函数模型（默认值/字段列表/规范化/迁移计划）与对应测试。
+- 这是「能力删除承诺面」（cross-cutting 专题）在配置域的具体实例：入口、文档、配置、导出一处不同步，就是一颗随时爆炸的哑弹。
 ## 八、多来源优先级与可诊断化 (Precedence & Diagnostics)
 
 第二节描述的是**补丁层之间**的覆盖。但同一个插件的同一项配置，往往同时来自四个彼此独立的通道：

@@ -9,7 +9,7 @@
 | 层 | 回答的问题 | 谁提供 |
 |---|---|---|
 | 插槽 slot | 组件画在哪个界面位置 | 客户端 slot 系统 |
-| Settings 命名空间 | 卡片读写哪份配置数据 | 宿主 `settings.register` |
+| Settings 命名空间 | 卡片读写哪份配置数据 | Loader 行 id（宿主推导） |
 | 生命周期观察 | 卡片何时存在、何时卸载 | 客户端 ConfigForms 服务 |
 
 常见误解：以为「注册了插槽就等于有了配置界面」。实际前两者与第三者缺一不可，且第三者的触发条件不是「插件存在」。
@@ -39,24 +39,34 @@ const cardFace = () => ({
 3. `inject: cardFace` 是数据面，组件从 props 消费，不直接触碰 ctx。
 4. 一个功能一个入口。多落点冗余等于 UI 污染，既有门禁通常直接判定失败。
 
-## 二、数据层：Settings 命名空间注册
+## 二、数据层：Settings 命名空间从哪里来
 
-宿主侧必须在插件配置 schema 上注册命名空间：
+**命名空间不是插件注册的，而是 Loader 条目 id。** Settings 服务从运行中的 Loader 条目推导命名空间
+（`entry.options.id`），因此：
+
+- 插件**不需要**、也无法手动 `register` 一个命名空间；想改命名空间只能改补丁里那条目的 `id`。
+- 插件导出名（`main` 指向的模块说明符）、包名、命名空间是三个独立字符串。声明了 `name` 不会自动产生命名空间。
+- 命名空间字符串是宿主表单、浏览器 `ConfigForms` 与插件自身常量三方的连接键，插件侧应当抽成一个常量并在三处复用，不要各写一份字面量。
+- **行 id 是破坏性变更**：已安装用户的 profile 补丁里写好的 `- id: <旧 id>` 会变成无主条目，用户配置随之失效。要改 id 等于要求用户重新配置，只能作为大版本迁移发布。
+
+Settings 服务只提供**页面呈现策略**，不提供命名空间注册：
 
 ```ts
+// 服务是可选的：未装配 settings 时静默降级，不阻断插件其余能力。
 ctx.inject(['settings'], (sctx) => {
-  const service = sctx.settings
-  if (typeof service?.register !== 'function') return
-  service.register('<ns>', ConfigSchema)
+  if (typeof sctx.settings?.configure !== 'function') return
+  // 自带配置页面的插件必须显式关掉自动生成，否则宿主按 schema 再生成一份，入口出现两份。
+  ctx.effect(() => sctx.settings.configure({ auto: false }, ctx.fiber))
 })
 ```
 
 契约要点：
 
-- 用 `ctx.inject` 动态探测，不要写进插件的静态 `inject` 数组。宿主未装配 settings 服务时应静默降级，不阻断插件其余能力。
-- 命名空间字符串是宿主、Settings 镜像与浏览器表单三方的连接键，一处写错则整条链断开。
-- `ConfigSchema` 通常与插件 `Config` 导出同一个对象，保证宿主读到的字段与声明一致。
-- 插件导出名与 Settings 命名空间是**两个独立命名空间**。插件名为 A 不代表命名空间为 A，声明了 `name` 也不会自动产生 Settings 命名空间。
+- 策略登记在**调用它的插件 fiber** 上；同一实例重复登记会抛 `already configured`，所以登记必须放在 `ctx.effect` 里且只做一次。
+- 用 `ctx.inject` 动态探测，不要写进插件的静态 `inject` 数组——静态注入会把「服务不存在就跳过」变成「服务不存在则整个插件不生效」。
+- 策略只影响宿主是否自动按 schema 生成页面，不改变 `Config` schema 本身。
+
+字段能否被表单写入由 schema 决定，与命名空间无关，见第四节。
 
 ## 三、生命周期层：ConfigForms 与 whileServed
 

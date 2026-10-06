@@ -46,25 +46,25 @@ export function apply(ctx) {
 
 DSH 社区里带界面的插件正是通过该机制在设置栏占位的。以下三个**真实注册样本**（包名仅作标识，机制通用）展示了 settings.section 的完整契约：
 
-### 样本 1：终端式输入设置页（第三方包，order 60）
-- **左侧导航项效果**：显示为带有终端命令行提示符的 `> 终端式输入`（英文环境显示为 `>_ Terminal Input`），`order: 60`；
+### 样本 1：终端输入类设置页（第三方包，order 60）
+- **左侧导航项效果**：显示为带有命令行提示符样式的 `> 终端输入`，`order: 60`；
 - **注册源码**：
   ```js
   ctx.slots.inject("settings.section", () =>
     ctx.slots.register(
       {
         name: "settings.section",
-        id: "dsh-prompt-history",
+        id: "<插件行 id>",
         order: 60,
         locale: NS,
-        label: () => T("settings.nav") // 动态返回 "终端式输入"
+        label: () => T("settings.nav") // 动态返回导航标题
       },
       SettingsSection
     )
   );
   ```
 - **图标注入技巧 (Glyph Injection)**：
-  官方 Shell 默认对第三方未知的 `id` 统一渲染兜底的“齿轮”图标。为了呈现原生的 `>` 终端提示符，它通过极简的 DOM 补丁挂载了一个专有类名样式，将该项左侧的齿轮图标替换为精致的终端字符。
+  官方 Shell 默认对第三方未知的 `id` 统一渲染兜底的“齿轮”图标。若想呈现自定义导航字形，通过极简的 DOM 补丁挂载专有类名样式，把该项左侧的齿轮图标替换为你的字形。
 
 ### 样本 2：侧边卡片设置页（第三方包，order 100）
 - **左侧导航项效果**：在设置左侧显示 `侧边卡片`，`order: 100`；

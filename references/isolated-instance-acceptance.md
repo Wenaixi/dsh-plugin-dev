@@ -62,6 +62,22 @@ dsh plugin --profile <实例名> add <本地插件目录>
 
 装完立刻检查 package.json 的 profile bundles 是否含该包——**dependencies 只管装进来，bundles 才决定是否作为补丁层参与组合**。只在前者里的插件完全不生效，且零报错。
 
+### 本地源码联调：手工建目录联接，不要跑 `pnpm install`
+
+隔离实例里装本地未发布的源码时，`dsh plugin add <目录>` 会走 pnpm，产出的 `node_modules` 布局对宿主不友好。
+宿主有自己的依赖解析器，pnpm 装出的状态文件可能让它在自己的解析阶段就失败，
+症状是**整棵插件树一起 import 失败**（日志里几十个插件同时报错），而不是只坏你这一个。
+
+可靠做法：
+
+1. 写好 `package.json`、`cordis.yml`、`cordis.patch.yml` 三个文件，`dependencies` 里把插件指向本地目录；
+2. **跳过 `pnpm install`**，手工创建一条指向仓库根的目录联接（Windows 用 junction，类 Unix 用符号链接），
+   目录名必须与包名一致（scoped 包形如 `node_modules/@scope/name`）；
+3. `node_modules` 里只放这一条，不要混装其它条目。
+
+联接必须**指向仓库根**。指向 pnpm store 里的实体副本时，宿主读到的是安装时的产物快照——源码改了也不生效，
+而且表现与「代码写错了」几乎一样，排查成本极高。改完源码若界面没变，第一件事就是回读这条联接的最终目标。
+
 ---
 
 ## 二、模型必须问用户，不能自己决定

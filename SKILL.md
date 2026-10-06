@@ -40,6 +40,8 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - **写入回读**：配置、UI、文件和发布操作都必须回读实际真值；点击、退出码或截图不能单独证明成功。
 - **断言可失败**：每条重要门禁都要通过人为破坏证明它真的会失败，优先验证行为和产物而不是源码文本。
 - **承诺同步**：删除或改名能力时，同步检查入口、文档、配置、导出、示例和发布物。
+- **废弃不是删除**：配置字段废弃时保留 schema 声明与 volatile 标注，只在写入侧不再触碰它。删声明让用户历史配置被静默丢弃；去 volatile 标注会让清掉它的 unset 也被宿主写入闸门拒绝。详见 [config-field-lifecycle.md](references/config-field-lifecycle.md)。
+- **分清静态与真机**：有一类门禁在原理上无法用静态断言覆盖——宿主运行时的语义闸门。写门禁前先对一遍 [host-semantic-gates.md](references/host-semantic-gates.md)，把真机项排进隔离实例验收，不要留在脚本里假装已覆盖。
 
 ## 场景路由
 
@@ -67,6 +69,18 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 | 找不到本机源码、桌面版解包、上游克隆 | [source-verification-and-caches.md](references/source-verification-and-caches.md) |
 | 插件写完了要验收、测安装卸载、跑浏览器验证 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) |
 | 插件自带配置界面、Settings 命名空间、ConfigForms 生命周期 | [plugin-config-card-architecture.md](references/plugin-config-card-architecture.md)、[plugin-config-ui-decision.md](references/plugin-config-ui-decision.md) |
+| **以下五类只在真机触发，静态断言原理上测不到** | [host-semantic-gates.md](references/host-semantic-gates.md)（先读这份清单再排期） |
+| 新增/废弃/迁移配置字段，升级后用户配置丢失，写入被拒 | [config-field-lifecycle.md](references/config-field-lifecycle.md) |
+| 迁移与回退兼容逻辑、归一化分支、幂等 | [config-field-migration-selfcheck.md](references/config-field-migration-selfcheck.md) |
+| 静态门禁全绿但真机零作用，不知道哪些必须真机测 | [host-semantic-gates.md](references/host-semantic-gates.md) |
+| 配置卡写入零生效、每点必报保存失败、整批被拒 | [host-semantic-gates.md](references/host-semantic-gates.md)、[config-field-lifecycle.md](references/config-field-lifecycle.md) |
+| 热重载后旧页面写操作静默失效、控件可点但不生效 | [host-semantic-gates.md](references/host-semantic-gates.md)、[official-settings-form-pattern.md](references/official-settings-form-pattern.md) |
+| 重复注入或卸载后仍有样式与监听残留 | [host-semantic-gates.md](references/host-semantic-gates.md)、[isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) |
+| 同层重名裁决顺序依赖、只做正向注册测不出 | [host-semantic-gates.md](references/host-semantic-gates.md)、[skill-provider.md](references/skill-provider.md) |
+| 缓存失效后宿主目录没刷新，或界面已变而注册表未变 | [host-semantic-gates.md](references/host-semantic-gates.md)、[provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) |
+| 改了客户端代码界面没变、版本号与界面不同步 | [host-semantic-gates.md](references/host-semantic-gates.md)、[client-ui-placement-and-verification.md](references/client-ui-placement-and-verification.md) |
+| 同一面板在多处重复出现、DOM 计数不是 1 | [host-semantic-gates.md](references/host-semantic-gates.md)、[client-ui-placement-and-verification.md](references/client-ui-placement-and-verification.md) |
+| 配置文档只读态下控件可点但写不进去 | [host-semantic-gates.md](references/host-semantic-gates.md)、[official-settings-form-pattern.md](references/official-settings-form-pattern.md) |
 | 热装/卸载后卡片未出现、刷新过早假死、Chokidar 2s 防抖期等待、Windows EPERM 锁 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) |
 | 裸 add 命令解析到远古旧版本、pnpm 冷却期版本回退陷阱 | [install-resolution-traps.md](references/install-resolution-traps.md) |
 | 包自带补丁 insert 格式规范、全新安装零配置自动渲染、界面写入自动持久化回写 | [plugin-config-card-architecture.md](references/plugin-config-card-architecture.md) |
@@ -79,6 +93,8 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - 生命周期：失效后得到新状态；卸载后无监听、写入、广播或旧异步结果；重复激活不叠加资源。
 - Browser：模块确实加载，插槽语义匹配，组件只消费 props，写操作后状态重新读取。
 - 交付：构建产物可加载，tarball 文件完整，临时干净环境能安装并启动，发布后通过权威四件套核验（Tag、Release、npm dist-tags，以及真实 tarball 解包 SHA256 逐文件数字对齐）。
+- 语义门禁：宿主写入闸门、注册表仲裁、缓存实时性、产物时序、生命周期残留、插槽注册、只读态逐条有真机判据。清单见 [host-semantic-gates.md](references/host-semantic-gates.md)，每条配一条破坏实验。
+- 配置演进：字段新增（是否需要保留、是否三态）、废弃（两个标注都不动）、迁移（写新字段与清旧字段同批）三件事各有判据；迁移逻辑自带语义转换表穷举与幂等自检。
 - 隔离实例：只装基础插件与目标插件，冷装、热装、热更新、卸载四态各过一遍；浏览器里每项控件点过并回读真值；测试模型由用户选定。
 
 ## Anti-Patterns
@@ -95,3 +111,8 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - 插件热重载后不刷新页面，直接在持有已废弃（disposed）旧表单实例的前端闭包中测试异步写入。
 - 误以为热安装必须由用户手动往 profile 补丁追加顶层条目，忽略了纯 `insert:` overlay 的自生挂载机制与宿主自动持久化回写闭环。
 - 在 CLI 安装或修改配置后，未等待宿主文件监听器防抖期（Chokidar `awaitWriteFinish` 2s）便立即判定热重载失效并误判必须重启宿主。
+- 废弃配置字段时删掉它的 schema 声明，或为「不再写入」去掉 volatile 标注。
+- 把「写新字段」与「清旧字段」拆成多次提交，或在迁移批里混入未通过 volatile 校验的路径——前者在并发下留下半迁移态，后者让整批零写入。
+- 迁移逻辑的测试样例与实现分支来自同一个直觉，于是测试只证明代码跑过，不证明读的是对的那张表。
+- 用接口的成功返回值当成功判据。返回 false 与返回 true 都不告诉你失败发生在哪一层；判据必须是可观察的状态转移。
+- 只写「不报错就不算错」的正向断言。漏掉一个测试场景这件事破坏实测抓不到，只能靠先写下来的语义转换表。

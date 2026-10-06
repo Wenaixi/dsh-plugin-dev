@@ -120,9 +120,30 @@ failed            失败，带可读错误
 
 注意一个结构性细节：安装类操作会在文件锁内串行化，并在有 HMR 服务时借它的排他区执行；**没有 HMR 服务的组合里，任何应用动作都不会发生**，一律走 restart-required。
 
-**客户端产物的缓存是另一个坑**：客户端 bundle 的响应头带长缓存且标记为不可变，且 rev 由产物时间戳与大小派生、不是内容哈希。所以浏览器刷新、重开面板、重开设置窗口都不够，**必须完全重启宿主进程**。桌面版更是要完全退出应用再启动。
+### 热安装验收的三大常见假死与深层机制
 
-判定动作：读页面里的实际 rev 值，或直接请求产物 URL 看内容是否变化。
+#### 1. Chokidar 写入防抖期（awaitWriteFinish 2秒延迟）
+宿主 `dsh-hmr` 监听 `package.json` 与 `cordis.patch.yml` 时配置了 `awaitWriteFinish: true`（通常阈值 2000ms）。
+- **常见误区**：在后台宿主运行中，CLI 安装命令刚返回就立即用脚本或手动刷新浏览器，此时宿主 HMR 仍在 2 秒等待期内未触发 `reconcileProfilePatches`，导致观测到「卡片未出现」，误判为热装失败或必须重启。
+- **验收规范**：CLI 命令退出后，**必须留出 2.5 至 3 秒静默等待时间**，等待宿主完成文件监听防抖并重新挂载 Include 树，然后再刷新浏览器页面。
+
+#### 2. Windows NTFS 跨进程文件锁冲突（EPERM: rename）
+在 Windows 平台上，如果宿主进程正在后台运行并对 profile 目录保持文件监听句柄，从外部终端并发或高频执行 `dsh plugin add` / `remove` 时，包管理器对 `package.json` 或 `pnpm-lock.yaml` 进行原子替换（rename）时极易抛出：
+```text
+EPERM: operation not permitted, rename '.../package.json.tmp' -> '.../package.json'
+```
+- **后果**：原子替换失败会导致安装事务回滚，`package.json` 未写入新插件，用户刷新页面自然找不到插件。
+- **应对策略**：高频测试时必须留出文件句柄释放间隔（至少 1 秒）；捕获 EPERM 时执行带轻微抖动的重试；若持续锁死，可先停宿主再执行包操作。
+
+#### 3. 原地更新（Update）的 HMR 短路限制
+在 `dsh-hmr` 机制中：
+```javascript
+const bundles = JSON.stringify(readProfileManifest(dir).dsh?.profile?.bundles ?? []);
+if (manifestOnly && bundles === lastBundles) return;
+```
+- **机制**：若仅在 `dependencies` 中修改了版本号，而 `dsh.profile.bundles` 数组未发生增减，HMR 判定为 bundles 未变而直接短路跳过重载。
+- **客户端 rev 冻结**：客户端 bundle 的响应头带长缓存且标记为不可变，宿主条目 `rev` 在进程启动时计算好后冻结，运行中单纯替换磁盘文件不会自动触发重算。
+- **通用原则**：原地更新已安装插件版本时，**必须重启宿主**，或者通过「先 `remove` 使 bundles 变化触发卸载 HMR、再 `add` 走全新安装 HMR」实现免重启加载。
 
 ---
 
@@ -159,6 +180,23 @@ failed            失败，带可读错误
 | 控制台中文乱码 | 断言全乱码 | 把输出流按 UTF-8 处理 |
 | 写入期间控件禁用 | 点击静默无效，值零写入 | 点之前轮询禁用属性直到解除 |
 | 收敛判断过早 | 以为写生效了，其实只是中间帧 | 要求连续两帧结果相同且满足目标谓词才判收敛 |
+| 长脚本静默失败 | 多步 Python/CDP 脚本整体无输出，短表达式正常 | 驱动脚本按「一步一调用」拆成多条极短片段；避免复杂表达式与长 sleep；单步超时单独定位 |
+| 标签失联 | 页面还在但 js() 无响应，list_tabs 显示多个旧宿主标签 | 检查 attached 标签 URL 是否还是活宿主；用 switch_tab 切回，不要继续在死标签上操作 |
+| 复杂 JS 表达式偶发空输出 | 同一表达式有时返回有时 Promise/空 | 每个断言用最小表达式独立调用；需要多步时写入临时 .py 文件逐行执行，不在一行里嵌大量反引号/正则 |
+
+### 验收的可靠性排序：API 真值回读 > 浏览器 DOM 断言 > 截图
+
+浏览器自动化工具（CDP/Playwright）本身可能不稳定（长脚本超时、复杂表达式静默失败、标签失联），
+而**插件核心行为（跟随、锁定、回退、配置落盘）几乎都能用 API 真值回读覆盖**——见
+[api-truth-read-back-without-browser.md](./api-truth-read-back-without-browser.md)。实测经验：
+
+1. **能走 API 回读的行为优先走 API**：settings/describe、settings/mutate、插件自己的 remote 端点。
+   「显式锁 A → 读 A；跟随源切 B → 不被推翻；unset → 恢复跟随」这类生命周期用 API 逐状态断言，
+   比在浏览器里点一遍快且稳。
+2. **浏览器只做 API 覆盖不了的断言**：面板渲染唯一性（DOM 计数 1）、控件实际渲染出三态、产物真的被加载
+   （window.__DSH_BOOT__ 的 entry + 请求产物 URL 验证新代码）。
+3. **产物层的验证可以完全绕开浏览器**：直接请求 /plugins/??<pkg>/client.js&rev=... 看是否含新代码特征
+   （如新增字典键），这比在 UI 里找更快、不受 DOM 时序影响。
 
 ---
 

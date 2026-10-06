@@ -144,6 +144,24 @@ registerProvider(create: (control: SkillProviderControl) => SkillProvider): () =
 - 正文是 Markdown，注入模型上下文时宿主会按 `resourceBase` 渲染资源引用，并对嵌入的模型可见文本做转义；
 - `whenToUse` 是可选的补充路由说明；`invocation` 控制模型/用户两侧的可见性，缺省两侧都开。
 
+### 消费方现取现读：模型侧与人类侧读的是同一个 provider 输出
+
+技能描述有两个消费方：模型目录（`skill` 工具目录 + `skill` 工具本身）与人类侧（斜杠菜单、配置面板）。
+**它们读的是同一个存活注册表 `ctx.skills` 的同一批 provider 输出**，而不是两份拷贝：
+
+- 模型侧：官方 `dsh-tool-skill` 在 agent/pre-step 里 `ctx.skills.snapshot({...}).filter(isModelInvocable)`
+  生成目录，`skill` 工具 execute 前再查一次 `modelInvocable`；
+- 人类侧斜杠菜单：官方 `dsh-client-ui-skill` 调宿主 `ctx.remote.skills.list()`（sessionSkillCatalog），
+  宿主侧 `skillRegistry.list({...}).filter(isUserInvocable)` 现取；
+- 配置面板（若插件自己提供 remote 快照）：与 provider 读同一份描述文件。
+
+推论（对 provider 实现者的硬要求）：**描述、语言、启用态的任何运行时变化，只要 provider 的
+`list()`/get()` 现读现算，两侧就自动同源，无需分别通知**。反之，provider 一旦缓存描述或语言，
+模型侧与人类侧会读到不同值，且两侧都没有报错。
+
+已知边界：人类侧菜单来源可能在客户端缓存到下一会话边界（`agent-preset/selected`/`connection/reset`
+才失效），这是官方消费方行为，provider 侧无法修复；模型目录与面板（现读）即时生效。
+
 ---
 
 ## 八、生命周期与失效的完整链路

@@ -20,7 +20,7 @@ with the target DSH release: peerDependencies {"@deepseek-ai/dsh-skill":"<old-pe
 dsh: restored package.json, pnpm-lock.yaml, and node_modules.
 ```
 
-**极易误读之处**：报错说「版本不兼容」，但**版本号不是人选的**。包管理器解析出 4.9.0-dsh.5 这个陈旧版本，才是真正的病灶；兼容性闸门只是把它拦下来了。
+**极易误读之处**：报错说「版本不兼容」，但**版本号不是人选的**。包管理器解析出一个陈旧的预发布版本（上例中的 <old-version>），才是真正的病灶；兼容性闸门只是把它拦下来了。
 
 排障第一步永远是**先确认解析到了哪个版本、为什么是它**，而不是去调 peerDependencies 范围或申请豁免。
 
@@ -235,7 +235,7 @@ allowBuilds:
   1. **文档与安装脚本中始终显式带版本号**：所有插件的 `README.md`、速查卡和部署脚本中，安装示例一律写成显式版本 `dsh plugin --profile <name> add @scope/pkg@<最新版本>`。显式指定精确版本时，pnpm 会将其自动写入 `pnpm-workspace.yaml` 的 `minimumReleaseAgeExclude` 豁免名单，直接放行安装。
   2. **自研测试 profile 全局关闭**：测试环境中直接在 `pnpm-workspace.yaml` 声明 `minimumReleaseAge: 0`（见 §5.1）。
 
-### 7.2.2 `dsh plugin add` 是否写 `dsh.profile.bundles`（取决于包是否声明 `dsh.bundle`）
+### 7.2.3 `dsh plugin add` 是否写 `dsh.profile.bundles`（取决于包是否声明 `dsh.bundle`）
 
 首次 `dsh plugin --profile <new> add <pkg>` 会自动脚手架出 profile 目录（`package.json` / `cordis.patch.yml` / `pnpm-workspace.yaml` / `.plugin-manager`）。分的两种情况（源码实证 `dsh-app-boot` `reconcileProfilePlugins` 与 `dsh-plugin-manager` `operations.reconcile`）：
 - 包**声明了** `dsh.bundle.patch`：`plugin add` 会**自动把它 push 进 `dsh.profile.bundles`**，启动即可用；
@@ -266,7 +266,7 @@ cat ~/.dsh/profiles/<name>/package.json   # 对比 dependencies 与 dsh.profile.
 }
 ```
 
-### 7.2.3 建议的全新 profile 落地顺序
+### 7.2.4 建议的全新 profile 落地顺序
 
 ```bash
 # 1. 脚手架 + 装本地插件（link: 直连工作区，源码改动即时生效）
@@ -285,7 +285,7 @@ dsh <name> --port <port> --no-open
 
 第 3 步必须锁版本：不带版本号会解析到 `0.0.1-rc.1` 这类被 semver 预发布排序排除的老版本，随后撞上第四节描述的兼容性闸门。
 
-### 7.2.4 pnpm add @scope/pkg 装不进的两个坑
+### 7.2.5 pnpm add @scope/pkg 装不进的两个坑
 
 场景：把已发布的 scoped 插件包装进 profile（pnpm add 或 dsh plugin add）。
 

@@ -90,6 +90,34 @@ class ConfigForms extends Service {
 2. namespace 由别的插件拥有时也能工作（设计意图就是让「编辑他人命名空间的页面」按需出现）。
 3. 宿主从未提供该 namespace 时，注册回调永不执行，界面完全不出现，且没有任何报错。
 
+### 核心机制：Bundle Overlay 补丁格式与配置卡全自动生命周期闭环
+
+配置卡能否「免手动配置即可出现」以及「点击后能否成功落盘」，由以下四个关键环节构成闭环：
+
+#### 1. 插件包自带补丁必须严格使用纯 `- insert:` 格式
+在插件包的 `cordis.patch.yml` 中声明条目时，**必须**使用纯 insert 格式：
+```yaml
+- insert:
+    - id: my-plugin
+      name: "@scope/my-plugin"
+```
+- **根因**：在用户未配置的干净 profile 中，Base 树里并没有该插件的条目。非 insert 的纯顶层条目（`- id: my-plugin`）在宿主 `applyEntryPatches` 中被当成按 id 覆写的 override 规则；因为找不到目标条目，会被直接警告 `patch: entry "my-plugin" not found` 并丢弃，条目根本无法进入 Loader 树。
+- 唯有无 id 的 `- insert:` 规则会向 Include 根条目数组执行追加（`data.push(...insert)`），将条目成功加入树中。
+
+#### 2. 全新安装未配置状态下，卡片会自动渲染
+- 只要 overlay 中的 `insert:` 条目成功进入 Loader 树并且 fiber 激活（`fiber.state === 2`），宿主 `dsh-settings.describe()` 就会遍历 include 条目，提取其 Config schema 中的 volatileForm 并将其命名空间加入 served 集合。
+- 客户端配置卡通常挂载在 `plugins.bundle.config` 插槽并由 `ctx.configForms.whileServed([ns])` 保护。**即使 profile 的 `cordis.patch.yml` 为完全空白的 `[]`，卡片也会正常渲染并呈现「(未设置)」态**。
+- **排错准则**：严禁要求普通用户在安装后手动往 profile 补丁里追加顶层条目，这是对宿主挂载机制误解所产生的反模式。
+
+#### 3. 界面点击修改配置，宿主自动回写 profile 补丁持久化
+- 用户在配置卡片界面上点击控件修改配置时，客户端调用 `configForms` 写入通道。
+- 宿主 `dsh-config-editor.edit()` 负责捕获变更，在 profile 根目录的 `cordis.patch.yml` 中自动创建或更新顶层的 `- id: my-plugin config: { ... }` 条目完成物理落盘。
+- 全程由宿主配置编辑器提供文件锁与冲突保护，用户无需接触底层 YAML。
+
+#### 4. 热卸载与重装时的配置继承
+- 当执行 `dsh plugin remove` 卸载插件时，宿主仅从 `package.json` 的 `dependencies` 与 `dsh.profile.bundles` 列表中移除插件，**不会**删除 profile `cordis.patch.yml` 中的用户配置条目。
+- 当用户再次安装该插件时，原先保留在补丁中的用户配置会被 `reconcileProfilePatches` 自动继承并重新对齐生效。
+
 ## 四、最关键的一条：ConfigForms 只能写 volatile 字段
 
 Settings 域的写入实现有两道硬门槛（以当前版本源码为准）：

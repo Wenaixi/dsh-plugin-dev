@@ -63,7 +63,7 @@
 - **[plugin-config-ui-decision.md](./plugin-config-ui-decision.md)**：
   配置界面的**选型与否决**——「DSH 有 Settings 就该交给它」是误解；重启后是否需要保留这一条判定直接决定走自有存储还是 Settings；三种实现形态（自有端点 / Settings 持久化字段写入抛错 / Settings volatile 重启丢失）的对照表；**迁移前五条否决条件**（视觉不变、卡片以运行时推导值为主、已有稳定落盘路径、现有实现已通过门禁、需要改成 volatile 才能跑通）；最小可行迁移路径与六条验收清单。
 - **[client-ui-placement-and-verification.md](./client-ui-placement-and-verification.md)**：
-  客户端 UI **落点选择与真机取证**——「界面语义 → 插槽」完整映射表（设置窗口各级 Tab / 插件页分组条目 / 卡片内联配置区 / 右侧栏 Tab / 侧边栏底部 / 全局浮层）；**铁律「一个功能一个入口」**（多落点冗余 = UI 污染，实测需回滚）；插槽三个必知机制（spec 由父条目 `children` 表声明、四种 kind 与注册参数对应关系、**`slots.inject` 在 spec 不存在时静默不执行且零报错**）；`plugins.bundle.config` 的 **`configured` 渲染门（匹配键是包名）**；「UI 不显示」三分法（模块没进图 / apply 没跑 / 落点或渲染门不匹配）；客户端产物 **`immutable` 长缓存与「版本号先于界面更新」的假象**（桌面端必须完全重启）；**无浏览器验证法（Node 直跑 CJS factory 探针）**；CDP / browser-harness 真机取证的环境坑；**解析 Electron `app.asar` 做桌面版与 CLI 版差异比对**。
+  客户端 UI **落点选择与真机取证**——「界面语义 → 插槽」完整映射表（设置窗口各级 Tab / 插件页分组条目 / 卡片内联配置区 / 右侧栏 Tab / 侧边栏底部 / 全局浮层）；**铁律「一个功能一个入口」**（多落点冗余 = UI 污染，实测需回滚）；插槽三个必知机制（spec 由父条目 `children` 表声明、四种 kind 与注册参数对应关系、**`slots.inject` 在 spec 不存在时静默不执行且零报错**）；`plugins.bundle.config` 的 **`configured` 渲染门（匹配键是包名）**；**组件列表里 `id` 与 `name` 相同的行会重复显示包名（宿主行为，且改 id 等于破坏性迁移）**；「UI 不显示」三分法（模块没进图 / apply 没跑 / 落点或渲染门不匹配）；客户端产物 **`immutable` 长缓存与「版本号先于界面更新」的假象**（桌面端必须完全重启）；**无浏览器验证法（Node 直跑 CJS factory 探针）**；CDP / browser-harness 真机取证的环境坑；**解析 Electron `app.asar` 做桌面版与 CLI 版差异比对**。
 - **[official-settings-form-pattern.md](./official-settings-form-pattern.md)**：
   官方设置页 UI 体系——**`SettingsForm` 外壳（unavailable/readOnly/saveFailed/save/saving 五文案、dirty/invalid 自动禁用 Save、卸载自动 discard）**；**官方 `SettingsFormModel` 只服务文本/数字字段**，bool 与带说明的枚举必须自写 card controller（形态抄官方 settings-subagent）；`ConfigForm` 与 `SettingsFormScope` 是同形契约（configForms.get 直接当 scope）；**五条保存铁律**（冲突置 invalid、回读逐字段比对、saveGeneration 抑制迟到回执、草稿过期的相等/冲突二分、无差异保存为 no-op）与六条验收判据。
 - **[client-bundle-loading-and-artifact-trace.md](./client-bundle-loading-and-artifact-trace.md)**：
@@ -157,6 +157,8 @@
 ### 十九、实战深挖沉淀：失效链路 / i18n 坑 / 重构经验 / 发布验证 (Field Experience)
 - **[publish-npm-verification.md](./publish-npm-verification.md)**：
   发布验证通用经验——镜像 registry 可能让 `npm view` 假阴性，直查官方 registry API 验 `versions` 与 `dist-tags.latest`；幂等发布「已发布跳过」只跳 npm 不跳 Release，需 `gh release view` 单独验证；tag 指向错误的修正流程（删 tag、补提交、重打、force push）；PowerShell 不支持 `&&` 的拼接坑；发布五步 checklist（bump、CHANGELOG、门禁、commit/tag/push、双真源验证）。
+- **[ci-release-workflow.md](./ci-release-workflow.md)**：
+  GitHub Actions 双流水线——push/PR 到 main 只跑全量测试（typecheck + 单测 + build），打 `v*` tag 才跑全量测试并 `pnpm publish` + `gh release create`。四个必踩坑：锁文件没入库报 `ERR_PNPM_OUTDATED_LOCKFILE`、tsdown 需要 `Promise.withResolvers` 所以 CI node 必须 ≥22、`NODE_AUTH_TOKEN` secret 必须手动配（OIDC 404 是噪音）、tag 打在旧 commit 的修正序列。
 
 ### 二十、源码核验与交付验收 (Source Verification & Acceptance)
 

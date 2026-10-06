@@ -277,6 +277,15 @@ dsh <name> --port <port> --no-open
 
 第 3 步必须锁版本：不带版本号会解析到 `0.0.1-rc.1` 这类被 semver 预发布排序排除的老版本，随后撞上第四节描述的兼容性闸门。
 
+### 7.2.4 pnpm add @scope/pkg 装不进的两个坑
+
+场景：把已发布的 scoped 插件包装进 profile（pnpm add 或 dsh plugin add）。
+
+- 坑一：npm 镜像假阴性。本机 registry 指向 npmmirror 时，刚发布的版本 npm view 可能查不到，pnpm 解析报 No matching version found。判定：npm config get registry；修法：装包那一条命令加 --registry=https://registry.npmjs.org/（或临时切换），不要改全局默认，装完切回。
+- 坑二：profile 的 bundle 名还是旧包名。用 dsh plugin add 装 scoped 包后，profile 的 dsh.profile.bundles 里如果还留着改名前的旧 bundle 名，启动报 cannot resolve profile bundle（旧名）。修法：把 bundles 里的旧名替换为 scoped 全名，并同步 dependencies 与 cordis.patch.yml 的 name（见 packaging.md 的 scoped 化六件套）。
+
+两个坑的共同判据：别只信安装命令的退出码。装完立刻读 profile 的 package.json（dependencies 与 dsh.profile.bundles 两处）与 patch 行，再启动实例验证。
+
 ---
 
 ## 八、官方依据

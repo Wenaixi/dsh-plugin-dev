@@ -361,7 +361,7 @@ console.log(extract('/dsh/node_modules/@deepseek-ai/<pkg>/lib/client.js')?.lengt
 | 客户端代码本身能跑 | 用 §四 的 Node factory 探针跑一遍 apply，确认无异常、参数正确 |
 | 界面上真的出现了 | 真机（§五）读 data-plugin-config 与 body.innerText，**不是**看接口 200 |
 | 改完重启过 | 桌面端完全退出再启动；确认 boot 图里的 rev 已变（§三） |
-| 用户报「不显示」时先问位置 | 明确他到的是哪个界面（§二.3 三分法），别直接改代码 |
+| 用户报「不显示」时先问位置 | 明确他到的是哪个界面（§二.4 三分法），别直接改代码 |
 | UI 落点无扩散 | 门禁里加一条反向断言（§四 末尾），锁死落点集合 |
 
 ---

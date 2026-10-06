@@ -223,6 +223,7 @@ if (!isDeepStrictEqual(combined, next))
 
 - 删除字段的完整清单：`src` schema 定义、`cordis.patch.yml` 的 config 行、已装 profile 的 patch 行、README 配置表、locale 文案、纯函数模型（默认值/字段列表/规范化/迁移计划）与对应测试。
 - 这是「能力删除承诺面」（cross-cutting 专题）在配置域的具体实例：入口、文档、配置、导出一处不同步，就是一颗随时爆炸的哑弹。
+
 ## 八、多来源优先级与可诊断化 (Precedence & Diagnostics)
 
 第二节描述的是**补丁层之间**的覆盖。但同一个插件的同一项配置，往往同时来自四个彼此独立的通道：

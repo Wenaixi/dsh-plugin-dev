@@ -164,7 +164,43 @@ ctx.slots.register(
 
 ---
 
-## 六、验收判据（六条，逐条可复现）
+## 五之二、注入面的三个形状陷阱（组件看得见 ≠ 你以为它看得见）
+
+注入面（`slots.register` 的 `inject` 字段）决定组件能拿到什么。这一节记三条会让「点一下毫无反应」「界面永久空白」或「键盘不可达」的形状错误。
+
+### 5.2.1 注入面顶层是工厂函数，不是对象
+
+`inject` 接受的是**函数**，渲染器在渲染时才调用它、拿到返回的 props。把面写成本身是对象不会立刻报错，`undefined` 会在更下游才炸。
+
+```javascript
+// 对：面顶层是工厂，渲染时产出 props
+inject() {
+  return {
+    hooks: { myCard: this.store },        // 值是 store：渲染器直接绑成 useMyCard 选择器钩子
+    edit: (field, value) => this.edit(field, value),
+  };
+}
+
+// 错：把工厂调用提前到注册期（此刻 store 还没建好，且早于渲染）
+inject: this.storeSnapshot           // 不是工厂，是快照本身
+```
+
+`hooks` 的值有两种形态，渲染器按「是不是函数」分流：值是 store 就直接绑定；**值是函数则当成延后工厂**，到渲染那一刻才调用（源码里 `typeof definition === "function"` 这个分流点）。所以需要「每次渲染拿到最新 store」时，把工厂放进 `hooks` 里是合法的。
+
+### 5.2.2 闭包变量不会自动出现在 props 上
+
+最容易踩的一种：注册时用 `slots.register({ ..., inject: () => ({ hooks: { s: store } }) }, Panel)`，而 `Panel` 里读 `props.scope.mutate(...)`。`scope` 是 apply 里的闭包变量，**从来没有被放进面里**，于是 `props.scope` 是 `undefined`，点击时抛 `TypeError: Cannot read properties of undefined`。
+
+- **症状**：控件能点、没有任何报错文案、界面随后卡住（渲染树被异常打断）。
+- **规矩**：组件只能消费 props。凡是它要用的东西，写操作的函数也要一并平铺进面里（`mutate: (ops, rev) => scope.mutate(ops, rev)`），不要指望闭包变量能穿透到组件。
+- **自查**：面板里出现的每个 `props.X`，回到注册处确认面里真的有 `X`；反向也查一遍——面里有、面板没用的是死代码。
+
+### 5.2.3 钩子的命名与签名由渲染器决定
+
+- `face.hooks` 的每个键 `name` 会被转成 `use<Name>`（首字母大写）交给组件；
+- 钩子的签名是**选择器**：`(selector, equal?) => 选中值`，不是「无参返回整快照」。`props.useMyCard(s => s)` 取整个快照，`props.useMyCard(s => s.value)` 只订阅其中一个字段（少写字段能显著减少重渲染）。
+
+## 六、验收判据（逐条可复现）
 
 1. **静态断言**：产物里只有允许的插槽名，配置卡 key 与包名一致（见 client-ui-placement-and-verification 的 configured 渲染门）。
 2. **写入断言**：改一个字段 → Save → 回读 `settings/describe` 与磁盘补丁，逐字段一致。
@@ -232,6 +268,10 @@ packages/client/ui-primitives  <-  @deepseek-ai/dsh-client-ui-primitives@0.2.0-r
   src/settings-form/SettingsForm.tsx / form-model.ts / fields.tsx
 packages/client/ui-settings   <-  @deepseek-ai/dsh-client-ui-settings@0.2.0-rc.2
   lib/types/client/config-form*.d.ts（ConfigForm / ConfigFormSnapshot）
+packages/client/ui-renderer  <-  @deepseek-ai/dsh-client-ui-renderer@0.2.0-rc.2
+  lib/client.js（bindInjectSources：hooks 键转 use<Name>、bindSnapshotSelector：选择器签名）
+packages/client/ui-slots    <-  @deepseek-ai/dsh-client-ui-slots@0.2.0-rc.2
+  lib/index.js（standardHookPropName：use<Name> 命名规则）
 packages/client/ui-settings-subagent  <-  官方 bool/枚举控制器范本（subagent-model-selection-card-controller）
 packages/client/ui-settings-shell     <-  官方 SettingsFormModel 用法范本
 ```

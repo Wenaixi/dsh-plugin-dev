@@ -228,7 +228,24 @@ ${specifier}/locale/en.json
 | 描述 | `locale/{en,zh}.json` 的 `meta.description`，缺失回退 manifest `description` | 官方包的 manifest `description` 一律写英文长句，中文请放 locale |
 | 图标 | manifest 的 `icon` 字段 | **必须是包内相对路径的 svg/png/jpg/webp，且 <= 256 KiB**，超限报 `icon exceeds 256 KiB` |
 | 版本号 | `package.json` 的 `version` | |
+| 面板文案 | 同一个 `locale/*.json` 的**扁平键** | 与 `meta` 段并存，互不干扰：`meta` 只被卡片元信息读取，扁平键供面板查词 |
 | 启用/禁用开关 | 由宿主改写 profile 的 `cordis.patch.yml` | |
+
+### 3. `meta` 段与面板文案键的分工，以及中英必须同族
+
+`locale/*.json` 是**一文件两用**：`meta` 段给卡片，扁平键给面板。别把面板标题塞进 `meta.title`，也别指望 `meta` 段能被面板的查词函数命中——两个命名空间互不相通。
+
+```json
+{
+  "meta": { "title": "懒人模式", "description": "…" },
+  "panel.title": "懒人模式配置",
+  "button.reset": "恢复默认配置"
+}
+```
+
+**中英两侧必须是同一个产品名的两种写法**：`meta.title` 的中文值应含中文、英文值应含英文，且英文值**不能是包名**。包名兜底只在 `meta` 整段缺失时发生——一旦你只写了中文而英文那册没有 `meta`，切到英文界面时用户看到的就是 `@scope/dsh-xxx`，和中文界面对不上，而且没有任何报错。
+
+**自查**：对 `locale/*.json` 逐册断言 `meta.title` 与 `meta.description` 存在且为非空字符串（宿主对非空有硬校验，空串会抛）；再断言英文册的 `meta.title` 不含包名形状。这类门禁很便宜，但只有破坏实测证明它会红才算数（见 [silent-failure-and-gate-design.md](./silent-failure-and-gate-design.md)）。
 
 ```yaml
 # 宿主自动写入的内容

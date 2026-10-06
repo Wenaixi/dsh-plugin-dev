@@ -162,6 +162,16 @@ registerProvider(create: (control: SkillProviderControl) => SkillProvider): () =
 已知边界：人类侧菜单来源可能在客户端缓存到下一会话边界（`agent-preset/selected`/`connection/reset`
 才失效），这是官方消费方行为，provider 侧无法修复；模型目录与面板（现读）即时生效。
 
+**反过来「两侧要不同」时，这里没有缝隙可钻。** 注册表把候选投影成摘要时只拷贝白名单字段，且摘要缓存键
+只含工作目录、作用域链与修订号——**不含任何按消费方区分的维度**。两个消费方传进去的作用域通常也是同一个对象，
+于是它们命中同一条缓存、读到同一个字符串副本。此时无论给候选挂多少自定义字段、还是在 `description` 上写
+「按调用方返回不同值」的 getter，都无效：值在摘要生成那一步已被拷成普通字符串，getter 之后不会被读。
+
+要做「模型侧固定一种语言、人类侧按配置另一种」这类差异化，先按
+[shared-contract-capability-boundaries.md](./shared-contract-capability-boundaries.md) 的判定程序逐条核对
+（投影白名单、缓存键维度、作用域对象、跨端结果 schema），确认上游是否支持；不支持时再从接受同源、
+并列注册、运行时改写上游对象三条路径里选，并写清代价。
+
 ---
 
 ## 八、生命周期与失效的完整链路

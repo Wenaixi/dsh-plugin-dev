@@ -279,6 +279,51 @@ DSH 官方 `@deepseek-ai/dsh-settings` 在执行 `mutate(ns, ops, expectedRevisi
      读取 volatile 配置时一律经过解包获取真实值，杜绝因持有引用包装导致类型判断失败；
    - 客户端行为差异：客户端通过 `SettingsForms.describe` 接收到的快照，已经由后端的 `plainConfig` 自动剥离了运行时引用包装，客户端接收到的是标准 JSON 纯标量。
 
+3. **嵌套 volatile 的位置限制只在解析期生效**：
+   `volatile` 只能落在**固定对象路径**上（某个对象字段自身）。放进数组元素、dict 的值、union 分支内部都会被拒绝——但**构造 schema 时不报错，只在 `resolve` / 校验那一刻抛**：
+
+   ```javascript
+   // 底层校验与报错原文（schemastery validateVolatileSchema）
+   if (schema.meta?.volatile && blocked) throw new ValidationError(
+     'volatile fields require a fixed object path without an enclosing volatile field', { path });
+   ```
+
+   `blocked` 由遍历时传递：进入 `inner`（数组/可调用内层）、`sKey`（dict 的键）、`list`（union 分支）时置 `true`；进入某个 `volatile` 节点后其子树也全部置 `true`。**因此一个 volatile 字段内部不得再含 volatile 子字段**。
+
+   ```javascript
+   Schema.object({ mode: Schema.union(['lite', 'full']).volatile() });                     // 允许
+   Schema.object({ list: Schema.array(Schema.string().volatile()) });                      // 拒绝 $.list.*
+   Schema.object({ map:  Schema.dict(Schema.string().volatile()) });                       // 拒绝 $.map.*
+   Schema.object({ pick: Schema.union([Schema.object({ y: Schema.string().volatile() })])}); // 拒绝 $.pick.0.y
+   ```
+
+   **为什么值得单独记**：构造期不抛意味着你的 schema 模块能正常加载、能过类型检查、`Schema({})` 形式的测试也全绿，只有真实宿主解析配置那一刻才炸。用户在界面上看到「插件加载即报错」，而你本地怎么测都复现不出来。**所以：含 volatile 的 schema 必须有一条真正走 `resolve` 的测试**，只测 `Schema({})` 不够。
+
+4. **解析非法值是抛异常，不是返回错误数组**：
+   `Schema.resolve(data, schema)` 遇到类型不符的值会**抛 `ValidationError`**，不会返回 `[value, errors]`。写门禁或迁移脚本时：
+
+   ```javascript
+   // 错：errors 永远 undefined，分支永不进入，断言是恒假的空门禁
+   const [, errors] = Schema.resolve({ mode: '非法值' }, ConfigSchema);
+   if (errors?.length) fail();
+
+   // 对：try/catch 才拿得到
+   let rejected = false;
+   try { Schema.resolve({ mode: '非法值' }, ConfigSchema); } catch { rejected = true; }
+   if (!rejected) fail();
+   ```
+
+   **连带的一条**：`toJSON()` 的返回值不是展开的树，而是**引用表**——顶层只有 `{ uid, refs }`，字段节点在 `refs` 里，`dict` 是字段名到 uid 的映射，数组元素与 union 分支都是下标引用：
+
+   ```javascript
+   const json = Config.toJSON();
+   json.dict?.defaultMode;                 // undefined —— dict 在根节点的 refs 条目里
+   json.refs[json.uid].dict.defaultMode;   // 字段名 → 节点 uid
+   json.refs[thatUid].meta.volatile;       // 才是字段元信息
+   ```
+
+   这一点对写 schema 形态门禁是决定性的：直读 `json.dict` 得到 `undefined`，断言**看起来写了、实际永远为假**，永远不会红。**每加一条形态门禁都要做破坏实测**（见 [silent-failure-and-gate-design.md](./silent-failure-and-gate-design.md)）——否则你不知道自己测的是契约还是空气。
+
 ---
 
 ## 八、多来源优先级与可诊断化 (Precedence & Diagnostics)
@@ -406,4 +451,5 @@ packages/experimental/voice-input-bundle  <-  @deepseek-ai/dsh-experimental-voic
 packages/mcp/mcp-client  <-  @deepseek-ai/dsh-mcp-client@0.2.0-rc.2
 packages/settings/settings  <-  @deepseek-ai/dsh-settings@0.2.0-rc.2
 packages/bundle/web-app  <-  @deepseek-ai/dsh-web-app@0.2.0-rc.2
+schema 库             <-  schemastery（lib/index.mjs 的 validateVolatileSchema / toJSON / resolve）
 ```

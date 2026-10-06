@@ -67,6 +67,9 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 | 找不到本机源码、桌面版解包、上游克隆 | [source-verification-and-caches.md](references/source-verification-and-caches.md) |
 | 插件写完了要验收、测安装卸载、跑浏览器验证 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) |
 | 插件自带配置界面、Settings 命名空间、ConfigForms 生命周期 | [plugin-config-card-architecture.md](references/plugin-config-card-architecture.md)、[plugin-config-ui-decision.md](references/plugin-config-ui-decision.md) |
+| 热装/卸载后卡片未出现、刷新过早假死、Chokidar 2s 防抖期等待、Windows EPERM 锁 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) |
+| 裸 add 命令解析到远古旧版本、pnpm 冷却期版本回退陷阱 | [install-resolution-traps.md](references/install-resolution-traps.md) |
+| 包自带补丁 insert 格式规范、全新安装零配置自动渲染、界面写入自动持久化回写 | [plugin-config-card-architecture.md](references/plugin-config-card-architecture.md) |
 
 已有专题参考仍按 [references/README.md](references/README.md) 索引；若通用参考与目标版本源码冲突，以源码和运行时为准。
 
@@ -90,3 +93,5 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - 在自己日常 profile 上验证通过就宣称功能可用，没开隔离新实例、没测热装冷装卸载。
 - 在表单异步交互中仅捕获异常而未在 UI 对应区域显式渲染失败状态，造成假死无响应的静默失败。
 - 插件热重载后不刷新页面，直接在持有已废弃（disposed）旧表单实例的前端闭包中测试异步写入。
+- 误以为热安装必须由用户手动往 profile 补丁追加顶层条目，忽略了纯 `insert:` overlay 的自生挂载机制与宿主自动持久化回写闭环。
+- 在 CLI 安装或修改配置后，未等待宿主文件监听器防抖期（Chokidar `awaitWriteFinish` 2s）便立即判定热重载失效并误判必须重启宿主。

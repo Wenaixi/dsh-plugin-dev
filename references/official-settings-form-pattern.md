@@ -2,6 +2,8 @@
 
 > 适用范围：任何带配置界面的 DSH 插件（`plugins.bundle.config` / `settings.section` / 自有设置页）的 UI 层实现。
 > 核心命题：**别手写设置页外壳与「点一下写一次」的即时保存。** DSH 官方提供了一整套设置表单体系，外壳、草稿、保存、冲突保护全部内建；只有开关与带说明的单选需要你自写一层薄薄的控制器。
+>
+> 例外：**开关/单选这类无文本草稿的控件，也可以放弃草稿体系、走「操作即写」**（每个控件点击直接写宿主）。两者选型见 §八。
 
 ---
 
@@ -212,6 +214,7 @@ inject: this.storeSnapshot           // 不是工厂，是快照本身
 7. **热更新自愈断言**：插件卸载后重新安装（或热更新后），若前端页面未刷新，组件如仍持有旧表单引用，应有显式失败感知并能引导刷新，刷新后新表单实例应完全恢复可读可写。
 8. **闸门断言**：人为让提交批次里一条 op 指向非 volatile 字段，观察到整批零写入且界面提示保存失败。这一条只在真机可测，它验证的是宿主写入闸门的真实行为，不是你的代码路径。完整清单见 [host-semantic-gates.md](./host-semantic-gates.md)。
 9. **旧字段收敛断言**：带旧格式配置启动，触发任意一次写入后回读，旧键已消失且新键已落盘。迁移写法见 [config-field-lifecycle.md](./config-field-lifecycle.md)。
+10. **操作即写接入断言**：点一个开关 → 不点任何保存 → 回读 `settings/describe` 的命名空间 `value` 已变；再回读磁盘补丁一致。每类控件（开关、单选、恢复默认）各验一条。恢复默认的期望值取 schema 默认值（与磁盘补丁 `base` 层一致），不是猜测。
 
 ---
 
@@ -258,6 +261,78 @@ ctx.effect(() => ctx.configForms.whileServed([MY_NAMESPACE], (served) => {
 ```
 
 - **运行原理**：`whileServed` 内部监听客户端的设置镜像快照（`SettingsDescribeMirror`）。只有当宿主当前真实服务的 `namespaces` 列表中包含指定命名空间时，才执行注册函数；一旦宿主卸载了该插件，它会自动触发注册时返回的清理函数（disposer），使配置项在界面上平滑退场，绝不残留未服务的死引用。
+
+19. **操作即写接入断言**：点一个开关 → 不点任何保存 → 回读 `settings/describe` 的命名空间 `value` 已变；再回读磁盘补丁一致。每类控件（开关、单选、恢复默认）各验一条。恢复默认的期望值取 schema 默认值（与磁盘补丁 `base` 层一致），不是猜测。
+
+---
+
+## 八、操作即写模式：开关/单选控件不套草稿
+
+需求是「改动立即生效、不要保存按钮」时（开关、单选这类无文本草稿、点一下就是一个完整值的控件），可以不套官方草稿外壳，控制器改为直写：
+
+### 8.1 什么时候选这个模式
+
+| 判据 | 草稿 + 保存 | 操作即写 |
+| --- | --- | --- |
+| 字段类型 | 文本/数字（草稿有中间态） | 开关/单选（点击即完整值，无中间态） |
+| 用户心智 | 批量改完再提交 | 点一下就是最终值（终端工具类偏好） |
+| 冲突风险 | 草稿期被别处改掉 → 保存被拒 | 无草稿 → 每次写都基于最新 revision，天然无冲突窗口 |
+| 失败恢复 | 保留草稿供修改 | 宿主镜像 `recover` 重读回滚，UI 值自动回落到真值 |
+
+写错了「点一下写一次」= 重造轮子；写对了「操作即写」= 文本/数字以外控件的合理取舍。
+
+### 8.2 控制器骨架：宿主快照读出 + 每次操作一个 mutate
+
+```ts
+class CardController {
+  private scope                  // ConfigForm（同 SettingsFormScope 同形）
+  private failed = false         // 最近一次写入是否未被接受
+  private generation = 0         // dispose 后抑制迟到回执
+  private unsubscribe
+
+  constructor(scope) {
+    this.unsubscribe = scope.subscribe(() => this.publish())
+  }
+
+  edit(field, next) {            // 立即写，不经过草稿
+    if (this.scope.getSnapshot().status !== 'ready' || !this.scope.getSnapshot().writable) return
+    this.failed = false
+    this.publish()
+    void this.write([{ op: 'set', path: [field], value: next }])
+  }
+
+  resetAll() {                   // 恢复默认：只写与当前值不同的字段
+    const current = currentValue(this.scope.getSnapshot())
+    void this.write(diffOps(DEFAULT, current))
+  }
+
+  async write(ops) {
+    if (ops.length === 0) return
+    const gen = this.generation
+    let accepted
+    try { accepted = await this.scope.mutate(ops) }   // 不传 expectedRevision：宿主用最新 revision
+    catch { if (gen !== this.generation) return; this.failed = true; this.publish(); return }
+    if (gen !== this.generation) return                // 已 dispose：丢弃迟到回执
+    this.failed = !accepted
+    this.publish()
+  }
+
+  dispose() { this.generation += 1; this.unsubscribe() }
+}
+```
+
+快照投影：`values` 永远取**宿主当前值**（`currentValue(snapshot)`），不做本地乐观值——宿主 `acceptView` 折叠写入答案、`recover` 在拒绝后重读，快照本身就会回到真值，UI 不需要自己补偿。
+
+### 8.3 四条要点（踩过才知道）
+
+1. **失败只标 `failed`，不吞**：`mutate` 返回 false 或抛错都置 `failed`，UI 显式渲染保存失败提示。返回 false 与返回 true 都不告诉你失败发生在哪一层，判据是可观察的状态转移（失败提示可见、值回落到宿主真值）。
+2. **连点不锁界面**：保存中不设 `saving` 锁（宿主写入队列串行 + revision 栅栏，最后操作胜出）；禁用条件只有 `!writable`。文本字段的草稿需要锁，开关/单选不需要。
+3. **「保存」相关的能力面全部删除**：`save`/`discard` 动作、`saving` 状态、`dirty` 投影、`draftHint`（「改动会在点击保存后生效」）提示与 `save`/`saving`/冲突相关文案键一并删，删不干净会让界面出现永不触发的死按钮或自相矛盾的提示。
+4. **恢复默认 = 写 schema 默认值**：`diffOps(DEFAULT, current)` 只写有差异的字段，与当前值全相等的默认恢复是 no-op（清 `failed` 即可）。
+
+### 8.4 数据通路与验收
+
+写入链路与草稿模式完全一致：`mutate(ops)` → `remote.settings` → 宿主配置控制器 → config-editor → 磁盘补丁。真值回读见 §六 第 10 条：点击后 describe 的 `value` 立即变化、磁盘补丁一致；失败时（人为制造拒写）显示失败提示且 `value` 回落到宿主真值，不显示本地乐观值。
 
 ---
 

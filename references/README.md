@@ -72,7 +72,7 @@
 - **[client-ui-placement-and-verification.md](./client-ui-placement-and-verification.md)**：
   客户端 UI **落点选择与真机取证**——「界面语义 → 插槽」完整映射表（设置窗口各级 Tab / 插件页分组条目 / 卡片内联配置区 / 右侧栏 Tab / 侧边栏底部 / 全局浮层）；**铁律「一个功能一个入口」**（多落点冗余 = UI 污染，实测需回滚）；插槽三个必知机制（spec 由父条目 `children` 表声明、四种 kind 与注册参数对应关系、**`slots.inject` 在 spec 不存在时静默不执行且零报错**）；`plugins.bundle.config` 的 **`configured` 渲染门（匹配键是包名）**；**组件列表里 `id` 与 `name` 相同的行会重复显示包名（宿主行为，且改 id 等于破坏性迁移）**；「UI 不显示」三分法（模块没进图 / apply 没跑 / 落点或渲染门不匹配）；客户端产物 **`immutable` 长缓存与「版本号先于界面更新」的假象**（桌面端必须完全重启）；**无浏览器验证法（Node 直跑 CJS factory 探针）**；CDP / browser-harness 真机取证的环境坑；**解析 Electron `app.asar` 做桌面版与 CLI 版差异比对**。
 - **[official-settings-form-pattern.md](./official-settings-form-pattern.md)**：
-  官方设置页 UI 体系——**`SettingsForm` 外壳（unavailable/readOnly/saveFailed/save/saving 五文案、dirty/invalid 自动禁用 Save、卸载自动 discard）**；**官方 `SettingsFormModel` 只服务文本/数字字段**，bool 与带说明的枚举必须自写 card controller（形态抄官方 settings-subagent）；`ConfigForm` 与 `SettingsFormScope` 是同形契约（configForms.get 直接当 scope）；**五条保存铁律**（冲突置 invalid、回读逐字段比对、saveGeneration 抑制迟到回执、草稿过期的相等/冲突二分、无差异保存为 no-op）与七条验收判据；**`ConfigFormController` 生命周期与热重载陷阱**（卸载时表单被 `dispose()` 置标志位，未刷新页面调用 `form.mutate` 会直接被底层短路返回 false 并不发 RPC，造成静默假死；组件需具备失败感知能力）；**`whileServed` 命名空间状态守卫机制**（按宿主真实服务列表动态激活与安全销毁注册）；**注入面形状三条**（面顶层必须是工厂函数而非对象；闭包变量不会自动出现在 props 上，`props.scope` 为 undefined 会让点击抛 TypeError 并拖死渲染树；`hooks` 的键会被转成 `use<Name>` 选择器钩子，签名是 `(selector, equal?)` 而非无参取全量）。
+  官方设置页 UI 体系——**`SettingsForm` 外壳（unavailable/readOnly/saveFailed/save/saving 五文案、dirty/invalid 自动禁用 Save、卸载自动 discard）**；**官方 `SettingsFormModel` 只服务文本/数字字段**，bool 与带说明的枚举必须自写 card controller（形态抄官方 settings-subagent）；`ConfigForm` 与 `SettingsFormScope` 是同形契约（configForms.get 直接当 scope）；**五条保存铁律**（冲突置 invalid、回读逐字段比对、saveGeneration 抑制迟到回执、草稿过期的相等/冲突二分、无差异保存为 no-op）与十条验收判据；**§八「操作即写」模式**（开关/单选不要保存按钮时的选型与控制器骨架：无草稿、每次操作一个 mutate、失败只标 failed 不吞、连点不锁界面、能力面与文案键删干净、恢复默认写 schema 默认值）；**`ConfigFormController` 生命周期与热重载陷阱**（卸载时表单被 `dispose()` 置标志位，未刷新页面调用 `form.mutate` 会直接被底层短路返回 false 并不发 RPC，造成静默假死；组件需具备失败感知能力）；**`whileServed` 命名空间状态守卫机制**（按宿主真实服务列表动态激活与安全销毁注册）；**注入面形状三条**（面顶层必须是工厂函数而非对象；闭包变量不会自动出现在 props 上，`props.scope` 为 undefined 会让点击抛 TypeError 并拖死渲染树；`hooks` 的键会被转成 `use<Name>` 选择器钩子，签名是 `(selector, equal?)` 而非无参取全量）。
 - **[client-bundle-loading-and-artifact-trace.md](./client-bundle-loading-and-artifact-trace.md)**：
   客户端加载与产物取证——**`__ModuleLoader__.load` 的注册 id 必须等于包名**（scoped 改名后构建 id 没同步 = `loaded without registering`，整条 bundle 不激活）；组合 URL `/plugins/??<pkg>/client.js&rev=<hash>` 形态与 rev 的非内容哈希语义（mtime/ctime/size）；**「改了代码不生效」的实例取证三步**（resolve 真实路径 → 逐字节比对 client.js → junction 目标）；重启宿主才能越过 immutable 长缓存的硬规矩。
 
@@ -180,6 +180,9 @@
 
 - **[isolated-instance-acceptance.md](./isolated-instance-acceptance.md)**：
   交付验收流程——只装基础插件与目标插件的隔离新实例创建、复用其他实例配置的安全追加法（凭据全局共享但引用必须存在）、**本地源码联调手工建 junction 且必须指向仓库根（跑 pnpm install 会让宿主解析失败、整棵树一起 import 失败）**、冷装/热装/热更新/卸载四种形态各自的验收点与读源码判据（应用状态三态、没有 HMR 服务时一律要求重启、客户端产物长缓存需完全重启）、模型必须问用户选定并建议选便宜的、真实浏览器逐项点击与回读真值清单、浏览器环境坑、debug-修复-验证循环。
+
+- **[browser-automation-acceptance.md](./browser-automation-acceptance.md)**：
+  browser-harness 真机验收实战——专用 Chrome 拉不起来的原因（doctor 的 0 connections 与 30s unreachable 是同一件事）、PowerShell 管道四个坑（heredoc 不可用、UTF-16 破坏中文要 `\uXXXX` 转义、stderr 假报错、tab 串场）、`cdp Runtime.evaluate awaitPromise` 发异步 RPC、导航到配置卡的稳定选择器序列（引导模态/插件中心/详情按钮）、真机断言纪律（中文乱码走 DOM 属性、负向断言限定卡片容器、点击→describe→磁盘三段一致）、隔离实例快速验收流程模板。
 
 - **[plugin-config-card-architecture.md](./plugin-config-card-architecture.md)**：
   插件自带配置界面的三层架构——插槽位置、Settings 命名空间与客户端生命周期观察者的职责切分，以及任一层缺失导致的界面静默消失。

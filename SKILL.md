@@ -55,6 +55,7 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 | 动态目录、Provider、缓存、失效、重名 | [skill-provider.md](references/skill-provider.md)、[provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) |
 | 设置面板、Web 插槽、Host/Client、UI 不显示 | [three-roles.md](references/three-roles.md)、[web-ui-slots-and-styling.md](references/web-ui-slots-and-styling.md)、[client-ui-placement-and-verification.md](references/client-ui-placement-and-verification.md) |
 | 设置页 UI 怎么写（官方 SettingsForm / 草稿 / 冲突栅栏） | [official-settings-form-pattern.md](references/official-settings-form-pattern.md) |
+| 开关/单选不要保存按钮、改动自动生效 | [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §八（操作即写） |
 | 输入框上方浮层、双击手势、焦点留输入框、中文输入法组字 | [input-overlay-and-keyboard-gestures.md](references/input-overlay-and-keyboard-gestures.md)、[web-ui-slots-and-styling.md](references/web-ui-slots-and-styling.md) |
 | 客户端没加载、注册 id 报错、改了代码不生效 | [client-bundle-loading-and-artifact-trace.md](references/client-bundle-loading-and-artifact-trace.md)、[silent-failure-and-gate-design.md](references/silent-failure-and-gate-design.md) |
 | 不开浏览器回读配置/状态真值、写自动化验收 | [api-truth-read-back-without-browser.md](references/api-truth-read-back-without-browser.md)、[debugging-and-troubleshooting.md](references/debugging-and-troubleshooting.md) |
@@ -73,7 +74,7 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 | 跨模块变更、能力删除、兼容迁移 | [cross-cutting-engineering-practices.md](references/cross-cutting-engineering-practices.md) |
 | 具体 API 或版本结论无法确认 | 先查现有参考，再核对目标运行时和 [official-upstream-and-docs.md](references/official-upstream-and-docs.md) |
 | 找不到本机源码、桌面版解包、上游克隆 | [source-verification-and-caches.md](references/source-verification-and-caches.md) |
-| 插件写完了要验收、测安装卸载、跑浏览器验证 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) |
+| 插件写完了要验收、测安装卸载、跑浏览器验证 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md)、[browser-automation-acceptance.md](references/browser-automation-acceptance.md) |
 | 插件自带配置界面、Settings 命名空间、ConfigForms 生命周期 | [plugin-config-card-architecture.md](references/plugin-config-card-architecture.md)、[plugin-config-ui-decision.md](references/plugin-config-ui-decision.md) |
 | **以下五类只在真机触发，静态断言原理上测不到** | [host-semantic-gates.md](references/host-semantic-gates.md)（先读这份清单再排期） |
 | 新增/废弃/迁移配置字段，升级后用户配置丢失，写入被拒 | [config-field-lifecycle.md](references/config-field-lifecycle.md) |

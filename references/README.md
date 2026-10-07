@@ -8,8 +8,15 @@
 
 **交付前的最后一道门**：功能写完不等于可用，必须在隔离新实例上完成四态安装与浏览器逐项验证。流程见 [isolated-instance-acceptance.md](./isolated-instance-acceptance.md)。
 
+**改完必查的环境四坑**（详见各专题，先对一遍再动手）：
+1. `node_modules/@types` 顶层缺失会让 tsc 报「找不到 react 声明 / JSX namespace」——按包用 `cmd mklink /J` 补 junction（见 [debugging-and-troubleshooting.md](./debugging-and-troubleshooting.md) 开头）；
+2. 固定端口联调时「改了没生效」先核对监听进程的 `StartTime`，旧实例残留会让一切回读都拿到旧 schema/旧产物（见 [api-truth-read-back-without-browser.md](./api-truth-read-back-without-browser.md)）；
+3. 发布验证直查官方源要用 `curl.exe --noproxy '*'`，`npm view` 与 `Invoke-RestMethod` 都会吃镜像/代理假阴性，发布后 1~2 分钟 propagation 时延内别重发同版本（见 [publish-npm-verification.md](./publish-npm-verification.md)）；
+4. 非负整数配置字段用 schemastery 的 `z.natural()`，没有 `z.number().integer()`（见 [config.md](./config.md) §7.8）。
+
 - [source-verification-and-caches.md](./source-verification-and-caches.md)：源码至上的三层来源（本机安装先 pnpm 后 npm、命中即停且未混淆不必解包 / 桌面版解包 / 上游仓库）、`lib/types/*.d.ts` 优先于读实现的阅读入口、pnpm isolated 目录名转义、跨平台定位、缓存目录约定与冲突裁决顺序。
 - [isolated-instance-acceptance.md](./isolated-instance-acceptance.md)：隔离新实例的创建与配置复用、四种安装形态、浏览器逐项验证、模型选择与 debug 循环；本地源码联调必须手工建指向仓库根的目录联接，不跑 `pnpm install`。
+- [reproduction-experiment-design.md](./reproduction-experiment-design.md)：复现实验设计——症状与状态分别取证、冷热态前置条件、对照组（只变一个变量）、断言锚点选择（不按类型取第一个、不用文本匹配）、环境不稳定与产品缺陷的区分、产物遗留物与文档口径漂移，以及把单次事故沉淀成可迁移规则的四段式。
 - [dependency-injection.md](./dependency-injection.md)：显式依赖、服务契约和缺失依赖。
 - [lifecycle.md](./lifecycle.md)：可逆副作用、异步取消和卸载竞态。
 - [discovery-cache-invalidation.md](./discovery-cache-invalidation.md)：动态发现、缓存分层和失效传播。
@@ -179,6 +186,8 @@
   源码至上的强制流程——三层来源与固定顺序（本机已安装源码先查 pnpm 再查 npm且命中即停，同机两份实现版本不同不得混读；两者都没有才把桌面版 asar 按需解包到工作目录里被 git 忽略的缓存目录；本机完全没有才浅克隆云端上游仓库）、跨平台定位方法（Windows/macOS/Linux 的用户数据根、npm 全局根、asar 与自带 CLI 位置差异，一律先探测再使用，不静默回退到猜测路径）、冲突裁决顺序（运行时行为 > 已安装源码 > 包内 README > 文档站散文 > 本技能库正文）、以及“仓库相对路径与版本号由各包 manifest 的 directory 与 version 字段生成、不靠推测”这一取数纪律。
 
 - **[isolated-instance-acceptance.md](./isolated-instance-acceptance.md)**：
+- **[reproduction-experiment-design.md](./reproduction-experiment-design.md)**：
+  复现实验设计与可失败断言——**症状与状态分别取证**（先证明状态真的发生，再看输出）、**冷热态前置条件必须显式满足**（懒加载目录未 ready 时的症状与功能缺陷不可区分）、**对照组只变一个变量**（用修复前的源码跑同一脚本，确认症状可复现）、**断言锚点纪律**（不按类型取第一个匹配、不用文本内容、分组标题会吃掉首列文本）、被测环境三类不稳定（一次性令牌、网络间歇、输出流污染）与产品缺陷的区分、产物目录遗留物（删源码不删声明）与文档数字口径漂移，以及把单次事故沉淀成「症状 / 根因类别 / 判定动作 / 可失败实验」四段式的通用化处理。
   交付验收流程——只装基础插件与目标插件的隔离新实例创建、复用其他实例配置的安全追加法（凭据全局共享但引用必须存在）、**本地源码联调手工建 junction 且必须指向仓库根（跑 pnpm install 会让宿主解析失败、整棵树一起 import 失败）**、冷装/热装/热更新/卸载四种形态各自的验收点与读源码判据（应用状态三态、没有 HMR 服务时一律要求重启、客户端产物长缓存需完全重启）、模型必须问用户选定并建议选便宜的、真实浏览器逐项点击与回读真值清单、浏览器环境坑、debug-修复-验证循环。
 
 - **[browser-automation-acceptance.md](./browser-automation-acceptance.md)**：

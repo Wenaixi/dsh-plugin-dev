@@ -39,6 +39,7 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - **跨端隔离**：Host、Browser 和隔离进程不是同一个运行面；只通过正式数据通道传递能力。
 - **写入回读**：配置、UI、文件和发布操作都必须回读实际真值；点击、退出码或截图不能单独证明成功。
 - **断言可失败**：每条重要门禁都要通过人为破坏证明它真的会失败，优先验证行为和产物而不是源码文本。
+- **先证状态再论症状**：同一症状可能来自「从未进入目标状态」或「已进入但被丢弃」，观测完全一样。先找一个状态发生的标记并断言它，再讨论原因。
 - **承诺同步**：删除或改名能力时，同步检查入口、文档、配置、导出、示例和发布物。
 - **废弃不是删除**：配置字段废弃时保留 schema 声明与 volatile 标注，只在写入侧不再触碰它。删声明让用户历史配置被静默丢弃；去 volatile 标注会让清掉它的 unset 也被宿主写入闸门拒绝。详见 [config-field-lifecycle.md](references/config-field-lifecycle.md)。
 - **先问哪一层**：构建期常量、编译期写死的清单、文档里的历史结论都会过期。真值在运行时响应、磁盘文件和源码里；三者对不上时先确认自己引的是哪一层。
@@ -75,6 +76,9 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 | 具体 API 或版本结论无法确认 | 先查现有参考，再核对目标运行时和 [official-upstream-and-docs.md](references/official-upstream-and-docs.md) |
 | 找不到本机源码、桌面版解包、上游克隆 | [source-verification-and-caches.md](references/source-verification-and-caches.md) |
 | 插件写完了要验收、测安装卸载、跑浏览器验证 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md)、[browser-automation-acceptance.md](references/browser-automation-acceptance.md) |
+| 症状看起来对但修完就好了，怀疑归错因；复现时好时坏；前置条件没满足就开跑 | [reproduction-experiment-design.md](references/reproduction-experiment-design.md)（症状与状态分别取证、冷热态前置、对照组） |
+| 验收脚本一直绿但测的不是它；断言靠文本匹配或「按类型取第一个」 | [reproduction-experiment-design.md](references/reproduction-experiment-design.md)（锚点纪律、断言可失败） |
+| 前导命令后打斜杠没补全；要判断是状态门禁还是解析失败 | [slash-commands-and-input-triggers.md](references/slash-commands-and-input-triggers.md)（守卫档位）、[reproduction-experiment-design.md](references/reproduction-experiment-design.md) |
 | 插件自带配置界面、Settings 命名空间、ConfigForms 生命周期 | [plugin-config-card-architecture.md](references/plugin-config-card-architecture.md)、[plugin-config-ui-decision.md](references/plugin-config-ui-decision.md) |
 | **以下五类只在真机触发，静态断言原理上测不到** | [host-semantic-gates.md](references/host-semantic-gates.md)（先读这份清单再排期） |
 | 新增/废弃/迁移配置字段，升级后用户配置丢失，写入被拒 | [config-field-lifecycle.md](references/config-field-lifecycle.md) |
@@ -116,6 +120,9 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 ## Anti-Patterns
 
 - 凭记忆猜服务名、字段名、插槽名或事件返回值。
+- 把「最终输出为空」直接当成「功能有缺陷」，不先证明中间状态真的发生过——归错因的修复同样能让症状消失，假结论于是被写进记忆库。
+- 在冷态（目录或注册表未 ready）下跑完整个验收就下结论，并把结论当可复现的缺陷记录。
+- 用「按类型取第一个匹配」或界面文本当断言锚点；同类元素多于一种时，断言稳定测错对象且一直绿。
 - 把 `ctx.get()` 当作必需注入的替代品。
 - 只清理 watcher/定时器，却放任已启动的 Promise 继续写入。
 - 把失效通知和刷新实现互相调用，形成递归或重复广播。

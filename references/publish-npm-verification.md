@@ -6,7 +6,13 @@
 
 本地 registry 配置成 **npmmirror 等镜像**时，刚发布的版本 `npm view @scope/pkg` 可能查不到（镜像缓存延迟），**不代表发布失败**。
 
-**正确验证**：直查官方 registry：
+**正确验证**：直查官方 registry，且绕过本机代理/镜像缓存：
+
+```bash
+# curl --noproxy '*' 绕过系统代理直连官方源（Invoke-RestMethod 走代理会同样假阴性）
+curl.exe --noproxy '*' -s https://registry.npmjs.org/@scope%2Fpkg | ConvertFrom-Json
+# 读 dist-tags.latest 与 versions.<新版本> 是否就位
+```
 
 ```js
 const api = await fetch("https://registry.npmjs.org/@scope%2Fpkg");
@@ -17,6 +23,8 @@ console.log(j["dist-tags"].latest);
 
 - `npm config get registry` 先确认本地指向；
 - GitHub Actions 日志里 `npm publish` 的成功并不总等于版本已可见——用官方 API 复核 dist-tags。
+- **发布成功后 1~2 分钟内 `dist-tags.latest` 仍显示旧版本是正常传播时延**（官方 registry 分布式
+  异步入库 + CDN 边缘同步），不要在这期间重复触发发布（会撞 E409 staged 锁死，见 §六）。
 
 ## 二、幂等发布的「已发布跳过」语义
 
@@ -44,6 +52,38 @@ git push origin v1.2.3 --force   # 强制更新远端 tag
 ## 四、PowerShell 拼接命令的坑
 
 `cmd1 && cmd2` 在 PowerShell 不是合法语法（ParserError: InvalidEndOfLine）——分两条 `pwsh` 调用跑，或写 `.ps1`。
+
+## 四之二、网络间歇性与重试纪律
+
+推送与发布过程中会遇到**同一条命令连续失败又连续成功**的情况（连接超时、连接重置）。
+这不是权限问题，也不是凭据问题，而是网络路径不稳定。
+
+**处置纪律**：
+
+1. 带退避重试，重试之间确认前一次确实失败再继续；
+2. 把「可重试的连接失败」与「确定性的命令失败」（拒绝、认证错、冲突）分开计数，
+   不要把前者算进后者；
+3. 判据：连续探测同一目标若干次，只要稳定有一次成功，就说明是间歇而非阻断；
+4. 连接类失败**不要**写进产品的缺陷记录，那是环境问题，
+   混进缺陷记录是最难清理的一类污染。
+
+**推 tag 的额外风险**：主分支推送成功、tag 推送失败，会留下「代码已上线但未发布」的半状态。
+处置：tag 推送与主分支推送视为一次原子操作，任一失败都重试到成功再往下走；
+重试仍失败时，先核对远程 tag 是否已被创建（可能推送已生效只是回执丢失），
+再决定是否重打。
+
+## 四之三、本地 CLI 未登录时，发布链的责任边界
+
+发布流水线通常由远端 CI 承担凭据（发布 token 与仓库 token 都是 secret）。
+这带来一个常见疑问：**本地 CLI 没登录能不能推**。
+
+| 动作 | 是否依赖本地 CLI 登录 |
+| --- | --- |
+| `git push`（分支与 tag） | 否，走 git 自身的凭据助手 |
+| 触发远端流水线并完成发布 | 否，流水线用 secret |
+| 本地验证流水线结果 | 需要远端 API 可读（匿名可读则不必登录） |
+本地 `gh` 未登录时，**用远端 HTTP API 的匿名只读端点核对结果**，不要因此跳过验证。
+只有需要本地创建/修改 Release 或写操作时才必须登录。
 
 ## 五、发布前 checklist
 

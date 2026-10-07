@@ -2,6 +2,31 @@
 
 ---
 
+**太长不看**：Windows 上本地开发/验收的常见环境坑：
+
+- **补充 `@types/*` 顶层目录**：pnpm 的全局/隔离安装经常只把 `@types` 放在 `.pnpm/node_modules` 里、
+  顶层没有 `node_modules/@types`。此时 tsc 报的是「找不到 react 声明」「JSX namespace 找不到」。
+  修法：`cmd /c mklink /J "<repo>\node_modules\@types" "<pnpm store>\node_modules\@types"` 或按包建
+  junction（`node_modules/@types/react` → `.pnpm/@types+react@x.y.z/node_modules/@types/react`）。
+  不要用 PowerShell `New-Item -ItemType Junction` 建到不存在的父目录——它会静默跳过，`mklink /J` 才直接报错。
+- **`.dsh/AGENTS.md` 是全局守则的硬编码路径**（改名即失效）；项目专属规范写在仓库根的 CLAUDE.md。
+- **npm registry 镜像假阴性**：刚发布的版本 `npm view` 可能查不到（镜像缓存延迟）。真值直查官方源：
+  `curl.exe --noproxy '*' -s https://registry.npmjs.org/@scope%2Fpkg`，读 `dist-tags.latest` 与 `versions.<ver>`。
+  发布成功后 1~2 分钟内某些端点短暂 404 属正常传播时延；**切勿在同一版本号上重跑发布**（撞上 staged
+  版本会锁死 E409，只能 bump 新版本）。
+- **旧实例进程残留会吃掉新产物**：改了代码、重建、重启「以为」换了实例，但端口 3099（或任何固定端口）
+  的监听进程还是旧的（PID 不变/根本没换）——你测试的一直是旧代码。判定与清理：
+  `Get-NetTCPConnection -LocalPort <port> -State Listen` 取 `OwningProcess`，
+  核对 `StartTime` 是否晚于你最后一次 build，不对就 `Stop-Process -Id <pid> -Force`（连带确认
+  没有旧 cmd 包装进程还挂在旁边）再重新起实例。
+- **规则化断言文本**：中文系统上 Playwright 的 body 文本是乱码，**断言不要匹配中文文本**，
+  用 DOM 属性（`aria-selected`/`role`/`id` 前缀）与 JS 状态（textContent、selection offset、`__DSH_BOOT__`）。
+- **`Set-Content` 会按本地编码重写文件**：向脚本/配置写回内容时用
+  `[System.IO.File]::WriteAllText($path, $content, [System.Text.UTF8Encoding]::new($false))`，
+  避免中文/特殊字符在读写往返中损坏（`SyntaxError: unterminated string literal` 常见于此类破坏）。
+
+---
+
 ## 零、伪 API 与伪归因黑名单
 
 DSH 里有一批「看起来非常合理、但根本不存在」的 API 和「听起来顺理成章、但方向完全错了」的归因。写错时不会报编译错误，也不会在启动时失败，而是静默失效或被误诊为别的问题。下表左两列是凭印象最容易脱口而出的写法与判断，右两列给出 DSH 的真相与一条**可执行的判定动作**。

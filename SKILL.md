@@ -58,12 +58,14 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 | 设置页 UI 怎么写（官方 SettingsForm / 草稿 / 冲突栅栏） | [official-settings-form-pattern.md](references/official-settings-form-pattern.md) |
 | 开关/单选不要保存按钮、改动自动生效 | [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §八（操作即写） |
 | 输入框上方浮层、双击手势、焦点留输入框、中文输入法组字 | [input-overlay-and-keyboard-gestures.md](references/input-overlay-and-keyboard-gestures.md)、[web-ui-slots-and-styling.md](references/web-ui-slots-and-styling.md) |
+| 手势关闭后宿主浮层关不掉 / 高亮越界环绕 / 视觉顺序与数据顺序相反 | [input-overlay-and-keyboard-gestures.md](references/input-overlay-and-keyboard-gestures.md)（让位分支、clamp、单套下标） |
 | 客户端没加载、注册 id 报错、改了代码不生效 | [client-bundle-loading-and-artifact-trace.md](references/client-bundle-loading-and-artifact-trace.md)、[silent-failure-and-gate-design.md](references/silent-failure-and-gate-design.md) |
 | 不开浏览器回读配置/状态真值、写自动化验收 | [api-truth-read-back-without-browser.md](references/api-truth-read-back-without-browser.md)、[debugging-and-troubleshooting.md](references/debugging-and-troubleshooting.md) |
 | patch、Bundle、peer 依赖、打包、发布 | [config.md](references/config.md)、[packaging.md](references/packaging.md)、[install-resolution-traps.md](references/install-resolution-traps.md) |
 | 面板点一下卡死 / 诊断段永久「不可用」/ 读不到命名空间 | [runtime-truth-and-external-contracts.md](references/runtime-truth-and-external-contracts.md)（信封未解包、命名空间未挂载）、[official-settings-form-pattern.md](references/official-settings-form-pattern.md)（注入面形状） |
 | 卡片显示包名、中英界面标题不一致 | [settings-and-plugin-ui.md](references/settings-and-plugin-ui.md)（meta 段与面板键分工、中英同族） |
 | schema 形态门禁从不红 / volatile 嵌套才在宿主炸 | [config.md](references/config.md)（嵌套位置限制、引用表形状）、[silent-failure-and-gate-design.md](references/silent-failure-and-gate-design.md)（破坏实测） |
+| 非负整数配置字段（`integer()` 不存在、用 `z.natural()`） | [config.md](references/config.md) §7.8 |
 | 插件改 scoped 名、改名后多处对不上 | [packaging.md](references/packaging.md)（scoped 化六件套）、[config.md](references/config.md)（patch name 引号） |
 | 搭 CI 流水线、tag 发版、npm 发布失败 | [ci-release-workflow.md](references/ci-release-workflow.md)、[publish-npm-verification.md](references/publish-npm-verification.md) |
 | 没有报错但功能不生效 | [silent-failure-and-gate-design.md](references/silent-failure-and-gate-design.md)、[debugging-and-troubleshooting.md](references/debugging-and-troubleshooting.md) |
@@ -72,6 +74,8 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 | volatile 字段拒写、联合字段设计、宿主端拿到引用包装需解包 | [config.md](references/config.md)、[settings-and-plugin-ui.md](references/settings-and-plugin-ui.md) |
 | 卡片版本与面板版本不一致、客户端版本常量脱节漂移 | [silent-failure-and-gate-design.md](references/silent-failure-and-gate-design.md)、[client-bundle-loading-and-artifact-trace.md](references/client-bundle-loading-and-artifact-trace.md) |
 | npm 发布后暂态 404/时延、E409 staged 冲突、线上产物 SHA256 验签 | [publish-npm-verification.md](references/publish-npm-verification.md)、[ci-release-workflow.md](references/ci-release-workflow.md) |
+| tsc 报「找不到 react 声明 / JSX namespace」、`@types` 顶层缺失 | [debugging-and-troubleshooting.md](references/debugging-and-troubleshooting.md)（开头环境四坑） |
+| 固定端口联调「改了没生效」、describe 回读是旧 schema | [api-truth-read-back-without-browser.md](references/api-truth-read-back-without-browser.md)（旧进程核对）、[debugging-and-troubleshooting.md](references/debugging-and-troubleshooting.md) |
 | 跨模块变更、能力删除、兼容迁移 | [cross-cutting-engineering-practices.md](references/cross-cutting-engineering-practices.md) |
 | 具体 API 或版本结论无法确认 | 先查现有参考，再核对目标运行时和 [official-upstream-and-docs.md](references/official-upstream-and-docs.md) |
 | 找不到本机源码、桌面版解包、上游克隆 | [source-verification-and-caches.md](references/source-verification-and-caches.md) |

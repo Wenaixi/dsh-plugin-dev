@@ -67,6 +67,12 @@ Invoke-WebRequest -Uri "http://127.0.0.1:$PORT/api/settings/describe" -Method Po
 
 **验证写入的真值**：`value` 与磁盘补丁逐字段一致 = 落盘确认。验证插件禁用：命名空间从列表消失（数量减一）。
 
+**写前必须核对 schema 真身**：`describe` 返回的 `value` 里出现一个 schema 已不认识的旧键（升级后
+残留的旧字段，例如已删除的旧手势/开关字段），说明宿主进程还加载着旧 schema——最常见的根因不是
+磁盘补丁没改，而是**监听那个端口的还是旧实例进程**。此时先 `Get-NetTCPConnection -LocalPort`
+核对 `OwningProcess.StartTime`（见 browser-automation-acceptance 一节），而不是去改代码重试。
+反过来，新字段不在 `value` 里但磁盘补丁已写，同样是读到了旧进程/旧产物。
+
 ---
 
 ## 四、mutate 的 expectedRevision 边界

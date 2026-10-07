@@ -264,7 +264,22 @@ DSH 官方 `@deepseek-ai/dsh-settings` 在执行 `mutate(ns, ops, expectedRevisi
    ```
    底层 Schemastery 会将其正确打包为含有 `uid` 和分支引用的复合结构，`isVolatilePath` 能够正确递归识别该属性为 volatile。
 
-2. **宿主端 volatile 引用对象的解包陷阱（unwrapValue）**：
+2. **非负整数用 `z.natural()`，不要找 `z.number().integer()`**：
+   schemastery 的 `z.number()` 返回的类型没有 `integer()` 方法（`Property 'integer' does not exist`
+   是编译期报错，不是运行期）。声明「非负整数 + 上下限」字段的正确写法：
+
+   ```typescript
+   // 正确：natural()（非负整数）+ min/max + 默认值
+   maxItems: z.natural().min(10).max(1000).default(100),
+
+   // 错：Property 'integer' does not exist on type ...
+   // maxItems: z.number().integer().min(10).max(1000).default(100),
+   ```
+
+   读取侧仍按「用户可持久化字段」的常规纪律处理：UI 选项（如档位单选）的值来自合法选项集合，
+   输入域边界值在进入状态前归一化夹取（见 runtime-truth-and-external-contracts 受控控件一节）。
+
+3. **宿主端 volatile 引用对象的解包陷阱（unwrapValue）**：
    - 核心事实：在宿主侧，插件的配置经过 Loader 与 Schemastery 校验后，**所有标记了 `.volatile()` 的字段会被包装为内部 volatile 引用对象**（即附带 `.get()` 方法的实体）；
    - 常见盲区：在宿主端代码（如 Provider 或服务实现）中，直接访问 `config.myOption` 拿到的不是原始字符串或数字，而是一个包含 `get` 方法的引用包装！
    - 防御规范：宿主代码必须提供通用解包函数：

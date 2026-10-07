@@ -10,6 +10,8 @@
 - 本机 Chrome 未开调试端口时：`local Chrome running` 是**没用的**——`browser-harness --doctor` 显示 `active browser connections — 0`，调用会等满 30s 报 `BU_CDP_URL=http://127.0.0.1:9222 unreachable`（连接被拒）。
 - 修法：自己拉一个**专用 Chrome**：`--remote-debugging-port=<port> --user-data-dir=<独立目录> --no-first-run --no-default-browser-check about:blank`，然后用 `http://127.0.0.1:<port>/json/version` 确认 200。专用目录与日常浏览器隔离，验完把进程杀干净（`Get-CimInstance Win32_Process` 按命令行过滤 `chrome-automation` 再 Stop-Process）。
 - 宿主 DSH 端口不是固定的：实例启动日志打印 `dsh web: http://127.0.0.1:<port>/?token=<TOKEN>`，**每次重启 token 都会换**；URL、token 从日志取，不要写死。
+- **固定端口上别相信「我重启了」**：用 `--port 3099` 这类固定端口联调时，改了代码跑完还是旧行为，先查监听者是不是旧进程：`Get-NetTCPConnection -LocalPort <port> -State Listen | Select OwningProcess, LocalAddress`，拿 PID 对 `Get-Process -Id` 的 `StartTime`，晚于最后一次 build 才是新实例。杀进程用 `Stop-Process -Id <pid> -Force`（Windows 上 force-kill 表现为 exit 1 无信号标记，属正常终止，别当成命令失败）。
+- **规则化断言文本**：中文系统上自动化读到的 body 文本是乱码，断言一律用 DOM 属性（`aria-selected` / `role` / `id` 前缀 / `data-*`）与 JS 状态（`textContent`、selection offset、`window.__DSH_BOOT__`），不要匹配中文文案；需要把文本规则化时随手 `json.dumps(..., ensure_ascii=False)` 留证据。
 
 ## 二、从 PowerShell 调 browser-harness 的四个坑
 

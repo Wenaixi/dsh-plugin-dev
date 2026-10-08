@@ -51,6 +51,10 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - **缺省值缓存隔离**：探测宿主全局设置时，对 `undefined` 缺省结果必须引入独立的布尔标志位区分「未探测」与「已探测为 undefined」，杜绝每次请求穿透缓存重复全量反射扫描；并在配置重载（`app-boot/config-reload`）中同步复位。详见 [provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) §九。
 - **取消优先穿透**：I/O 变动探测的异常捕获块严禁无差别吞没异常，必须优先判断并 rethrow `AbortError`，保障协作式取消链路畅通。详见 [provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) §十。
 - **增量替换通知**：向会话注入动态目录时严禁篡改已持久化的历史事件，严格遵循 Append-only 增量替换通知模型（`renderCatalogUpdate`），保全大模型长会话 Prompt Cache。详见 [session-prompt-cache-and-catalog-update.md](references/session-prompt-cache-and-catalog-update.md)。
+- **双层提示词与零缓存破坏**：插件自身模式切档严禁修改顶层 SystemPrompt 前缀（基线终身静态化），必须通过 `agent/pre-step` 尾部追加增量提醒并就地更新，彻底保全大模型 KV Cache（Prompt Cache）。详见 [session-prompt-cache-and-catalog-update.md](references/session-prompt-cache-and-catalog-update.md) §六。
+- **轮次拦截深模块化**：在 `agent/pre-step` 与 `session/event` 拦截用户指令时，坚决避免将消息展平、waterfall 穿透、变动对比、原地替换与状态标记散落在入口胶水代码中，必须收敛为单一的 `TurnCoordinator` 深模块，并捍卫 6 大核心不变量。详见 [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §八。
+- **全状态存储虚拟化**：插件持久化存储严禁硬编码调用 `node:fs` 读写磁盘，所有私有文件 I/O 必须由存储适配器代理，并向单测暴露纯内存适配器（`createMemoryStorage`），物理零磁盘触碰。详见 [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §九。
+- **包引擎与 CI 兼容基线**：`package.json.engines` 仅声明 Node 基础运行底座（`node: ">=20"`），严禁锁死 `engines.pnpm`（防 CI 触发 `ERR_PNPM_UNSUPPORTED_ENGINE` 与 `ERR_UNKNOWN_BUILTIN_MODULE` 恶性死锁）。详见 [ci-release-workflow.md](references/ci-release-workflow.md) §三。
 - **控制器深度抽象**：双面客户端配置交互必须抽象为领域控制器深模块（`CardController` / `PanelModel`），统一封装 `ConfigForm` 交互与单次原子 ops 拍平，React 视图仅通过 `useSyncExternalStore` 接入不可变快照，从根源杜绝并发渲染状态撕裂；并在纯 Node 环境下利用 `node:vm` 建立毫秒级脱机单测（The interface is the test surface）。详见 [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md)。
 - **重置边界正交隔离**：列表工具条上的批量重置操作严格局限于该列表项字典路径，严禁越权侧漏抹除用户独立的全局标量配置（如语言或主题偏好）。详见 [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §十。
 
@@ -58,6 +62,10 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 
 | 需求或症状 | 先读 |
 | --- | --- |
+| 会话内动态切档、插件自身模式切换与大模型 Prompt Cache 零破坏 | [session-prompt-cache-and-catalog-update.md](references/session-prompt-cache-and-catalog-update.md) §六 |
+| agent/pre-step 轮次拦截胶水代码膨胀、TurnCoordinator 深模块收敛与 6 大不变量 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §八 |
+| 状态模块硬编码 node:fs 导致测试污染磁盘、StateStorageAdapter 纯内存虚拟化 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §九 |
+| CI 安装报 ERR_PNPM_UNSUPPORTED_ENGINE、PowerShell CLI 管道符 | 语法截断 | [ci-release-workflow.md](references/ci-release-workflow.md) §三 |
 | 双面客户端控制器深模块重构、`useSyncExternalStore` 接入、纯 Node 脱机状态机单测 | [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md) |
 | 列表批量重置意外抹掉语言/主题偏好、正交隔离准则 | [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §十 |
 | Tag 指针漂移导致 CI 发布旧代码、发版前三步核验与标准纠偏序列 | [publish-npm-verification.md](references/publish-npm-verification.md) §三 |

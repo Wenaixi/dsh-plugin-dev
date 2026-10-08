@@ -90,3 +90,35 @@ DSH 官方在每轮对话发起前，通过瀑布流事件对全量动态条目�
    当插件内部状态变化（如开关、语言、选项配置）时，只需通过 Provider 控制器触发注册表失效（如 `control.invalidate()`）并递增宿主 `revision`。宿主会在下一次对话的 `agent/pre-step` 自动完成指纹比对与增量通知派发。
 3. **避免无意义的微小波动触发高频更新**：
    若导出的描述字符串带有无意义的动态时间戳、随机数或每次遍历顺序不一致（未排序），会导致 SHA-256 指纹每轮都发生虚假变动，使已存在会话在每一轮都不必要地追加替换通知，白白浪费新增 Token 成本。条目清单必须保持**确定性排序（Deterministic Sorting）**。
+
+---
+
+## 六、进阶：双层提示词架构与全生命周期缓存保护模式（Dual-tier Prompt Architecture）
+
+在实际插件开发中，很多插件不仅需要向模型同步外部技能/工具目录，还需要支持**插件自身的运行强度、工作模式或角色策略在会话内的动态切换**。若直接修改顶层 `systemPrompt.section`，会立即击穿从该 Token 往后的历史所有 KV 缓存。
+
+为解决这一问题，DSH 高阶插件应采用**双层提示词架构（Dual-tier Prompt Pattern）**：
+
+### 1. 顶层基线终身锁定（Session Baseline Invariance）
+- 当一个会话被创建或首次唤醒时，原子捕获当前全局配置作为该会话的初始基线（`baselineMode`）；
+- 在该会话整个生命周期中，顶层 `systemPrompt.section` **只能且必须输出这一初始基线**；
+- 无论后续在会话内执行了多少次切换指令，或外部全局配置发生了何种改变，顶层 SystemPrompt 前缀在字节级别绝对保持恒定，从而为历史长对话锁住 100% 的 Prompt Cache。
+
+### 2. 当前轮次末尾追加瞬态更新（Turn-end Incremental Notification）
+- 当实际生效模式（`effectiveMode`）与最后一次向模型发射的模式（`lastEmittedMode`）不一致时，在 `agent/pre-step` 拦截点构造带有 `<system-reminder>` 的增量系统提醒；
+- 将提醒仅追加在当前轮次待发消息数组的末尾，大模型在注意力机制的最新位置以最高权重即时对齐新模式；
+- 发射成功后标记状态对齐，后续未切档轮次保持**零注入（Idempotent）**，不产生冗余 Token 消耗。
+
+### 3. 同轮流水线原地替换防重入（In-place Replacement Anti-duplication）
+- 在复杂的 Agent 执行循环中，同一轮次可能会触发多次内部重试、工具调用流水线或二次拦截；
+- 在 `agent/pre-step` 准备追加更新通知前，必须遍历 `decision.messages` 检索是否已存在未提交的同源模式更新项（例如 `m.source?.kind === 'plugin-mode-update'`）；
+- **存在则原地覆盖替换，不存在才向后 push 追加**。彻底杜绝流水线重试过程中的更新消息无限膨胀。
+
+### 4. 跨进程重启与 LRU 淘汰的会话基线持久化（Session Baseline Persistence）
+- 内存中的会话状态表往往受限于 LRU 缓存上限（如最大保留 100 会话）和 DSH 进程的日常重启；
+- 若旧会话被内存淘汰后重新唤醒时丢失了原初基线，被迫采用新的全局默认档重新生成 SystemPrompt，会导致历史长对话瞬间全盘脱靶重算；
+- **通用解法**：在 profile 目录下以轻量 JSON 异步持久化各会话的 `baselineMode`。当旧会话被再次唤醒时，优先从磁盘恢复其原初基线，使跨进程、跨天的历史会话依然永久享受 100% 缓存命中！
+
+### 5. 会话显式意图守卫（Explicit Intent Guard）
+- 当用户在某个具体会话内通过命令显式指定了工作模式时，给该会话打上 `explicitlySet = true` 意图保护标记；
+- 当外部全局配置发生热变更（经 `loader/volatile-update` 广播）时，状态管理器**只同步那些从未显式设置过的跟随型会话**，严禁覆盖用户已明确指定的会话模式。

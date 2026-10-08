@@ -178,3 +178,71 @@ vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
 packages/settings/settings  <-  @deepseek-ai/dsh-settings@0.2.0-rc.2
 packages/skill/skill  <-  @deepseek-ai/dsh-skill@0.2.0-rc.2
 ```
+
+---
+
+## 八、轮次拦截深模块架构：TurnCoordinator 模式
+
+在很多涉及交互指令或动态提示词调整的插件中，宿主入口容易在 `agent/pre-step` 拦截点产生严重的**浅模块与逻辑泄露（Shallow Module）**问题。
+
+### 1. 典型坏味道
+一次普通的用户请求，入口处散落着多达 6~7 步的底层管道拼接：
+1. 从复杂载荷中提取多层级会话 ID；
+2. 展平消息块并调用指令分发器；
+3. 亲自驱动下游 `await next()` waterfall 执行；
+4. 检查下游决策并对比状态变动；
+5. 构造增量系统提醒消息（`<system-reminder>`）；
+6. 遍历消息数组检索并执行原地替换或追加；
+7. 显式调用状态机标记已发射状态。
+
+这使得命令分发器仅仅是一层薄薄的正则表达式壳子，而真正的**轮次拦截生命周期与消息管道控制**全部泄露在入口胶水代码中，理解一次交互需要在 3 个文件之间反复跳跃，缺乏 **Locality**。
+
+### 2. 深模块重构方案：TurnCoordinator
+将上述 7 步调用流完整封装进一个统一的高杠杆深模块中，对外仅暴露极窄接口（Narrow Interface）：
+```ts
+export interface TurnCoordinator {
+  handlePreStep(payload: unknown, next: () => Promise<unknown>): Promise<unknown>
+  handleSessionEvent(session: unknown, event: unknown): void
+}
+```
+
+### 3. 必须严格捍卫的 6 大不变量（Invariants）
+- **不断链不变量（Pass-through Invariant）**：无论内部解析还是渲染抛出任何异常，必须由 try/catch 记录 warn 且继续 `return await next()`，绝不能中断宿主执行；非 `enter` 决策原样透传。
+- **KV Cache 保护不变量（Prompt Cache Protection Invariant）**：整个会话生命周期内顶层 SystemPrompt 前缀必须绝对不可变，所有动态变动严格限制在当前轮次尾部瞬态消息。
+- **单通知幂等不变量（Single-Notice Idempotency Invariant）**：同轮消息流中带有更新标识的消息至多 1 条，流水线重试时就地替换，绝不盲目重复 push。
+- **发射标记收敛时机不变量（Emission Timing Invariant）**：必须且只能在 `decision.kind === 'enter'` 且消息成功注入后才标记已发射，绝不在 pre-step 前半段提前标记。
+- **多会话隔离不变量（Session Isolation Invariant）**：所有状态变更严格限定在当前 `sessionId` 作用域，严禁单会话切档污染全局或兄弟会话。
+- **只读命令安全不变量（Read-only Intact Invariant）**：裸查询指令绝不触发状态写入或发射漂移。
+
+### 4. 架构收益
+- 宿主入口 `apply` 的两处事件监听直接缩减为两行极简委托；
+- 测试面升级：测试用例直接以入站消息和下游桩作为输入，断言出站消息流的最终形状，真正实现 **"The interface is the test surface"**！
+
+---
+
+## 九、全状态存储虚拟化模式（StateStorageAdapter）
+
+很多需要持久化状态（如 flag 标志、会话状态备份）的插件，往往会抽象一个简单的接口（如仅包含 flag 字符串读写的 `Storage`）。但后续当系统引入更复杂的状态文件（如 `session-states.json`）时，开发者容易图省事直接在模块内部硬编码调用 `node:fs` 的 `readFileSync/writeFileSync`。
+
+### 1. 隐藏的物理磁盘耦合风险
+- **单元测试内存隔离破损**：测试用例即使传入了内存 Storage 假桩，模块内部依然会去触碰真实物理磁盘；
+- **并发与环境竞争**：多测试并行运行时会争抢写同一个磁盘文件，导致偶发脏数据测试崩溃；
+- **无权限沙箱失败**：在受限沙箱或无写权限的只读容器下，直接抛错使核心生命周期瘫痪。
+
+### 2. 解决方案：全状态存储契约虚拟化
+将持久化适配器契约扩充为覆盖全量状态的抽象接缝（Seam）：
+```ts
+export interface StateStorageAdapter {
+  // 基础 flag 存取
+  readFlag(): string | null
+  writeFlag(mode: string): void
+  clearFlag(): void
+  
+  // 复杂会话状态字典存取（可选解耦抽象）
+  readSessions?(): Record<string, SessionState>
+  writeSessions?(sessions: Record<string, SessionState>): void
+}
+```
+- **生产适配器**：`createDiskStorage(profileDir)` 代理物理磁盘文件的安全原子读写与异常兜底；
+- **测试适配器**：导出 `createMemoryStorage()` 纯内存适配器，在内存字典中克隆往返，**物理磁盘 0 次触碰**；
+- **引导期隔离原则**：一次性引导迁移（如旧路径向 profile 补丁导入）属于启动编排职责，坚决不硬塞进运行时状态引擎，保持运行时模块的纯粹与轻盈。

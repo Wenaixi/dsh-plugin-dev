@@ -57,3 +57,23 @@ git push origin v1.2.3 --force          # 远端 tag 强制更新
 ```text
 apps/cli  <-  @deepseek-ai/dsh@0.2.0-rc.2
 ```
+
+---
+
+## 三、依赖引擎声明与 CI 环境避坑指南
+
+### 1. package.json 的 engines 切勿锁死 pnpm 版本
+- **典型症状**：在 `package.json` 中声明了 `"engines": { "node": ">=20", "pnpm": ">=11" }`，本地开发一切正常，但在 GitHub Actions 等 CI Runner 上执行 `pnpm install --frozen-lockfile` 时突然崩溃，报错：  
+  ` ERR_PNPM_UNSUPPORTED_ENGINE  Expected version: >=11, Got: 10.x`。
+- **连锁反应（恶性死锁）**：若尝试将 CI 中的 `pnpm/action-setup` 强行指定为 `version: 11`，在 `node-version: 20` 的容器中，最新版 pnpm 内部引用的新 Node 内置模块（如 `node:sqlite`）又会抛出 `ERR_UNKNOWN_BUILTIN_MODULE`，导致依赖安装彻底瘫痪！
+- **最佳工程实践**：
+  - 学习大厂优秀开源库（如 `dsh-superpower`）的黄金准则：`package.json.engines` **只声明 Node 底座版本**（如 `"node": ">=20"`），**绝不写死 `engines.pnpm`**；
+  - 高版本包管理器的偏好建议仅在 README 顶部作为生态徽章（Badges）呈现；
+  - CI 工作流中的 `pnpm/action-setup` 与 `actions/setup-node` 严格按 LTS 稳定兼容基线搭配（Node 20 配 pnpm 10，Node 22 配 pnpm 11+）。
+
+### 2. PowerShell CLI 命令中管道符 | 的语法陷阱
+- **典型症状**：在 Windows PowerShell / pwsh 中通过 CLI 命令更新云端配置或 GitHub 仓库简介（如 `gh repo edit --description "A | B"`）时，命令直接报错或返回非零 ExitCode。
+- **根因分析**：PowerShell 的词法分析器在解析双引号字符串时，管道符 `|` 极易被误识别为命令行数据流管道（Pipeline Operator），导致命令被从管道处硬生生切成两段执行。
+- **最佳工程实践**：
+  - 在 PowerShell / pwsh 下传递包含 `|` 的参数时，**统一使用单引号包裹**：`gh repo edit --description 'A | B'`；
+  - 若在模板字符串中动态拼接，优先使用反引号（`` `| ``）进行显式转义。

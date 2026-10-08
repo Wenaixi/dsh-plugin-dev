@@ -31,6 +31,7 @@
 - [provider-catalog-invalidation.md](./provider-catalog-invalidation.md)：动态技能目录失效机制——`skills/change` 递归反模式、闭包捕获实例、**宿主跨 Fiber 全局配置变更（如界面语言）收敛点 `app-boot/config-reload`**、**异步扫描 In-Flight 并发重入屏障 `scanPromise`**，以及**呈现投影变动与物理文件变动解耦（零磁盘 I/O 刷新）**。
 - [session-prompt-cache-and-catalog-update.md](./session-prompt-cache-and-catalog-update.md)：已存在会话条目更新机制与大模型 Prompt Cache 保全原理——会话级增量消息注入、历史事件一字不动保全前缀缓存、极限全关降级提示词。
 - [sandbox-process-and-pipe-traps.md](./sandbox-process-and-pipe-traps.md)：Windows 沙箱环境下子进程命名管道受限 EPERM 陷阱与 node:vm 纯内存语法校验实践。
+- [client-controller-architecture-and-headless-testing.md](./client-controller-architecture-and-headless-testing.md)：双面客户端控制器深度架构与 node:vm 脱机纯内存状态机单测实践——消除多参数提交泥球、PanelController 深度抽象、单次原子 mutate 批处理、React 18 `useSyncExternalStore` 零撕裂渲染、以及在无真实浏览器环境下 50ms 极速覆盖全量状态机用例。
 - [shared-contract-capability-boundaries.md](./shared-contract-capability-boundaries.md)：当「同一个数据要按调用方给出不同表现」的需求撞上一个改不动的上游时，先沿链路收敛——枚举全部消费方、追到投影函数的字段白名单、抄缓存键的构成维度、核对作用域参数能否区分调用方。四条全过才有受支持路径；不过就是上游数据模型不支持。不可行时的三条覆写路径（接受同源 / 并列注册 / 运行时改写上游对象）各自的代价、失效形态与门禁写法，含「为省条目而改可见性标志会砍掉主功能」这一常见否决项。
 
 通用专题与具体版本资料冲突时，以目标运行时和源码为准。**每篇专题末尾都有「相关 DSH 源码」清单**，列出上游仓库相对路径与版本号，版本升级后必须重新读源码核对。
@@ -169,6 +170,8 @@
   已存在会话条目更新机制与大模型 Prompt Cache 保全原理——会话日志 Append-only 事件流契约；每轮对话前置 SHA-256 条目指纹检测；`history.published` 驱动的 `renderCatalogUpdate` 增量替换通知模型；**历史所有轮次 Token 序列 100% 保持未改动从而保全大模型服务端 Prompt Cache** 的设计原理；全关极端状态下的安全降级文案；插件严禁篡改会话历史。
 - **[sandbox-process-and-pipe-traps.md](./sandbox-process-and-pipe-traps.md)**：
   Windows 沙箱环境下子进程命名管道受限 EPERM 陷阱与 node:vm 纯内存语法校验实践——Windows 受限沙箱禁止非受信任命名管道；`child_process` 默认 stdio pipe 导致 EPERM 且返回对象未判空直接 `.trim()` 造成致命 TypeError 崩溃；**纯内存语法校验最佳实践 `new vm.Script(source)`**（0 子进程开销、耗时 1ms、0 代码执行副作用、100% 绝对免疫沙箱 EPERM）；必须派生子进程时的安全姿态（可选链保护与禁止盲目重试）。
+- **[client-controller-architecture-and-headless-testing.md](./client-controller-architecture-and-headless-testing.md)**：
+  双面客户端控制器深度架构与 node:vm 脱机纯内存状态机单测实践——**浅组件参数泥球反模式**；提炼高内聚的 `PanelController` / `CardModel` 深度领域控制器，统一封闭 `ConfigForm` 交互与单次原子 `allOps` 批处理；**React 18 原生 1 行代码接入 `useSyncExternalStore`** 消除并发渲染状态撕裂（Tearing）；以及**利用 Node 原生 `node:vm` 纯内存沙箱提取 CJS bundle 工厂导出**，通过最小 MockScope 在 **< 50ms** 内极速覆盖全量状态机用例（单开关三段式、旧表原子继承、批量 17 条原子批处理、disposed 假死拦截与堆栈捕获），彻底免除启动笨重真实浏览器的依赖。
 - **[client-i18n-pitfalls.md](./client-i18n-pitfalls.md)**：
   客户端 `ctx.locale` 实战六铁律——双语键必须完全成对、值可相同（刻意单语条目也用同值占位）；字典是纯数据、**不能嵌 `t()` 调用**；构建期 Node 计算、产物只内嵌**字面量**（浏览器端执行 `readdirSync` 会 ReferenceError）；宿侧下发的诊断链中文在客户端按枚举查字典覆盖（宿侧契约零改动）；语言切换刷新用 `ctx.locale.subscribe` 而非 `locale/change` 事件；字典并入 `locale/*.json` 顶层键组与 meta 键共存；反向断言门禁清单。
 - **[architecture-refactor-experience.md](./architecture-refactor-experience.md)**：

@@ -411,6 +411,33 @@ function submit(form, t, names, op, setPending, setFailures, opsOverride) {
 
 ---
 
+## 十、UI 批量重置的正交隔离原则 (Orthogonal Scope of Reset Operations)
+
+当单个插件配置面板同时管理**集合字典**（如按项开关的字典 `{ itemOverrides: { <id>: boolean } }`）与**独立全局标量**（如全局呈现偏好 `language: 'zh' | 'en' | undefined`）时，工具条上的「恢复默认（resetAll）」必须严格遵循**正交隔离**原则：
+
+### 10.1 常见架构陷阱：重置操作越权侧漏 (Scope Leakage)
+- **典型误区**：开发者为了追求所谓的“彻底归零”，在列表工具条的「恢复默认」按钮回调中，顺带向全局标量字段派发了 `unset` 操作；
+- **严重后果**：用户精心锁定的语言偏好、展示主题等全局配置，在仅仅想要重新启用列表中某项条目时被**无预警抹杀**，严重破坏用户的心智模型，违反最小惊讶原则（Principle of Least Astonishment）。
+
+### 10.2 三大正交划界准则
+1. **区域物理位置与文案契约一致（Spatial & Textual Boundedness）**：
+   - 若重置按钮物理位于列表正上方的子工具条（Toolbar），且悬浮提示文案（`resetHint`）承诺的是「恢复列表项全部开启」，则其生成的操作路径必须严格局限在该列表字典的路径内；
+   - 文案未承诺的范围，代码绝无权越权操作。
+2. **独立标量提供专属重置通道（Orthogonal Channel Self-Closure）**：
+   - 全局独立标量必须在自身控件内提供自洽的重置/清空机制。例如语言或主题偏好使用 `SegmentedControl` 三段选择器时，提供「跟随宿主（自动）」选项，用户选中该选项即派发该标量字段的 `unset`；
+   - 标量域内部已实现完整闭环，坚决不依赖外部列表工具条代劳。
+3. **自动化测试防侧漏断言（Anti-Leakage Assertion）**：
+   在单测或端到端测试中，执行批量重置时不仅要断言列表字典已被清空，还必须显式断言**不含无关字段的变更**：
+   ```javascript
+   await controller.resetAll();
+   const ops = mockForm.__historyOps[0];
+   // 硬性断言：生成的全部 ops 路径中绝不包含无关的标量字段
+   const hasUnrelatedLeak = ops.some(op => op.path[0] === 'language');
+   assert.equal(hasUnrelatedLeak, false, 'resetAll 绝不能越权操作无关字段');
+   ```
+
+---
+
 ## 相关 DSH 源码
 
 ```text

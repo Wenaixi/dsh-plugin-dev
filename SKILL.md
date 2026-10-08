@@ -51,11 +51,16 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - **缺省值缓存隔离**：探测宿主全局设置时，对 `undefined` 缺省结果必须引入独立的布尔标志位区分「未探测」与「已探测为 undefined」，杜绝每次请求穿透缓存重复全量反射扫描；并在配置重载（`app-boot/config-reload`）中同步复位。详见 [provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) §九。
 - **取消优先穿透**：I/O 变动探测的异常捕获块严禁无差别吞没异常，必须优先判断并 rethrow `AbortError`，保障协作式取消链路畅通。详见 [provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) §十。
 - **增量替换通知**：向会话注入动态目录时严禁篡改已持久化的历史事件，严格遵循 Append-only 增量替换通知模型（`renderCatalogUpdate`），保全大模型长会话 Prompt Cache。详见 [session-prompt-cache-and-catalog-update.md](references/session-prompt-cache-and-catalog-update.md)。
+- **控制器深度抽象**：双面客户端配置交互必须抽象为领域控制器深模块（`CardController` / `PanelModel`），统一封装 `ConfigForm` 交互与单次原子 ops 拍平，React 视图仅通过 `useSyncExternalStore` 接入不可变快照，从根源杜绝并发渲染状态撕裂；并在纯 Node 环境下利用 `node:vm` 建立毫秒级脱机单测（The interface is the test surface）。详见 [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md)。
+- **重置边界正交隔离**：列表工具条上的批量重置操作严格局限于该列表项字典路径，严禁越权侧漏抹除用户独立的全局标量配置（如语言或主题偏好）。详见 [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §十。
 
 ## 场景路由
 
 | 需求或症状 | 先读 |
 | --- | --- |
+| 双面客户端控制器深模块重构、`useSyncExternalStore` 接入、纯 Node 脱机状态机单测 | [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md) |
+| 列表批量重置意外抹掉语言/主题偏好、正交隔离准则 | [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §十 |
+| Tag 指针漂移导致 CI 发布旧代码、发版前三步核验与标准纠偏序列 | [publish-npm-verification.md](references/publish-npm-verification.md) §三 |
 | 全局改配置是否影响已有会话、动态条目更新与 LLM Prompt Cache 保全 | [session-prompt-cache-and-catalog-update.md](references/session-prompt-cache-and-catalog-update.md) |
 | Windows 沙箱下管道 EPERM 报错、node --check 崩溃、纯内存语法校验 | [sandbox-process-and-pipe-traps.md](references/sandbox-process-and-pipe-traps.md) |
 | 批量修改配置/开关报保存失败、部分成功部分失败、并发 mutate 乐观锁撕裂 | [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §九 |
@@ -180,3 +185,6 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - 客户端样式注入使用纯 `if (!document.querySelector(...))` 守卫，导致开发期 HMR 热重载时因已有标签未被清理，新修改的 CSS 规则无法热生效覆盖。
 - 在 `package.json` 的 `files` 发布白名单中遗漏多语言说明文档（如 `README.zh.md`），导致 npm 线上发布包中缺失该文件，文档顶部的语言跳转链接沦为 404 死链。
 - 试图在插件层覆写或篡改已持久化的会话历史事件，破坏会话事件流的 Append-only 契约，摧毁大模型服务端原本逐字匹配的 Prompt Cache 历史前缀。
+- 在 React 组件内部将多个 `useState` 状态更新器深传给散落的提交函数中，形成高耦合浅模块（Shallow Module），导致测试必须强依赖启动真实的 Chromium/Playwright 进程，无法建立毫秒级的脱机状态机单元测试。
+- 列表工具条的「恢复默认」在清理条目字典时，私自向独立的全局标量字段派发 `unset`，违反最小惊讶原则，意外抹杀用户显式配置的全局偏好设置。
+- 重新发版前未核对本地与远程 tag 的提交指针（`git rev-parse <tag>` vs `HEAD`），导致本地残留旧 tag 并触发 CI 流水线发布未经修复的历史旧产物。

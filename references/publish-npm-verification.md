@@ -33,21 +33,32 @@ console.log(j["dist-tags"].latest);
 - `npm publish` 与 `gh release` 是两套独立产物、不自动成立：npm 发布成功不代表 Release 存在（`gh release view <tag>` 才是 Release 真值）；npm 发布成功也不代表 registry 可见（镜像缓存延迟，直查官方 API 为准）；
 - 发布流程先跑门禁再构建（`lib/` 为构建时产物，官方包 files 精确含 lib 不含 src），版本号是 package.json 的 manifest 字段；tag 指向的 commit 决定发哪个版本。
 
-## 三、tag 指向错误的修正
+## 三、tag 指向错误的修正与指针漂移防御
 
-推送 tag 后发现 tag 打在旧 commit（比如 bump 提交因命令拼接失败没落地）：
+### 3.1 发版前 Tag 指针一致性核验（防静默发旧代码）
+在本地推送 tag 之前，高频陷阱是：前期测试或调试时已经打过同名 tag，后续多轮修复提交了新的 commit，但 tag 仍锚定在历史旧提交上。若直接推送，CI 将检出未修复的老代码并发布错误的产物！
 
+**核验标准动作**：
 ```bash
-git tag -d v1.2.3            # 删本地
-# 先完成遗留提交（add + commit 分开跑，PowerShell 5.1 的 && 不可用（ParserError；7+ 才支持 &&））
-git add -A -- <files>; git commit -m "chore: bump to v1.2.3"
-git tag v1.2.3               # 在新 commit 重打
-git push origin main
-git push origin v1.2.3 --force   # 强制更新远端 tag
+git rev-parse vX.Y.Z                     # 本地 tag 指向的 commit
+git rev-parse HEAD                       # 当前工作区最新 commit
+git ls-remote origin refs/tags/vX.Y.Z   # 远端已存在的 tag 指向（如有）
+```
+若三者（尤其是本地 tag 与 HEAD）不一致，必须立即执行标准纠偏序列。
+
+### 3.2 标准纠偏序列
+```bash
+git tag -d vX.Y.Z                                # 1. 彻底删除本地旧 tag
+# 2. 确认最新提交已干净落库（add 与 commit 分开执行，PowerShell 5.1 不支持 &&）
+git add -A; git commit -m "chore(release): vX.Y.Z"
+git tag -a vX.Y.Z -m "vX.Y.Z: release notes"     # 3. 必须在最新 HEAD 上重新打 annotated tag
+git push origin main                             # 4. 先推主分支
+git push origin vX.Y.Z --force                   # 5. 强制覆盖远端 tag 触发最新 CI
 ```
 
-- 远端 tag 更新后，`git ls-remote --tags origin v1.2.3` 应指向新 SHA；
-- force-push tag 是发布修正的常规操作（release 已建时另需处理 Release 指向）。
+- 远端 tag 更新后，`git ls-remote --tags origin vX.Y.Z` 应指向新 SHA；
+- force-push tag 是发布修正的常规安全操作（release 已建时另需处理 Release 指向）；
+- **CHANGELOG 提取健壮性**：CI 发版脚本通常通过正则 `/^## \[${escVer}\].*/` 切片提取更新日志。发布前必须确保版本小节直接位于开篇顶层，避免遗留未关闭的 `[Unreleased]` 或散落文本导致 GitHub Release 正文提取落空或为空。
 
 ## 四、PowerShell 拼接命令的坑
 

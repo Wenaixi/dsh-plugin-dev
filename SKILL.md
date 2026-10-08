@@ -46,11 +46,22 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - **门禁不写死会变的东西**：把具体版本号或阈值抄进门禁，等于每次变更都要改门禁本身，漏改即失效。断言应校验「几处一致」，不是「某处等于某字符串」。
 - **分清静态与真机**：有一类门禁在原理上无法用静态断言覆盖——宿主运行时的语义闸门。写门禁前先对一遍 [host-semantic-gates.md](references/host-semantic-gates.md)，把真机项排进隔离实例验收，不要留在脚本里假装已覆盖。
 - **先判能力再写方案**：需求是「同一份数据按调用方给出不同表现」时，先沿链路收敛——枚举全部消费方、追到投影函数的字段白名单、抄缓存键的构成维度、核对作用域参数。四条全过才有受支持路径；有一条不过就是上游数据模型不支持，此时该做的是选覆写路径并写清代价，而不是继续找写法。判定程序见 [shared-contract-capability-boundaries.md](references/shared-contract-capability-boundaries.md)。
+- **原子批处理**：多字段或列表项变更必须由客户端平铺为单次原子 `form.mutate(allOps)`，严禁并发触发多次独立 `mutate` 竞争宿主 revision 乐观锁，杜绝状态撕裂与局部失败。详见 [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §九。
+- **内存语法解析**：构建与门禁语法校验严禁使用跨进程 `spawnSync('node --check')`，改用 Node 原生 `node:vm`（`new vm.Script`）纯内存解析，彻底免疫 Windows 沙箱命名管道 EPERM 崩溃。详见 [sandbox-process-and-pipe-traps.md](references/sandbox-process-and-pipe-traps.md)。
+- **缺省值缓存隔离**：探测宿主全局设置时，对 `undefined` 缺省结果必须引入独立的布尔标志位区分「未探测」与「已探测为 undefined」，杜绝每次请求穿透缓存重复全量反射扫描；并在配置重载（`app-boot/config-reload`）中同步复位。详见 [provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) §九。
+- **取消优先穿透**：I/O 变动探测的异常捕获块严禁无差别吞没异常，必须优先判断并 rethrow `AbortError`，保障协作式取消链路畅通。详见 [provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) §十。
+- **增量替换通知**：向会话注入动态目录时严禁篡改已持久化的历史事件，严格遵循 Append-only 增量替换通知模型（`renderCatalogUpdate`），保全大模型长会话 Prompt Cache。详见 [session-prompt-cache-and-catalog-update.md](references/session-prompt-cache-and-catalog-update.md)。
 
 ## 场景路由
 
 | 需求或症状 | 先读 |
 | --- | --- |
+| 全局改配置是否影响已有会话、动态条目更新与 LLM Prompt Cache 保全 | [session-prompt-cache-and-catalog-update.md](references/session-prompt-cache-and-catalog-update.md) |
+| Windows 沙箱下管道 EPERM 报错、node --check 崩溃、纯内存语法校验 | [sandbox-process-and-pipe-traps.md](references/sandbox-process-and-pipe-traps.md) |
+| 批量修改配置/开关报保存失败、部分成功部分失败、并发 mutate 乐观锁撕裂 | [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §九 |
+| 宿主缺省值导致缓存穿透、每次请求全量重复扫描 describe | [provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) §九 |
+| 开发期 HMR 修改 CSS 样式不生效、刷新页面才生效 | [web-ui-slots-and-styling.md](references/web-ui-slots-and-styling.md) §十 |
+| npm 发布后线上多语言 README 点击报 404 死链 | [packaging.md](references/packaging.md) §五 |
 | 服务注入、Service、PENDING、缺失依赖 | [services.md](references/services.md)、[plugin-anatomy.md](references/plugin-anatomy.md) |
 | 监听器、定时器、异步任务、重载或卸载 | [events.md](references/events.md)、[plugin-anatomy.md](references/plugin-anatomy.md) |
 | 动态目录、Provider、缓存、失效、重名 | [skill-provider.md](references/skill-provider.md)、[provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) |
@@ -107,6 +118,12 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 | 打算猴补官方对象、担心升级后静默失效 | [shared-contract-capability-boundaries.md](references/shared-contract-capability-boundaries.md)（三条失效形态与对应门禁）、[host-semantic-gates.md](references/host-semantic-gates.md) |
 | 想少显示几条上游条目，动了可见性标志后主功能也坏了 | [shared-contract-capability-boundaries.md](references/shared-contract-capability-boundaries.md)（同一标志是否被多通路共用） |
 | 包自带补丁 insert 格式规范、全新安装零配置自动渲染、界面写入自动持久化回写 | [plugin-config-card-architecture.md](references/plugin-config-card-architecture.md) |
+| 三态/多态配置字段在客户端缺项折叠、未配置跟随失效 | [client-i18n-pitfalls.md](references/client-i18n-pitfalls.md) 铁律七 |
+| 宿主切换界面语言后插件缓存陈旧、模型目录不刷新 | [provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) §五 |
+| 异步扫描多任务并发重入、Map 相互清空报假重名或丢技能 | [provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) §六 |
+| 呈现维度（如语言）切换造成高频无谓读盘、未解耦物理变动 | [provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) §七 |
+| 集合/字典型字段惰性迁移时，单项操作抹除旧表其余历史数据 | [config-field-lifecycle.md](references/config-field-lifecycle.md) §3.2.1 |
+| 本地 pnpm pack 重装调试时报 Already up to date、产物不更新 | [install-resolution-traps.md](references/install-resolution-traps.md) §8.4 |
 
 已有专题参考仍按 [references/README.md](references/README.md) 索引；若通用参考与目标版本源码冲突，以源码和运行时为准。
 
@@ -124,6 +141,10 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 ## Anti-Patterns
 
 - 凭记忆猜服务名、字段名、插槽名或事件返回值。
+- 把带有「跟随默认」语义的三态字段在客户端读取时折叠成兜底字面量，让前端跟随逻辑永久成为死代码。
+- 集合/字典型字段惰性迁移时只把当前操作项写入新表就全量 unset 旧表，导致历史表中其余生效项被连带意外抹除复活。
+- 异步多 I/O 扫描器在函数开头裸调 `clear()` 且无并发重入屏障，让后进入的任务清空前一个正在填充的 Map 造成技能丢失。
+- 宿主全局配置（如界面语言）变更依赖自身插件的 volatile 广播，不知道该事件只在所属插件 Fiber 传播而漏接 `app-boot/config-reload`。
 - 把「最终输出为空」直接当成「功能有缺陷」，不先证明中间状态真的发生过——归错因的修复同样能让症状消失，假结论于是被写进记忆库。
 - 在冷态（目录或注册表未 ready）下跑完整个验收就下结论，并把结论当可复现的缺陷记录。
 - 用「按类型取第一个匹配」或界面文本当断言锚点；同类元素多于一种时，断言稳定测错对象且一直绿。
@@ -152,3 +173,10 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - 拿一个改不动的上游字段去做「按调用方差异化」的需求，写完方案才发现投影与缓存那一层已经把信息抹掉了；判定程序见 shared-contract-capability-boundaries.md。
 - 为了让上游少显示自己的条目去改可见性标志，没先确认该标志是否被上游多个通路共用，结果连带砍掉主功能。
 - 选中运行时改写上游对象之后不把失效形态与升级核对清单写进项目记忆库，让它变成没人复查的暗债。
+- 批量配置变更采用 `Promise.all(items.map(form.mutate))` 发起并发写入，在同一微秒内竞争宿主单调递增的 revision 锁，导致后序调用被版本冲突拦截、UI 状态严重撕裂与级联失败。
+- 在门禁或构建脚本中使用跨进程 `spawnSync('node --check')` 校验语法，在 Windows 沙箱受限环境下遭遇命名管道 EPERM 拦截并因未判空调用 `.trim()` 引发致命的 TypeError 崩溃。
+- 以 `if (this.cache !== undefined)` 作为宿主缺省值探测的缓存守卫，在默认未配置环境下守卫恒为 false，导致后续每一次调用都全量重复反射扫描。
+- 在目录/文件变动探测的 catch 块中盲目返回 true，吞没 `signal.throwIfAborted()` 抛出的 `AbortError`，使已取消的任务反被误判为文件变更并强行触发全量重扫。
+- 客户端样式注入使用纯 `if (!document.querySelector(...))` 守卫，导致开发期 HMR 热重载时因已有标签未被清理，新修改的 CSS 规则无法热生效覆盖。
+- 在 `package.json` 的 `files` 发布白名单中遗漏多语言说明文档（如 `README.zh.md`），导致 npm 线上发布包中缺失该文件，文档顶部的语言跳转链接沦为 404 死链。
+- 试图在插件层覆写或篡改已持久化的会话历史事件，破坏会话事件流的 Append-only 契约，摧毁大模型服务端原本逐字匹配的 Prompt Cache 历史前缀。

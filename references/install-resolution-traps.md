@@ -331,6 +331,34 @@ dsh <name> --port <port> --no-open
   2. 重启该 profile 对应的常驻 DSH 服务进程，使 Node.js 模块加载器重新初始化并读取最新的物理路径；
   3. 插件本身的 package.json 必须维持标准的 exports 配置，明确暴露 ./locale/*、./package.json 与 ./icon.*，确保模块解析器具备合法的解析入口。
 
+### 8.4 本地调试 Tarball 缓存陷阱（Local Tarball Cache Trap in pnpm）
+
+在隔离测试 profile 中通过本地打出的 tarball 进行真机验收时，存在一个极具隐蔽性的解包缓存陷阱：
+
+#### 陷阱现象
+1. 测试 profile 的 `package.json` 声明本地包依赖：`"@scope/pkg": "file:/path/to/pkg-x.y.z.tgz"`；
+2. 开发者在插件源码仓库中修改了代码，重新执行 `pnpm build && pnpm pack` 生成了新的 `pkg-x.y.z.tgz` 文件，但未递增版本号；
+3. 随后在测试 profile 目录执行 `pnpm install` 甚至 `pnpm install --force`；
+4. pnpm 瞬间输出：
+   ```text
+   [WARN] using --force I sure hope you know what you are doing
+   Already up to date
+   Done in 300ms using pnpm v11.x
+   ```
+5. **灾难结果**：测试环境 `node_modules/@scope/pkg/` 下的代码**完全没有更新**！测试依然在跑旧代码，开发者误以为修改无效，陷入漫长的无效调试。
+
+#### 根因剖析
+pnpm 的内容寻址存储（Content-Addressable Store）与锁文件机制在解析本地 `file:*.tgz` 时：
+- 若依赖 specifier 路径与文件名（如 `pkg-x.y.z.tgz`）未发生改变；
+- 且当前锁文件 `pnpm-lock.yaml` 中已经记录了该依赖条目；
+- 即使物理 tarball 文件内容已经被重新打包覆写，pnpm 仍会判定为「依赖未发生变更」，直接短路返回 `Already up to date`，绝不重新解包覆盖！
+
+#### 通用避坑纪律
+在本地自动化测试或调试脚本中：
+1. **显式产物同步（推荐）**：重新打包后，测试脚本应将新编译的 `lib/`（或待测静态文件）直接覆盖复制到测试 profile 的 `node_modules/@scope/pkg/lib/` 目录，确保测试进程 100% 消费最新构建产物，完全绕过 pnpm 的 tarball 缓存；
+2. **锁文件失效重解析**：若必须走包安装流程，安装命令必须附加 `--no-frozen-lockfile`，或临时删除测试 profile 的 `pnpm-lock.yaml` 并清除该包的缓存；
+3. **版本号隔离**：在不同测试批次间为调试包附加递增的预发后缀（如 `x.y.z-test.1`），迫使 pnpm 识别为全新包并触发重新解包。
+
 ---
 
 ## 九、官方依据

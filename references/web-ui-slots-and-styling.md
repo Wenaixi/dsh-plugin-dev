@@ -485,6 +485,52 @@ P.Button({ variant: "outline", size: "sm", onClick: reset }, "恢复默认")
 - 浮层打开时，宿主输入框的「打开建议菜单」类监听要让位，否则取消浮层还原出的草稿（以 `/`、`@` 开头等）
   会再次弹出建议菜单，把你的浮层顶掉并再也关不掉。
 - composition 期间的按键让给输入法：Esc 必须放行（检查 `isComposing` 或 `keyCode === 229`），否则中文用户无法取消组字。
+
+---
+
+## 十、客户端样式注入单例守卫与 HMR 热更新覆盖幂等范式
+
+在 Dual-Face 插件的浏览器端代码（如 `client.js`）中注入自定义 CSS 时，存在一个常见的开发期热重载（HMR）失效陷阱。
+
+### 10.1 传统单例守卫的 HMR 盲区
+
+常见的防御性注入写法：
+```javascript
+// ❌ 常见写法：在开发期 HMR 时新样式无法热生效
+if (typeof document !== 'undefined' && !document.querySelector('style[data-plugin-css=' + JSON.stringify(CSS_ID) + ']')) {
+  var tag = document.createElement('style');
+  tag.dataset.plugin = PACKAGE_NAME;
+  tag.dataset.pluginCss = CSS_ID;
+  tag.textContent = CSS;
+  document.head.appendChild(tag);
+}
+```
+- **成因**：在开发模式下修改了 CSS 规则并触发 HMR 时，客户端工厂代码被重新执行。此时 `<head>` 中已经存在先前注入的 `<style>` 标签，导致 `!document.querySelector(...)` 判定为假，直接跳过了分支！开发者无论怎么改 CSS，页面依然停留在旧样式上，不得不强制刷新整个页面。
+
+### 10.2 正确姿势：更新优先的幂等模式
+
+采用“存在则更新 `textContent`，不存在才新建追加”的纯正幂等范式：
+
+```javascript
+// ✅ 正确范式：兼顾 DOM 单例回收与开发期 HMR 即时热生效
+if (typeof document !== 'undefined') {
+  var tag = document.querySelector('style[data-plugin-css=' + JSON.stringify(CSS_ID) + ']');
+  if (!tag) {
+    tag = document.createElement('style');
+    tag.dataset.plugin = PACKAGE_NAME;
+    tag.dataset.pluginCss = CSS_ID;
+    document.head.appendChild(tag);
+  }
+  // 核心：若已存在则直接刷新内容，保证 HMR 毫秒级热生效
+  tag.textContent = CSS;
+}
+```
+
+### 10.3 双向收益
+1. **DOM 严格单例**：无论模块被重复执行或热重载多少次，DOM 树中的 `<style>` 标签数量严格恒为 1，绝不产生累加污染；
+2. **宿主生命周期兼容**：宿主在插件卸载时依然能通过 `style[data-plugin-css="..."]` 属性选择器将其 100% 精准回收；
+3. **开发调试流畅**：HMR 触发时样式即时热覆盖，无需手动刷新页面。
+
 ---
 
 ## 相关 DSH 源码

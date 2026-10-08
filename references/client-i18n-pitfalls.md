@@ -1,4 +1,4 @@
-# 客户端 i18n 实战：双语字典与构建产物的六条铁律
+# 客户端 i18n 实战：双语字典与构建产物的九条铁律
 
 > 适用于：双面 UI 插件、`ctx.locale` 接入、构建脚本内嵌字典。官方参考实现：`@deepseek-ai/dsh-client-ui-plugin-manager`。
 
@@ -75,7 +75,69 @@ const content = `const SKILL_META = ${JSON.stringify(SKILL_META_BUILD)};`;
 
 面板字典并入 `locale/*.json` 顶层键组（`panel`/`mode`/`toast`/…）时，宿主 `readPluginMeta` 只读 `meta` 键——加顶层键组不影响卡片元信息。构建脚本 import 同一份 JSON 作为唯一真源，不另起第二份。前提：浏览器侧 import `locale/*.json` 依赖该包 exports map 放行 `./locale/*.json`（官方如 dsh-schedule 已放行；未放行的包只能从 Node 端读）。
 
-## 八、反向断言门禁
+## 八、铁律 7：三态/多态配置字段在客户端的「缺项折叠陷阱」
+
+当一个 volatile 配置字段具有三态语义（例如 `undefined` = 动态跟随宿主当前设置、`'zh'` / `'en'` = 用户显式锁定）时，客户端读取函数存在极易踩中的**缺项折叠反模式**：
+
+```javascript
+// ❌ 灾难：直接把未声明/缺项折叠成了兜底值 'zh'
+function readLanguage(value) {
+  return value && value.language === 'en' ? 'en' : 'zh';
+}
+```
+
+**危害链路**：
+1. 客户端状态快照把 `undefined` 强行吞成 `'zh'`；
+2. 组件内部本意用于跟随的派生逻辑：`var effective = language === undefined ? hostActive : language;`，因为 `language` 永远非 `undefined`，**前半句永远死代码**；
+3. 前端界面无法感知「跟随宿主」状态，面板永远显示为显式锁定的 `'zh'`；
+4. 形成「Host 侧真实 Provider 动态跟随宿主，Browser 侧面板却固定显示中文」的**隐蔽跨端语义撕裂**。
+
+**正确姿势**：读取函数必须显式保留 `undefined`，只有这样三态派生与未配置提示才可能生效：
+```javascript
+// ✓ 正确：三态干净透传，缺项严格返回 undefined
+function readLanguage(value) {
+  var raw = value && value.language;
+  return raw === 'zh' || raw === 'en' ? raw : undefined;
+}
+```
+
+---
+
+## 九、铁律 8：分段选择器（SegmentedControl）的「合法配置态常驻」vs「未设置占位段」
+
+官方 `SegmentedControl`（`@deepseek-ai/dsh-client-ui-primitives`）内部使用 `options.findIndex(o => o.value === value)` 确定高亮指示器的下标。若传入的 `value` 不在 `options` 列表中，下标为 `-1` 会导致**指示器滑出轨道外，且全段元素失去键盘可达性（`tabIndex=-1`）**。
+
+在设计选项集合时，必须严格区分两类性质相反的段：
+
+| 选项类型 | 典型代表 | 用户操作语义 | options 展示策略 |
+|---|---|---|---|
+| **合法配置态** | 「跟随宿主（自动）」 | 用户配过显式值后**仍必须能随时选回**的长期合法状态 | **options 中恒久常驻**（通常排在末尾），点击时提交 `{ op: 'unset', path: [...] }` 清空配置，**严禁条件追加/收走** |
+| **未设置占位段** | 「未设置」 | 仅代表当前补丁未声明该字段、由内置默认兜底生效的临时提示 | **仅在未配置时追加**，用户一旦选择具体档位，该占位段随之消失 |
+
+**铁律**：如果一个状态是用户在任何时候都可以切回的（如自动跟随宿主），切忌照抄占位段的条件追加写法——否则用户一旦点过具体选项，自动选项将永久消失，再也无法切回！
+
+---
+
+## 十、铁律 9：控件的作用域可见性与明确指引（Control Scope Labeling）
+
+官方 `P.SegmentedControl` 的 `label` 属性仅作为 `aria-label` 输出到无障碍树，**不会在屏幕视觉上渲染可见文本**。
+
+**踩坑现象**：
+在插件配置面板中放置语言切换或模式选择时，若仅孤立放置一个 `[ 中文 | English | 跟随宿主（自动） ]` 控件，用户完全无法理解：
+- 这个切换改变的究竟是整个 DSH 主界面的语言？
+- 还是当前插件设置页面的 UI 界面？
+- 还是插件注入给大模型的 Prompt / 技能描述？
+- 或者是下方的技能执行正文代码？
+
+**规范要求**：
+1. **显式可见标题**：必须在选择器正上方渲染独立的加粗区域标题（例如使用 DSH 标准字阶 `font: var(--dsw-font-xs-strong-13)` 渲染 `技能介绍语言（用户「/」唤出菜单及模型可见）`）；
+2. **状态感知详细提示**：
+   - 未配置态：提示当前正在动态跟随的宿主界面语言（如「当前跟随宿主界面语言（中文），可在上方显式切换」）；
+   - 任何状态下：清晰告知作用域边界——**受控范围**为用户输入「/」唤出技能菜单展示的介绍与模型可见描述；**不受控范围**为插件正文（保持原版）与面板其余 UI（恒跟随宿主界面语言），消除一切用户困惑。
+
+---
+
+## 十一、反向断言门禁
 
 - `build script` 不得含硬编码中文文案（`t(` 之外无中文字符串字面量，字典 JSON 除外）；
 - 必须含 `ctx.locale.register(NS` 与 `exports.inject` 含 `locale`；

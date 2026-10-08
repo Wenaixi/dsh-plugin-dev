@@ -140,6 +140,61 @@ await form.mutate(ops)
 
 读取侧要配套：新字段为空时才回退读旧字段。收敛后回退分支自然不再命中，无需额外的清理任务。
 
+### 3.2.1 集合/字典型字段的惰性迁移陷阱：局部操作与原子继承（Atomic Carryover）
+
+§3.2 展示的代码适用于「单值字段」（如字符串、数字、枚举）。当待迁移的字段是**集合或字典**（例如历史上的 `modelDisabled: Record<string, boolean>` 与 `userDisabled` 收敛为单一字典 `disabled: Record<string, boolean>`）时，惰性迁移存在一个极具破坏性的**局部操作陷阱**：
+
+#### 陷阱场景
+
+用户升级前在旧表禁用了条目 A、B、C。
+升级后进入面板：
+- 客户端若正确把旧表并集读出，条目 A、B、C 视觉上正确显示为禁用；
+- 此时用户操作了条目 D（例如将 D 禁用）。
+- 若变异组装逻辑直觉地生成了如下操作批：
+  ```javascript
+  // ❌ 灾难性代码：只写了当前被点击的单项 D，并全量 unset 了旧表！
+  const ops = [
+    { op: 'set', path: ['disabled', 'D'], value: true },
+    { op: 'unset', path: ['modelDisabled'] },
+    { op: 'unset', path: ['userDisabled'] },
+  ]
+  await form.mutate(ops)
+  ```
+- **严重后果**：新表 `disabled` 中只有单项 D，而承载 A、B、C 的历史旧表被彻底 `unset` 抹除！用户只点了一下 D，原本被禁用的 A、B、C **全部被意外瞬间复活**！
+
+#### 通用规范：原子继承迁移（Legacy Carryover）
+
+1. **读取侧**：新表为空时才回退读旧表并集，并建立 `legacyActive` 判定标记；
+2. **变异组装侧**：若当前处于旧表状态（`legacyActive === true`），执行任何局部操作（如操作单开关）时，**必须将旧表中其余依然生效的项作为 `set` 一同打包写入新表**，再同批执行旧表的 `unset`：
+
+```javascript
+function switchOps(names, op, legacyCarry) {
+  const list = Array.isArray(names) ? names : [names];
+  const ops = [];
+
+  // 关键继承：首次在旧表状态下操作局部单项时，把旧表中其余有效项一并迁移写入新表
+  if (legacyCarry) {
+    Object.keys(legacyCarry).forEach((key) => {
+      if (legacyCarry[key] === true && !list.includes(key)) {
+        ops.push({ op: 'set', path: ['disabled', key], value: true });
+      }
+    });
+  }
+
+  // 正常生成当前操作项的 set / unset
+  list.forEach((name) => {
+    ops.push(op === 'disable'
+      ? { op: 'set', path: ['disabled', name], value: true }
+      : { op: 'unset', path: ['disabled', name] });
+  });
+
+  // 同一批原子清空全部旧表字段
+  return ops.concat(LEGACY_FIELDS.map((field) => ({ op: 'unset', path: [field] })));
+}
+```
+
+如此一来，无论用户是点单开关还是批量按钮，首次写入都会无缝、无损、原子地将全部历史配置完整带入新表，杜绝配置静默丢失。
+
 ### 3.3 只读兼容
 
 保留旧字段读取路径，新字段优先，**不做写入收敛**。

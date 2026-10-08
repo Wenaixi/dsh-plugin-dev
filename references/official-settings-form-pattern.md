@@ -336,6 +336,81 @@ class CardController {
 
 ---
 
+## 九、批量操作的单次原子批处理（allOps）vs 并发 mutate 乐观锁竞争撕裂
+
+在具有列表开关、多选配置或批量重置场景的面板中，处理批量变更存在一个极易踩入的工业级架构陷阱。
+
+### 9.1 并发 mutate 的乐观锁撕裂（State Tearing）陷阱
+
+- **反模式写法**：
+  ```javascript
+  // 危险：多项变更并发触发多次独立 mutate
+  var work = Promise.all(names.map(function (name) {
+    return form.mutate(switchOps(name, op));
+  }));
+  ```
+- **宿主锁机制与冲突根因**：
+  DSH 的 `ConfigFormController` 与宿主 `SettingsService` 严格维护单调递增的版本号（`revision`）作为乐观并发控制（OCC）。
+  当并发发起 N 次 `form.mutate` 时，N 个请求在同一微秒到达宿主。第 1 个请求被宿主接受后，宿主磁盘与内存中的 `revision` 立即自增；其余并发请求携带的基线版本号瞬间过期，被宿主判定为版本冲突并直接短路返回 `accepted === false`！
+- **后果与灾难表征**：
+  界面上表现为**状态撕裂（State Tearing）**——前 1~2 个开关成功更新，后续的开关全部爆红报错；同时产生 N 次远程 RPC 往返、N 次磁盘 I/O 抖动与 N 次宿主全量快照重读广播。
+
+### 9.2 宿主事务级原子批处理契约
+
+DSH 官方 `ConfigForm.mutate(ops: PatchOperation[])` 接口原生接收一个操作数组：
+- **事务级全量校验**：宿主配置闸门在处理一组 `ops` 时，会逐条校验其 `path` 是否全部落在对应 Schema 的 `volatile` 声明节点下。**任一条操作非法，整批操作立即被整体拒绝，零写入**；
+- **单次原子提交**：全量校验通过后，宿主在单一事务内一次性提交草稿并持久化，`revision` 仅自增 1 次，广播仅触发 1 次。
+
+### 9.3 客户端扁平拍平设计范式（Flattening Pattern）
+
+无论当前用户操作的是单个条目还是批量条目，客户端提交前统一将其组装为一个扁平的操作数组，仅调用一次 `form.mutate(allOps)`：
+
+```javascript
+function buildSwitchOps(names, op) {
+  var list = Array.isArray(names) ? names : [names];
+  // 1. 批量生成目标字段的操作
+  var ops = list.map(function (name) {
+    return op === 'disable'
+      ? { op: 'set', path: ['disabled', name], value: true }
+      : { op: 'unset', path: ['disabled', name] };
+  });
+  // 2. 关联字段或历史废弃字段的清理：在末尾统一追加 1 次 unset，杜绝重复冗余
+  LEGACY_FIELDS.forEach(function (field) {
+    ops.push({ op: 'unset', path: [field] });
+  });
+  return ops;
+}
+
+function submit(form, t, names, op, setPending, setFailures, opsOverride) {
+  // 设置 pending 忙碌态...
+  var ops = opsOverride || buildSwitchOps(names, op);
+  
+  // 核心：单次原子批处理提交
+  form.mutate(ops).then(function (accepted) {
+    if (accepted === false) throw new Error(t('writeFailed'));
+    setFailures(clear);
+  }).catch(function (error) {
+    // 铁律：防静默失败必须输出原生控制台堆栈
+    console.error('[plugin-name] form.mutate failed:', error);
+    setFailures(function (prev) {
+      var next = clear(prev);
+      var message = t('writeFailed') + ': ' + String(error?.message || error);
+      names.forEach(function (name) { next[name] = message; });
+      return next;
+    });
+  }).finally(function () {
+    setPending(clear);
+  });
+}
+```
+
+### 9.4 核心收益
+1. **彻底消除乐观锁竞态**：1 次往返，版本锁递增 1 次，绝无并发冲突；
+2. **状态完全一致**：全成功或全失败，失败时统一回退至宿主快照真值，彻底避免局部更新撕裂；
+3. **RPC 负载大幅压降**：历史废弃字段去重后，批量更新 15 项时的 payload 从 45 条操作压减至 17 条操作，网络和 I/O 耗时降低 70% 以上。
+
+---
+
 ## 相关 DSH 源码
 
 ```text

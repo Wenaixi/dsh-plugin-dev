@@ -203,6 +203,11 @@ pnpm link --global dsh-plugin-foo
    `loaded without registering "<id>"` / `already executed without registering "<id>"`，整条 client bundle 不激活。
    门禁：构建后从产物 grep 出 `load({ id:` 的字面量，与 `package.json` 的 `name` 断言相等。完整取证见
    [client-bundle-loading-and-artifact-trace.md](./client-bundle-loading-and-artifact-trace.md)。
+6. **发布白名单（files）与多语言 README 404 陷阱**：
+   开源插件通常同时维护双语说明文档（如 `README.md` 与 `README.zh.md`），并在两份文档顶部互置跳转链接。
+   npm 的打包规则是：默认无条件打入标准 `README.md`，但**绝不会自动识别多语言变体**！
+   若在 `package.json` 声明了 `"files"` 白名单且遗漏了 `"README.zh.md"`，打出的 tarball 中将彻底丢失中文文档，导致用户在 npm 线上网页或解压阅读时点击语言切换链接直接触发 **404 死链**。
+   **规避法则**：凡在文档中有互跳链接的说明文件，必须在 `package.json` 的 `"files"` 数组中逐一显式列出，并在发布前的 `pnpm pack --dry-run` 清单中建立自动断言。
 
 ## 安装与依赖陷阱避坑指南 (npm & pnpm Pitfalls)
 

@@ -695,3 +695,42 @@ packages/dsh-app-boot/src/config.ts           <-  @deepseek-ai/dsh-app-boot
 packages/dsh-schemastery/src/index.ts         <-  @deepseek-ai/schemastery
 packages/dsh-client-ui-primitives/src/index.ts <- @deepseek-ai/dsh-client-ui-primitives
 ```
+
+---
+
+## 十五、模板字符串嵌套反引号语法破坏与构建假绿陷阱 (Template String Backtick Trapping & The Phantom Green Trap)
+
+### 1. 语法破坏现场与提前闭合机理
+在编写配置自愈生成器、代码脚手架或 YAML 补丁生成函数时，开发者普遍习惯使用外层 ES 模板字符串（反引号）包裹多行输出。
+当模板字符串内部生成带有动态反引号表达式的代码时（例如包含嵌套反引号的授权头）：
+如果内层的反引号未进行斜杠转义，内层的第一个反引号会被 JavaScript / TypeScript 词法解析器直接当作外层模板字符串的结束标志！
+紧随其后的单词直接沦为裸 JavaScript 标识符，导致 TypeScript 编译直接报出连环语法错误：
+- error TS1005: ';' expected.
+- error TS1127: Invalid character.
+- error TS1434: Unexpected keyword or identifier.
+整包构建和类型检查在编译期彻底瘫痪！
+
+---
+
+### 2. 假绿陷阱（The Phantom Green Trap）机制
+最危险的不是编译报错，而是报错被测试套件静默掩盖！
+
+在许多高质量插件的门禁体系中，为了测试真实接口行为，单元测试通常直接 import 产物目录中的文件（如 lib/ 下的已有构建产物）。
+当源码中出现了上述致命的模板字符串反引号语法崩溃，但构建目录中仍存留着上一次成功编译生成的旧产物时：
+- 开发者或本地脚本运行单元测试，测试直接 import 存留的旧产物，测试用例全线飘绿（100% Passed）！
+- 开发者误以为系统一切正常、代码健康无虞；
+- 这种“假绿”现象具有极强的欺骗性，直到在全新的干净环境（如 CI clean checkout、全新拉取仓库）、或发版前触发全新的 clean build 时，才会在最后一道防线惨烈爆发中断！
+
+---
+
+### 3. 标准通用防御规程
+
+#### 准则 1：生成动态代码模板时，一律使用字符串数组物理隔离
+生成包含内层反引号的代码时，坚决放弃外层模板字符串直拼，采用纯字符串数组 join('\n')：
+在词法解析层面实现物理隔离，根本不给内层反引号干扰外层语法的机会。
+
+#### 准则 2：综合门禁流水线第一步必须是真实全新构建，且严格遇错熔断
+在总控门禁脚本中：
+1. 第一步必须执行真实构建（npm run build）；
+2. 构建失败立即退出熔断：一旦构建或类型检查返回非零，整个流水线必须立即宣告失败并阻断退出，绝不允许执行后续仅读取旧产物的测试步骤，彻底戳破假绿泡沫！
+3. 断言验证产物行为，但必须前置证明源码无漂移。

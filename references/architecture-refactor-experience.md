@@ -357,3 +357,168 @@ FullyQualifiedErrorId : InvalidEndOfLine
 在面向跨平台与 Windows 宿主环境编写自动化工具或流水线命令时：
 1. **优先使用标准分号 `;` 分隔**：`git add . ; git commit -m "..."`，语法在全版本 PowerShell、pwsh 及跨平台环境中均能原生兼容；
 2. **或拆分为独立的命令调用执行**：在自动化脚本中分别调度 `tools.pwsh`，并根据前一个调用的 `exitCode === 0` 显式裁决是否继续执行后续步骤，从根源杜绝命令行解析器方言带来的意外中断。
+
+---
+
+## 十四、对称具名安装器装配范式 (Symmetric Named Installer Pattern)
+
+### 1. 现实痛点：apply() 闭包变量膨胀与生命周期纠缠
+在 Cordis / DSH 插件开发中，随着功能增多，入口函数 `apply(ctx, config)` 极其容易退化为一个长达数百行的“上帝闭包”：
+```typescript
+// 典型反模式：数十个生命周期变量混杂在一个 ctx.effect 中
+export function apply(ctx: Context, config: Config) {
+  ctx.effect(() => {
+    let disposed = false;
+    let timerA: NodeJS.Timeout | undefined;
+    let isFeatureASyncing = false;
+    let unregisterA: (() => Promise<void>) | undefined;
+    // 嵌套 80 行实现 Feature A...
+
+    let featureBState = false;
+    const disposeB = ctx.on('event-b', () => { ... });
+    // 嵌套 60 行实现 Feature B...
+
+    return () => {
+      disposed = true;
+      clearTimeout(timerA);
+      if (unregisterA) void unregisterA();
+      disposeB();
+      // 注销链条极其脆弱，只要漏写一个变量就会发生内存或事件泄漏！
+    };
+  });
+}
+```
+
+**架构危害**：
+1. **内聚局部性丧失**：Feature A 的临时变量与 Feature B 的监听器并列存在于同一函数作用域中，开发者阅读 Feature A 时必须在大脑中过滤掉混杂的无关变量；
+2. **生命周期可逆性难以审查**：无法直观判断某个副作用是否真正拥有对称的清理函数，重载时极易产生悬挂监听器；
+3. **无法独立单元测试**：由于所有逻辑深嵌在 `apply` 的闭包内部，无法在不启动全量宿主环境的情况下对单个能力进行隔离测试。
+
+### 2. 标准解法：对称具名安装器 (Named Installer)
+将每一个独立的能力或副作用提炼为专门的**具名安装器函数**。每个安装器遵循统一的契约范式：
+- **明确入参**：显式传入所需的宿主上下文与 getter 依赖，杜绝隐式作用域捕获；
+- **对称返回**：统一返回单一清理函数 `() => void`，或 `[triggerFn, disposeFn]` 元组；
+- **内部自闭环**：该功能所有的重试定时器、防抖标志位、注销 Promise 独占内聚在安装器内部，绝不外溢。
+
+```typescript
+/** 具名安装器示例：预设模式管理器 */
+function installPresetMode(ctx: Context, options: {
+  getMode: () => string;
+  getPresets: () => any;
+}): [() => void, () => void] {
+  let disposed = false;
+  let unreg: (() => Promise<void>) | undefined;
+  let timer: NodeJS.Timeout | undefined;
+
+  const sync = async () => {
+    if (disposed) return;
+    // 内部自闭环处理注册与重试...
+  };
+
+  void sync();
+
+  return [
+    () => { void sync(); }, // 触发接口
+    () => {                 // 清理接口
+      disposed = true;
+      clearTimeout(timer);
+      if (unreg) void unreg().catch(() => {});
+    },
+  ];
+}
+
+/** 具名安装器示例：特权工具运行期拦截守卫 */
+function installToolGuard(ctx: Context, options: { getTools: () => any }): () => void {
+  return ctx.on('agent/created', (agent) => {
+    // 内部自闭环挂载 tools.restrict 与 tools.guard...
+  });
+}
+```
+
+### 3. apply() 蜕变为极薄的装配层编排器
+提炼具名安装器后，入口 `apply()` 彻底脱胎换骨为极简高可读的装配层：
+```typescript
+export function apply(ctx: Context, config: Config) {
+  ctx.effect(() => {
+    // 四大具名安装器同构对称装配
+    const [runtime, disposeRuntime] = installSkillRuntime(ctx, runtimeOptions);
+    const [, disposeWatcher] = installSkillsWatcher(ctx, watcherOptions);
+    const [syncPreset, disposePreset] = installPresetMode(ctx, presetOptions);
+    const disposeToolGuard = installToolGuard(ctx, guardOptions);
+
+    // 统一串联清理函数，可逆性一目了然
+    return () => {
+      disposeToolGuard();
+      disposePreset();
+      disposeWatcher();
+      disposeRuntime();
+    };
+  });
+}
+```
+
+---
+
+## 十五、全链路 AbortSignal 取消信号无死角穿透与快照发布闭环
+
+### 1. 取消信号断路陷阱 (Signal Truncation Trap)
+在许多 DSH 插件中，开发者在最底层的 I/O 方法（如 `readFile(path, { signal })` 或 `provider.list({ signal })`）中接入了取消信号支持，但在上层代码中却常常出现断路：
+```typescript
+// 典型反模式：上层封装丢弃取消信号
+class Runtime {
+  async listNames() {
+    // 错误！底层明明支持 signal，这里却传递了空配置 {} 丢掉了上下文！
+    const list = await this.provider.list({});
+    return list.map(item => item.name);
+  }
+}
+
+async function publishCatalog(runtime: Runtime) {
+  // 当大型目录扫描耗时较长、用户或宿主发出取消时，这里完全无法响应！
+  const names = await runtime.listNames();
+  await settings.update(namespace, { catalog: names });
+}
+```
+
+**危害**：
+1. **外部取消无法中断**：当技能目录包含成百上千个文件或网络磁盘发生高延迟时，上层无信号参数导致扫描任务必须完整跑完才能退出，浪费计算资源与 I/O；
+2. **外部取消被误判为物理损坏**：如果底层抛出 `AbortError`，而在异常捕获层盲目执行 `cache.delete(path)` 或记为读取失败，会将一次正常的主动中止错误地当作磁盘文件损坏，甚至误删合法的 mtime 缓存！
+
+### 2. 标准全链路贯穿规范
+必须保证取消信号从入口流水线一直无死角透传至底层文件系统：
+
+1. **上层抽象显式透传**：
+   ```typescript
+   export interface SkillRuntime {
+     // 接口必须支持可选的 signal
+     listNames(signal?: AbortSignal): Promise<string[]>;
+   }
+
+   // 实现层严格透传
+   async listNames(signal?: AbortSignal) {
+     const listed = await provider.list({ signal });
+     return listed.map(c => c.name);
+   }
+   ```
+
+2. **异常捕获必须优先识别并重抛 AbortError**：
+   ```typescript
+   function isAbortError(error: unknown, signal?: AbortSignal): boolean {
+     if (signal?.aborted) return true;
+     return error instanceof Error && error.name === 'AbortError';
+   }
+
+   try {
+     const text = await readFile(path, { encoding: 'utf8', signal: options.signal });
+   } catch (error) {
+     // 铁律：优先检查是否为取消错误！
+     if (isAbortError(error, options.signal)) {
+       throw error; // 必须原样重抛，绝不吞没，绝不执行 cache.delete！
+     }
+     // 真正的文件读取损坏才走降级和日志
+     cache.delete(path);
+     logger.warn('file read failed: ' + String(error));
+   }
+   ```
+
+**总结**：全链路贯穿 `AbortSignal` 并严密保护异常判断，能够彻底确保系统在处理高并发、长遍历及协作式取消时表现出极强的健壮性与防抖抗性。

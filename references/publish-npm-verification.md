@@ -186,3 +186,73 @@ apps/cli  <-  @deepseek-ai/dsh@0.2.0-rc.2
 packages/boot/config-editor  <-  @deepseek-ai/dsh-config-editor@0.2.0-rc.2
 packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@0.2.0-rc.2
 ```
+
+---
+
+## 四、Git Tag 显式 SHA 强绑定、spawnSync 数组传参防御与发布网络排障 (Robust Git Tag Binding & Release Transport)
+
+在 DSH 插件发版流水线中，推送 Git Tag 是触发 GitHub Actions 自动执行 `release.yml`（版本比对、自动构建、npm publish、GitHub Release 创建）的最高触发器。
+
+### 1. 致命痛点：Shell 字符串解析错位与 Tag 静默漂移
+在自动化脚本中，若直接通过 Shell 命令行字符串拼接调用 Git：
+```javascript
+// 典型反模式：依赖 Shell 字符串解析调用 git tag
+execSync(`git tag -a v${version} -m "Release v${version}"`);
+```
+**隐患机理**：
+1. **Shell 引号解析与换行符吞没**：在 Windows PowerShell 等复杂 Shell 环境下，外层双引号与内部换行容易发生转义解析错位，导致参数被错误切分；
+2. **重名 Tag 覆写静默失败**：如果本地此前因演练已存在同名 Tag，`git tag -a` 会抛出 `already exists` 错误；如果不加 `-f` 或在多命令管道中错误被忽略，本地 Tag 依然悄悄停留在旧的历史提交上；
+3. **严重发版事故**：Tag 指针落后于最新的版本升级 commit，导致推送到远程后，CI Release 流程拉取 Tag 对应的提交时读到了旧的 `package.json` 版本号，引发 CI 校验失败抛错退出；或更严重地发布了未包含最新代码的历史旧产物！
+
+---
+
+### 2. 标准通用防线：spawnSync 纯数组传参与显式 SHA 强绑定
+
+必须通过 Node 原生 `child_process.spawnSync` 进行纯数组参数调用，物理隔绝任何 Shell 字符串转义解析，并显式将绝对 Commit SHA-1 传入：
+
+```javascript
+const { spawnSync } = require('child_process');
+
+// 1. 获取当前最新 HEAD 的完整绝对 SHA-1 哈希
+const revHead = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' });
+const targetSha = revHead.stdout.trim();
+
+// 2. 纯数组传参，显式带上 -f 强制覆写，并显式传入 targetSha 目标提交！
+const tagRes = spawnSync(
+  'git',
+  ['tag', '-f', '-a', `v${version}`, '-m', `Release v${version}`, targetSha],
+  { encoding: 'utf8' }
+);
+if (tagRes.status !== 0) throw new Error('git tag failed: ' + tagRes.stderr);
+
+// 3. 发版三步核验铁律：双向比对哈希值完全一致！
+const checkTag = spawnSync('git', ['rev-parse', `v${version}^{commit}`], { encoding: 'utf8' });
+const actualTagSha = checkTag.stdout.trim();
+
+if (actualTagSha !== targetSha) {
+  throw new Error(`Tag 指针严重漂移！HEAD: ${targetSha}, Tag: ${actualTagSha}`);
+}
+
+// 4. 双向一致后，方可执行推送
+spawnSync('git', ['push', 'origin', 'main'], { encoding: 'utf8' });
+spawnSync('git', ['push', 'origin', `v${version}`, '--force'], { encoding: 'utf8' });
+```
+
+---
+
+### 3. 多语言说明文档白名单防 404 死链规范 (Multi-lingual Doc Packaging Rule)
+当插件在根目录提供国际化多语言跳转链接（如 `[English](./README.md) | [中文](./README.zh.md)`）时：
+- **致命陷阱**：若仅在 `package.json.files` 中声明了 `README.md`，打包发布的 npm tarball 将不会包含 `README.zh.md`！用户在 npm 官网浏览包首页点击语言切换时，直接跳转至 404 页面！
+- **防御铁律**：主文档中只要声明了相对路径跳转的任何语言副档（如 `README.zh.md`、`README.en.md`），必须将其显式登记至 `package.json.files` 白名单中；并在 `scripts/check.js` 或 `scripts/validate-bundle.js` 的 `files[]` 校验中同步核查，确保打包物完备。
+
+---
+
+### 4. 国际网络暂态超时与系统代理单次会话透传排障 (Proxy Passthrough for Release)
+在特定网络环境下，直接访问 GitHub 443 端口可能遭遇 `Connection was reset` 或连接超时中断：
+- **优雅解法**：优先探测本机活跃的系统代理客户端设置（如 Windows 注册表 `Internet Settings` 中的 `ProxyServer`，如 `127.0.0.1:10801`）；
+- **单次会话参数透传**：严禁永久修改开发者的全局 `git config --global http.proxy`（避免污染日常网络环境）；一律使用 Git 支持的单次会话级参数：
+  ```bash
+  git -c http.proxy=http://127.0.0.1:<port> -c https.proxy=http://127.0.0.1:<port> push origin main
+  git -c http.proxy=http://127.0.0.1:<port> -c https.proxy=http://127.0.0.1:<port> push origin v<version> --force
+  ```
+  既能实现秒级顺畅发版，又保持开发环境配置纯洁。

@@ -364,3 +364,116 @@ assert.deepEqual(
 ```
 
 **避坑总结**：在任何基于 `node:vm` 的纯内存脱机单测中，只要断言沙箱输出的复合对象或数组，一律使用 `toJson()` 消除 Realm 差异，绝不应误判为“业务逻辑写错”或被迫回退去拉起笨重的真实浏览器！
+
+---
+
+## 七、React 18 合成事件微任务并发窗口缺陷与同步栈内存互斥防重锁模式
+
+### 1. 现实痛点：为什么 `useState(busy)` 守卫必定发生并发撕裂？
+在编写 DSH 双面插件配置面板时，开发者最常见的直觉是在 React 组件内定义一个忙碌状态：
+```typescript
+// 典型反模式：依赖 React 局部状态做互斥防重
+const [busy, setBusy] = React.useState(false);
+
+const handleToggle = async (item) => {
+  if (busy) return; // 试图通过 busy 拦截二次点击
+  setBusy(true);
+  try {
+    await form.mutate(buildOps(item), state.revision);
+  } finally {
+    setBusy(false);
+  }
+};
+```
+
+**底层缺陷根因剖析**：
+1. **React 18 批量异步调度窗口 (Batched Updates Window)**：在 React 18 的合成事件系统中，`setBusy(true)` 不会立刻同步触发组件重新渲染，而是作为一个状态更新任务被加入微任务/事件循环队列。从用户第一次点击、到 React 实际完成下一次 Commit 渲染期间，当前闭包执行环境中的 `busy` 仍然是 `false`！
+2. **微任务竞态穿透**：如果用户快速连续点击（如双击开关，或极快地连续切换两个选项），第二次点击会在第一次点击的异步请求返回之前、甚至在下次渲染生效之前被捕获，直接绕过 `if (busy) return` 守卫！
+3. **宿主 Revision 乐观锁撕裂**：宿主底层 `ConfigFormController.mutate(ops, expectedRevision)` 收到显式版本号时会进行严格的版本栅栏比对（Revision Fence）。两次并发点击带着相同的当前版本号（如 `revision: 42`）进入宿主队列。前一个操作成功将宿主版本提升为 `43`，紧随其后的第二个操作带着旧版本号 `42` 到达宿主，被宿主检测到版本落后直接返回 `false`，触发 UI 报出不可逆的保存失败错误！
+
+### 2. 标准解法：领域控制器同步栈内存物理互斥锁模式
+互斥防重的本质是**同步执行锁**，绝不能依赖异步调度的 UI 渲染状态。必须将互斥锁下沉到领域控制器实例的物理内存属性上：
+
+```typescript
+export class PanelController {
+  private form?: PageForm;
+  private _busy = false; // 实例级同步布尔锁
+  private _error: string | null = null;
+
+  async toggle(id: string, next: boolean): Promise<boolean> {
+    // 关键：在 JavaScript 主线程同步执行栈的第一行瞬间判锁并置位！
+    if (this._busy || !this.isWritable() || !this.form) {
+      return false; // 同步拦截，绝不生成异步 Promise，绝不进入网络队列
+    }
+    this._busy = true;
+    this._error = null;
+
+    try {
+      const ops = this.computeAtomicOps(id, next);
+      // 单次原子批处理提交，严格传递当前表单版本
+      const ok = await this.form.mutate(ops, this.form.state.revision);
+      if (!ok) this._error = this.t('saveFailed');
+      return ok;
+    } catch (e) {
+      this._error = String(e && (e as Error).message ? (e as Error).message : e);
+      return false;
+    } finally {
+      // 异步任务终结时释放锁
+      this._busy = false;
+    }
+  }
+
+  isBusy(): boolean {
+    return this._busy;
+  }
+}
+```
+
+**机制优势**：
+- **零微任务延迟**：只要在同步栈第一行执行 `this._busy = true`，任何在同一事件循环轮次、微任务交错期进入的二次调用，都会在第一行被同步拦截并立即返回 `false`；
+- **100% 根除版本冲突**：由于微任务窗口被物理闭合，底层宿主 `form.mutate` 绝不可能在前序操作未完成前收到并发调用，彻底消除乐观锁撕裂。
+
+---
+
+## 八、Ponytail 极简工程裁决——单页面板何时果断砍掉自建事件总线与 useSyncExternalStore 脚手架
+
+### 1. 架构场景判据：单页面板 vs 跨组件共享面板
+在评估是否需要在控制器中引入 `_listeners = new Set()`、`subscribe()`、`useSyncExternalStore` 与 `Generation Counter` 等重型脚手架时，必须首先判定宿主的挂载架构：
+
+| 挂载场景 | 宿主分发行为 | 是否需要自建事件总线？ | Ponytail 裁决 |
+|---|---|---|---|
+| **场景 A：跨组件共享全局控制器**<br>(如独立的全局浮层、多个分立插槽共用同一控制器实例) | 控制器作为跨组件单例存在，状态变动需主动通知多个分散组件刷新 | **需要**自建订阅与外部存储接入 | 遵循通用模板实现完整发布订阅模式 |
+| **场景 B：宿主单页面板**<br>(如挂载于 `plugins.row.config` 或 `plugins.bundle.config`) | 宿主上层已经在全局监听配置变动；每次变动宿主都会给组件传入全新的 `props.form` | **坚决不需要**自建事件分发器 | **果断砍掉！** 控制器只需作为轻量无状态/轻状态领域模型 |
+
+### 2. 避免过度工程的设计实践
+在场景 B（宿主单页面板）中，若机械照抄通用控制器的全量模板，会带来明显的过度设计：
+- 引入了 50+ 行从不被多调用方使用的 `subscribe` / `_notify` 胶水代码；
+- 增加了 React 闭包与外部订阅的生命周期解绑开销。
+
+**最高杠杆的极简落地方式**：
+1. **组件内轻量持有控制器**：
+   ```typescript
+   function Panel(props: PanelProps, fallbackT: Translate): React.ReactElement {
+     const t = props.t ?? fallbackT;
+     const [, setTick] = React.useState(0);
+     
+     // 直接实例化轻量控制器并随时同步最新 props
+     const [controller] = React.useState(() => new PanelController(props.form, t));
+     controller.update(props.form, t);
+
+     const snap = controller.getSnapshot();
+     if (snap.status === 'loading') return React.createElement('div', null, t('loading'));
+
+     // 触发操作时驱动极薄重绘
+     const trigger = (action: () => Promise<boolean>) => {
+       setTick((v) => v + 1); // 立即驱动 busy 禁用态重绘
+       action().finally(() => setTick((v) => v + 1)); // 异步完成后驱动解锁重绘
+     };
+
+     // 组件退化为 100% 声明式纯视图渲染 snap.skills, snap.loadMode...
+   }
+   ```
+2. **收益总结**：
+   - 控制器仅需约 70 行代码，没有任何冗余抽象；
+   - 彻底摆脱了复杂的事件分发管理，纯状态机直接暴露给纯 Node 脱机测试（毫秒级执行）；
+   - 代码行数负增长，圈复杂度降至最低。

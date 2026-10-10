@@ -283,12 +283,59 @@ invalidate(): void {
 所有涉及变动探测与状态推导的 catch 块，必须优先检查取消状态：
 ```typescript
 } catch (err: unknown) {
-  if (signal?.aborted || (err as Error)?.name === 'AbortError') {
+  if (signal?.aborted || (err as DOMException)?.name === 'AbortError') {
     throw err; // 取消信号必须畅通穿透，立刻中止调用链
   }
   return true; // 仅常规 I/O 错误才走回退分支
 }
 ```
+
+### 10.4 陷阱延伸一：遍历循环内无差别 catch 导致取消异常误分类为业务损坏
+在遍历文件目录、多资产扫描或批量条目解析的循环体内：
+```typescript
+for (const item of items) {
+  signal?.throwIfAborted();
+  try {
+    const doc = await parseItemAsync(item, signal);
+    results.set(item.name, doc);
+  } catch (err: unknown) {
+    // ❌ 致命陷阱：无差别 catch 将取消异常误当成「条目损坏/业务解析失败」
+    logger.warn(`skip ${item.name}: parse failed — ${err}`);
+    this.loadErrors.push({ name: item.name, error: String(err) });
+    continue;
+  }
+}
+```
+- **灾难表征**：
+  1. 当外部调用者在读取第 N 个条目的 I/O 期间触发中止（`signal.abort()`）时，抛出的 `AbortError` 被内层 catch 捕获，当成“这个文件语法坏了”记录到 `loadErrors` 脏状态中；
+  2. 若该条目恰好是循环中的最后一个，`continue` 退出循环后函数居然继续执行下游的指纹落盘或缓存写入，并向调用方**误报为正常执行成功**！调用方无法感知任务已被取消，内存中还残留了虚假的损坏报错。
+- **规避铁律**：循环内部 catch 块首行必须执行取消守卫：
+  ```typescript
+  } catch (err: unknown) {
+    if (signal?.aborted || (err as DOMException)?.name === 'AbortError') {
+      throw err; // 取消异常绝不是业务失败，必须立即向外重抛中断循环！
+    }
+    // 仅常规业务解析失败才记录 loadErrors 并 continue
+  ```
+
+### 10.5 陷阱延伸二：仅校验名称导致的自定义 Abort Reason 吞没
+在单条目自愈按需重读（如 `get(candidate, options)`）中：
+```typescript
+} catch (err: unknown) {
+  if ((err as DOMException)?.name === 'AbortError') throw err; // ❌ 隐藏漏洞
+  if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') return undefined;
+  logger.warn(`read failed: ${err}`);
+  return undefined; // 吞没错误回退
+}
+```
+- **漏洞成因**：
+  根据 Web 标准与 Node.js 现代规范，当外部调用者使用携带具体原因的中止控制器（例如超时控制器 `controller.abort(new Error('fetch timeout'))`）时，底层抛出的异常其实例名称是 `'Error'` 而非 `'AbortError'`！
+  上述代码仅检查了 `err.name === 'AbortError'`，导致判断为 false，错误被当作普通读取异常记录警告并吞没返回了 `undefined`。
+- **规避铁律**：必须组合检查入参信号状态与错误类型：
+  ```typescript
+  if (options?.signal?.aborted || (err as DOMException)?.name === 'AbortError') throw err;
+  ```
+
 
 ---
 

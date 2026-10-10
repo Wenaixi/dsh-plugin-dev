@@ -67,6 +67,11 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - **运行时持久化自愈回写闭环**：`apply` 入口深度清洗内存配置，若检测到修正且宿主 `settings` 就绪，必须通过 `settings.update` 自动将纯净 volatile 字段回写宿主，消除宿主存储中的持久化脏数据。详见 [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §七。
 - **配置重生成反引号转义隔离**：生成包含 `!!js` 动态表达式（含内层反引号）的配置文件时，严禁使用外层模板字符串直拼，一律采用字符串数组 `join('\n')` 物理隔离，杜绝反引号提前闭合截断文件与引发编译崩溃。详见 [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §八。
 - **客户端插槽防崩与防白屏守卫**：双面客户端组件严禁直接解构不可信的 `state.user`/`value`，必须使用防污解构与 `strArray` 清洗器兜底，杜绝组件崩溃被宿主降级为静默 `<div data-slot-error>`。详见 [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §九。
+- **遍历取消绝对穿透**：多条目/多文件循环扫描的 catch 块严禁无差别捕获，必须优先执行 `if (signal?.aborted || (err as DOMException)?.name === 'AbortError') throw err`；严禁将外部取消误判为业务解析损坏记入脏错误状态，严禁自定义 Abort reason 被静默吞没。详见 [provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) §十。
+- **构建先验后写原子时序**：双面或编译型插件构建流水线必须严格遵循「纯内存前置校验 -> 零漂移后安全写入目标磁盘 -> 最终产物落地核验」时序；严禁先覆写分发目录再做校验，彻底消除因漂移退出导致的脏产物落盘污染。详见 [deep-refactor-and-governance-hardening.md](references/deep-refactor-and-governance-hardening.md) §一。
+- **编译器死代码零容忍与导入解耦**：模块入口严禁顶层 import 本地未直接消费的符号，纯对外公开接口必须物理分离为 `export { ... } from './module'` 委托重导出；保证 `tsconfig.json` 能够永久开启 `noUnusedLocals: true` 与 `noUnusedParameters: true` 严格死代码拦截。详见 [deep-refactor-and-governance-hardening.md](references/deep-refactor-and-governance-hardening.md) §二。
+- **Tag 指针绝对对齐与纠偏铁律**：打 Tag 前后必须执行 `git rev-parse HEAD === git rev-parse "<tag>^{commit}"` 双向指针核验；一旦 Tag 误落入历史提交，严格执行「删 tag -> 在最新 HEAD 重打 tag -> 推 main -> 推 tag」标准纠偏序列，杜绝 CI 发布旧产物。详见 [deep-refactor-and-governance-hardening.md](references/deep-refactor-and-governance-hardening.md) §三。
+- **私有复杂度就地内聚防浅模块膨胀**：单消费方、纯内部的私有逻辑（如宿主配置解构或内部操作组装）严禁冲动抽离为独立的浅类（Shallow Module）；就地内聚在私有方法中不仅减少函数签名膨胀、维护单一测试表面，更能保全短路求值性能。详见 [deep-refactor-and-governance-hardening.md](references/deep-refactor-and-governance-hardening.md) §四。
 
 ## 场景路由
 
@@ -76,6 +81,12 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 | 插件启动时发现配置有脏数据、自动写回宿主 settings 持久层自愈闭环 | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §七 |
 | 生成带 !!js 动态表达式的配置时反引号提前闭合、TS1005 编译报错或文件被截断 | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §八 |
 | 客户端配置面板打开空白、渲染被替换为 `<div data-slot-error>`、state.user 防污 | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §九 |
+| 资产/条目循环扫描时被取消、取消异常被当成业务损坏并残留脏错误状态 | [provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) §10.4 |
+| 携带自定义错误原因的 AbortController 取消时异常被静默吞没 | [provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) §10.5 |
+| 构建脚本校验失败但目标目录已被脏产物覆盖、先验后写原子时序 | [deep-refactor-and-governance-hardening.md](references/deep-refactor-and-governance-hardening.md) §一 |
+| TypeScript 开启 noUnusedLocals 报 TS6133、模块消费导入与委托导出物理解耦 | [deep-refactor-and-governance-hardening.md](references/deep-refactor-and-governance-hardening.md) §二 |
+| 本地打 Tag 后又有新 commit、CI 发布旧代码、Tag 指针漂移纠偏序列 | [deep-refactor-and-governance-hardening.md](references/deep-refactor-and-governance-hardening.md) §三 |
+| 冲动抽离单消费方私有逻辑导致接口反噬与性能倒退、浅模块防陷阱准则 | [deep-refactor-and-governance-hardening.md](references/deep-refactor-and-governance-hardening.md) §四 |
 | 本地私有配置文件掉电截断、损坏时抢救提取数据、留样备份与自动自愈重新生成 | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) |
 | 拦截器状态变动比对与标记回写时序外泄、重试管道重复追加通知、原子跃迁事务 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十 |
 | 多环境配置持久化双轨撕裂、消灭旁路直接写盘、单一 ConfigSink 接缝范式 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十一 |
@@ -225,3 +236,9 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - 读取物理配置文件时仅使用简单的 `try { JSON.parse() } catch { return {} }`，在遇到截断损坏或手改括号缺失时粗暴丢弃用户的全部历史有效配置。
 - 在拦截器或中间件中将状态变动比对与发射标记回写拆散为两步独立调用，导致同轮发生内部重试流水线时漏标已发射状态并反复追加冗余通知消息。
 - 在纯 Node 环境下使用 `node:vm` 脱机运行客户端控制器时，直接使用严格深度断言比较跨 Realm 输出的数组或对象，遭遇 V8 原型链隔离报错误判为业务逻辑缺陷。
+- 在多资产/多条目循环遍历中使用无差别 catch，导致外部取消被误判为条目解析损坏并计入脏状态，甚至在末尾条目取消时误报为成功。
+- 在自愈读取 catch 块中仅检查 `err.name === 'AbortError'`，导致携带具体错误信息的自定义 Abort reason 被当作常规错误静默吞没。
+- 构建脚本先执行文件复制覆写再比对元数据一致性，导致比对失败时目标分发目录已被写入脏产物。
+- 在顶层无差别 import 未在本地直接消费的符号，迫使团队在 tsconfig 中妥协关闭 noUnusedLocals 导致死代码静态拦截失效。
+- 在修改完发版文档或提交最后修正前提前打 Tag，未核对 `git rev-parse HEAD` 与 Tag 指针一致性便推送到远程触发 CI 发布历史旧代码。
+- 违背 YAGNI 原则将单消费方的私有逻辑过度抽象为浅类（Shallow Module），带来入参膨胀并破坏短路求值性能。

@@ -76,6 +76,13 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - **损坏现场留样备份入口时序**：物理文件读取一旦标准 `JSON.parse` 抛出语法异常，必须在进入 catch 块的第一时间立即执行现场留样备份（`.corrupted.<timestamp>`，轮转保留 ≤3 份），严禁将备份调用滞后放置在第一阶语法修补之后，杜绝因第一阶语法修复成功提前 return 造成案发现场漏备份。详见 [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §十二。
 - **多通道上下文目标解构单一真源与依赖消环**：多通道异构宿主上下文（如 `agent.session.id` / `scope.session.id` / `session.id`）提取逻辑必须下沉至基础无状态模块（`resolveSessionTarget`）作为全仓单一真源；消费子系统单向引用，严禁提示词引擎与轮次拦截器相互反向导入引发 ESM 双向循环依赖死锁。详见 [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十二。
 - **PowerShell 自动化命令链分号兼容规范**：跨平台或 Windows 自动化执行器连续执行终端命令严禁使用 `cmd1 && cmd2`（易在受限管道解析器引发 InvalidEndOfLine 语法解析中断），一律使用标准分号 `;` 分隔或拆分为独立执行调用。详见 [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十三。
+- **同步栈内存互斥防微任务竞态**：双面客户端在防范高频连击时，严禁依赖 React 的 `useState(busy)` 守卫；React 18 合成事件批处理机制下，状态更新属于异步调度，在下次 commit 渲染前闭包内 busy 仍为 false，快速连击能轻易穿透守卫并携带相同 revision 发射多次并发 mutate，引发宿主版本乐观锁撕裂冲突。必须在领域控制器上维护内存布尔字段（`private _busy = false`），在动作同步调用栈第一行立即执行 `if (this._busy) return false; this._busy = true;`，在 JavaScript 主线程同步期瞬间锁死，物理消除微任务并发窗口。详见 [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md) §七。
+- **单页面板拒绝自建事件总线过度工程 (Ponytail 裁决)**：双面插件设置面板若挂载于宿主行配置页（如 `plugins.row.config`），宿主上层本就监听了全局配置变动并在更新时重新下发全新 `props.form`，面板自身没有多调用方共享订阅需求；坚决遵循 Ponytail 极简原则（YAGNI），果断砍掉通用控制器模板中的 `_listeners = new Set()`、`subscribe()`、`useSyncExternalStore` 与 `Generation Counter` 等 50+ 行无用脚手架，控制器保持为极轻量的纯内存领域映射与同步互斥器即可。详见 [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md) §八。
+- **对称具名安装器装配范式**：插件入口 `apply(ctx, config)` 随功能增多时，严禁将多条独立的生命周期逻辑（如动态预设注册、工具运行期守卫、提示词注入、文件变动监听等）以匿名闭包直接内联堆叠在单个 `ctx.effect` 内；必须提炼为对称的具名安装器函数（如 `installPresetMode`、`installToolGuard`），每个安装器入参明确、职责内聚，统一返回标准的清理函数 `() => void` 或 `[trigger, dispose]`。`apply()` 彻底收敛为极薄的装配层编排器，圈复杂度大幅下降，生命周期可逆性一目了然。详见 [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十四。
+- **全链路取消信号穿透无死角**：取消信号不仅要在底层 I/O（如 `provider.list` / `get`）中传递，更必须在上层生命周期抽象（如 `Runtime.listNames(signal?: AbortSignal)`）与目录发布流水线中全链路透传到底层；严禁在上层封装中丢弃信号传递空配置 `{}`，并在所有的异常处理块中显式通过 `isAbortError(err, signal)` 识别重抛，严防外部取消信号被误判为物理文件损坏或目录卡死无法中断。详见 [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十五。
+- **模板嵌套反引号破坏与构建假绿陷阱**：在代码生成器或补丁自愈模块中使用 ES 模板字符串（反引号）生成包含动态表达式的代码时（如嵌套的反引号表达式），内层反引号若未加斜杠转义会提前闭合外层模板字符串，使后续代码沦为裸标识符引发致命编译错误（TS1005/TS1127/TS1434）；必须防范“假绿陷阱（The Phantom Green）”——若测试直接 import 编译产物，源码编译崩溃会被历史产物静默掩盖，门禁流水线第一步必须是全新构建（`npm run build`），遇错立即熔断，断言必须防御产物与源码漂移。详见 [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §十三。
+- **Git Tag 显式 SHA 强绑定与 spawnSync 数组传参防御**：发版打 Tag 时严禁直接通过 Shell 命令行字符串拼接调用（易受 Shell 双引号转义、编码与换行符吞没干扰，且重名 Tag 在未带 `-f` 时会静默失败保持旧指针）；必须使用 Node 原生 `child_process.spawnSync('git', ['tag', '-f', '-a', tagName, '-m', msg, targetSha])` 纯数组传参物理隔离 Shell 解析歧义，显式将 `git rev-parse HEAD` 的绝对哈希传入，并在推 Tag 前后执行双向哈希比对核验。详见 [publish-npm-verification.md](references/publish-npm-verification.md) §四。
+- **多语言说明文档发布白名单防 404 死链**：主文档包含多语言跳转链接（如 `[English](./README.md) | [中文](./README.zh.md)`）时，必须将多语言副档显式加入 `package.json.files` 发布白名单中；严禁遗漏副档导致 npm 线上发布包中缺失该文件，使文档顶部的语言跳转链接沦为 404 死链。详见 [packaging.md](references/packaging.md) §五。
 - **猴子补丁会话级深度还原**：插件覆写宿主单例服务工厂（如 `sessionOf`、`get` 等）时，仅在卸载回调中重置该工厂方法并不够（已被分发给外部使用中的活跃会话实例仍持有篡改后的闭包）；必须使用全局唯一的 `Symbol.for('dsh.<plugin>.origMethod')` 在会话实例上固化原始方法（杜绝二次重复包装），并使用 `Set<WeakRef<object>>` 收集活跃实例（零内存泄露）；在 `ctx.effect` 销毁时，设 `active = false`，恢复工厂方法，并遍历解引用逐一还原已分发实例的方法并 `delete Symbol`。详见 [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §一。
 - **声明式样式与插槽监听销毁**：客户端 `<style>` 标签挂载与 `ctx.slots.inject` 监听器严禁裸露在 `apply` 入口；必须分别包在 `ctx.effect(() => { document.head.appendChild(style); return () => style.remove() })` 与 `ctx.effect(() => ctx.slots.inject(...))` 内部，杜绝 HMR 与热重载下的标签堆积与插槽监听器翻倍泄露。详见 [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §二。
 - **非 React 交互浮层深模块化与离线单测**：当交互浮层受限于键盘焦点必须锁定在输入框而无法使用 React Portal 时，严禁手写散落的全局 DOM 变量与命令式突变；必须抽象为独立的 `OverlayController` 深模块，将 DOM 骨架挂载、视口定位计算与事件委托统一内聚；将文本高亮切片（`splitHighlighted`）、多行文本截断预览与视口边界避让算法提炼为零 I/O 纯函数，实现纯 Node 环境下无需伪造 JSDOM 的毫秒级脱机单测（The interface is the test surface）。详见 [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §三。
@@ -93,6 +100,12 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 | 每次发版被迫散弹式修改 README、说明文档写死历史版本与单测数字去中心化 | [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §五 |
 | 多文件 JSON 损坏修补重复代码膨胀、通用语法自愈纯函数 repairJsonSyntax | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §十一 |
 | 损坏文件自愈成功但未生成留样备份文件、备份调用时机滞后陷阱 | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §十二 |
+| React 18 useState 异步调度并发穿透、连击导致 revision 乐观锁冲突 | [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md) §七 |
+| 双面单页面板是否需要自建事件总线、useSyncExternalStore 过度工程裁决 | [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md) §八 |
+| apply() 闭包变量膨胀纵横交错、对称具名安装器解耦装配模式 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十四 |
+| 目录收集与清单发布丢失 AbortSignal 上下文、全链路取消信号穿透 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十五 |
+| 模板字符串嵌套反引号引发编译崩溃、测试读旧产物产生虚假安全感 | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §十三 |
+| Git Tag 因 Shell 引号解析截断未绑定最新提交、spawnSync 数组强绑定 | [publish-npm-verification.md](references/publish-npm-verification.md) §四 |
 | 提取会话或上下文 ID 导致模块间循环依赖、resolveSessionTarget 下沉消环 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十二 |
 | Windows 下自动化脚本运行多条命令报 && 不是有效语句分隔符 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十三 |
 | YAML 补丁损坏截断、YAML 解析出 null 空值毒丸、启发式状态机抢救 | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §六 |
@@ -246,6 +259,14 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - 在 React 组件内部将多个 `useState` 状态更新器深传给散落的提交函数中，形成高耦合浅模块（Shallow Module），导致测试必须强依赖启动真实的 Chromium/Playwright 进程，无法建立毫秒级的脱机状态机单元测试。
 - 列表工具条的「恢复默认」在清理条目字典时，私自向独立的全局标量字段派发 `unset`，违反最小惊讶原则，意外抹杀用户显式配置的全局偏好设置。
 - 重新发版前未核对本地与远程 tag 的提交指针（`git rev-parse <tag>` vs `HEAD`），导致本地残留旧 tag 并触发 CI 流水线发布未经修复的历史旧产物。
+- 在双面客户端中使用 React `useState(busy)` 守卫异步操作，忽略了 React 18 批处理调度窗口，使快速连续点击穿透守卫并携带相同旧 revision 触发宿主乐观锁撕裂。
+- 在单页宿主注入面板中生搬硬套控制器全量模板，为不需要多处订阅的简单面板引入自建事件总线与 `useSyncExternalStore`，平白制造 50+ 行死代码与复杂度债务。
+- 在 `apply()` 中将多条独立生命周期逻辑以匿名闭包直接堆叠在单个 `ctx.effect` 内，数十个闭包变量纵横交错，导致注销链条脆弱且无法独立单元测试。
+- 在上层运行时封装中调用底层 Provider 接口时传递空配置 `{}` 丢弃 `AbortSignal`，使取消信号在顶层发布与目录收集链路上发生断路。
+- 在代码生成模块中使用外层模板字符串包裹包含内层未转义反引号的动态模板，造成模板字符串提前闭合，引发致命语法崩溃。
+- 测试直接 import 上一次构建留下的 `lib/` 产物且未配置前置 clean build，使源码语法破坏被旧产物静默掩盖，形成“假绿”虚假安全感。
+- 在自动化发版脚本中使用拼接 Shell 命令字符串执行 `git tag`，因双引号转义解析异常导致 Tag 未能覆盖绑定到最新发版提交。
+- 提供了包含多语言跳转链接的主说明文档，却未将副语言文档加入 `package.json.files`，导致 npm 线上发布包中缺失该文档产生 404 死链。
 - 在声明插件 Config 时对易被用户手动编辑的字典或枚举字段使用严苛强校验 Schema，导致底层配置文件一旦出现脏数据、类型不符或非标别名时 Loader 直接抛出 invalid config 致命崩溃使插件激活完全失败。
 - 容灾提取键值字典时直接使用普通对象字面量 `{}`，导致外部包含原型属性名时触发 `constructor` 等原型链继承假阳性与原型污染隐患。
 - 为了实现所谓的“自动修复损坏配置”，在前端组件挂载（useEffect）或控制器构造函数中自发调用 `scope.mutate`，在 React 严格模式和热重载下微秒级并发消耗宿主版本号 revision，引发乐观锁冲突与严重的状态撕裂。

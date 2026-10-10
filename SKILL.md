@@ -72,11 +72,29 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - **编译器死代码零容忍与导入解耦**：模块入口严禁顶层 import 本地未直接消费的符号，纯对外公开接口必须物理分离为 `export { ... } from './module'` 委托重导出；保证 `tsconfig.json` 能够永久开启 `noUnusedLocals: true` 与 `noUnusedParameters: true` 严格死代码拦截。详见 [deep-refactor-and-governance-hardening.md](references/deep-refactor-and-governance-hardening.md) §二。
 - **Tag 指针绝对对齐与纠偏铁律**：打 Tag 前后必须执行 `git rev-parse HEAD === git rev-parse "<tag>^{commit}"` 双向指针核验；一旦 Tag 误落入历史提交，严格执行「删 tag -> 在最新 HEAD 重打 tag -> 推 main -> 推 tag」标准纠偏序列，杜绝 CI 发布旧产物。详见 [deep-refactor-and-governance-hardening.md](references/deep-refactor-and-governance-hardening.md) §三。
 - **私有复杂度就地内聚防浅模块膨胀**：单消费方、纯内部的私有逻辑（如宿主配置解构或内部操作组装）严禁冲动抽离为独立的浅类（Shallow Module）；就地内聚在私有方法中不仅减少函数签名膨胀、维护单一测试表面，更能保全短路求值性能。详见 [deep-refactor-and-governance-hardening.md](references/deep-refactor-and-governance-hardening.md) §四。
+- **多持久化语法自愈纯函数化**：当插件管理多个本地私有持久化 JSON（如主配置、会话表、缓存映射等）时，必须提炼通用的零 I/O 纯函数 `repairJsonSyntax(raw)` 统一闭合缺失大/中括号并清洗悬挂逗号；严禁在各业务存储模块各自手写重复的括号计数与正则修复样板。详见 [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §十一。
+- **损坏现场留样备份入口时序**：物理文件读取一旦标准 `JSON.parse` 抛出语法异常，必须在进入 catch 块的第一时间立即执行现场留样备份（`.corrupted.<timestamp>`，轮转保留 ≤3 份），严禁将备份调用滞后放置在第一阶语法修补之后，杜绝因第一阶语法修复成功提前 return 造成案发现场漏备份。详见 [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §十二。
+- **多通道上下文目标解构单一真源与依赖消环**：多通道异构宿主上下文（如 `agent.session.id` / `scope.session.id` / `session.id`）提取逻辑必须下沉至基础无状态模块（`resolveSessionTarget`）作为全仓单一真源；消费子系统单向引用，严禁提示词引擎与轮次拦截器相互反向导入引发 ESM 双向循环依赖死锁。详见 [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十二。
+- **PowerShell 自动化命令链分号兼容规范**：跨平台或 Windows 自动化执行器连续执行终端命令严禁使用 `cmd1 && cmd2`（易在受限管道解析器引发 InvalidEndOfLine 语法解析中断），一律使用标准分号 `;` 分隔或拆分为独立执行调用。详见 [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十三。
+- **猴子补丁会话级深度还原**：插件覆写宿主单例服务工厂（如 `sessionOf`、`get` 等）时，仅在卸载回调中重置该工厂方法并不够（已被分发给外部使用中的活跃会话实例仍持有篡改后的闭包）；必须使用全局唯一的 `Symbol.for('dsh.<plugin>.origMethod')` 在会话实例上固化原始方法（杜绝二次重复包装），并使用 `Set<WeakRef<object>>` 收集活跃实例（零内存泄露）；在 `ctx.effect` 销毁时，设 `active = false`，恢复工厂方法，并遍历解引用逐一还原已分发实例的方法并 `delete Symbol`。详见 [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §一。
+- **声明式样式与插槽监听销毁**：客户端 `<style>` 标签挂载与 `ctx.slots.inject` 监听器严禁裸露在 `apply` 入口；必须分别包在 `ctx.effect(() => { document.head.appendChild(style); return () => style.remove() })` 与 `ctx.effect(() => ctx.slots.inject(...))` 内部，杜绝 HMR 与热重载下的标签堆积与插槽监听器翻倍泄露。详见 [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §二。
+- **非 React 交互浮层深模块化与离线单测**：当交互浮层受限于键盘焦点必须锁定在输入框而无法使用 React Portal 时，严禁手写散落的全局 DOM 变量与命令式突变；必须抽象为独立的 `OverlayController` 深模块，将 DOM 骨架挂载、视口定位计算与事件委托统一内聚；将文本高亮切片（`splitHighlighted`）、多行文本截断预览与视口边界避让算法提炼为零 I/O 纯函数，实现纯 Node 环境下无需伪造 JSDOM 的毫秒级脱机单测（The interface is the test surface）。详见 [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §三。
+- **输入交互外壳 Coordinator 模式与 Hooks 正交解耦**：输入框增强类插件涉及按键拦截、右键粘贴、选区浮动工具栏、会话消息同步等多重关注点时，严禁揉成单一庞大 React 组件（发散式变化坏味道）；主组件仅作为协调器（Coordinator），维护单一的 `liveRef` 避免闭包过期，将其穿透至若干专注的子 Hooks；所有捕获期全局事件监听器的依赖项一律设为 `[]`，彻底消除按键输入过程中的事件解绑重绑抖动与 Fiber 重新调度开销。详见 [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §四。
+- **非必要文档写死版本与度量指标去中心化**：面向最终用户的说明文档（`README`）严禁充斥如 `（vX.Y.Z 新增）` 等历史版本标注，或写死的测试用例具体数字；版本变更全量收敛至 `CHANGELOG.md`，测试保障以自动化门禁脚本为单一真源；消除每次版本发布时对说明文档的散弹式修改（Shotgun Surgery）。详见 [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §五。
 
 ## 场景路由
 
 | 需求或症状 | 先读 |
 | --- | --- |
+| 覆写宿主全局服务工厂导致旧会话永久持有闭包、Symbol+WeakRef 深度可逆还原 | [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §一 |
+| 插件多次热重载导致 `<head>` 内 `<style>` 标签堆积与插槽监听器翻倍泄露 | [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §二 |
+| 键盘焦点需锁定输入框无法用 React Portal、OverlayController 浮层解耦与脱机单测 | [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §三 |
+| 输入增强组件膨胀至数百行、捕获期监听频繁重绑颠簸、Coordinator 与 Hooks 拆分 | [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §四 |
+| 每次发版被迫散弹式修改 README、说明文档写死历史版本与单测数字去中心化 | [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §五 |
+| 多文件 JSON 损坏修补重复代码膨胀、通用语法自愈纯函数 repairJsonSyntax | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §十一 |
+| 损坏文件自愈成功但未生成留样备份文件、备份调用时机滞后陷阱 | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §十二 |
+| 提取会话或上下文 ID 导致模块间循环依赖、resolveSessionTarget 下沉消环 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十二 |
+| Windows 下自动化脚本运行多条命令报 && 不是有效语句分隔符 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十三 |
 | YAML 补丁损坏截断、YAML 解析出 null 空值毒丸、启发式状态机抢救 | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §六 |
 | 插件启动时发现配置有脏数据、自动写回宿主 settings 持久层自愈闭环 | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §七 |
 | 生成带 !!js 动态表达式的配置时反引号提前闭合、TS1005 编译报错或文件被截断 | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §八 |
@@ -242,3 +260,11 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - 在顶层无差别 import 未在本地直接消费的符号，迫使团队在 tsconfig 中妥协关闭 noUnusedLocals 导致死代码静态拦截失效。
 - 在修改完发版文档或提交最后修正前提前打 Tag，未核对 `git rev-parse HEAD` 与 Tag 指针一致性便推送到远程触发 CI 发布历史旧代码。
 - 违背 YAGNI 原则将单消费方的私有逻辑过度抽象为浅类（Shallow Module），带来入参膨胀并破坏短路求值性能。
+- 将损坏现场留样备份调用滞后写在第一阶语法修补之后，导致因尾部截断缺失闭合括号被第一阶自愈成功提前 return，原始破坏现场从未被留样备份从而彻底丧失事故可追溯性。
+- 在提示词装配引擎与轮次拦截协作者之间相互反向导入异构上下文提取探针，在 ESM 模块体系下引发致命的双向循环依赖（Circular Dependency）与未初始化变量死锁。
+- 在 Windows PowerShell 或受限自动化执行器下使用 `&&` 串联多条连续 Git/CLI 命令，遭遇语法解析器报错 `InvalidEndOfLine` 导致自动化流水线意外崩溃中断；应统一使用标准分号 `;` 分隔。
+- 猴补宿主单例工厂（如 `sessionOf`）时仅还原工厂方法自身，未通过 Symbol 与 WeakRef 级联还原各活动实例的原方法，导致插件热重载或禁用后旧闭包继续劫持输入。
+- 客户端样式注入与 `slots.inject` 裸露在 `apply` 顶层，丢弃返回的 Disposer，导致 HMR 期间重复堆积标签与内存监听泄露。
+- 交互浮层为了避免失去焦点而手写全局 DOM 变量与命令式突变，未将切片与视口定位提炼为纯算法深模块，导致测试必须依赖重型浏览器。
+- 在高频变动状态（如 `draft`）的输入框组件中混杂多个正交特性，导致捕获期全局事件监听器频繁解绑重绑引发事件颠簸。
+- 在面向用户的说明文档（`README`）中滥用 `（vX.Y.Z 新增）` 历史标签或写死单测通过数量，破坏文档长青性并引入散弹式维护债务。

@@ -554,7 +554,140 @@ const mode: 'global' | 'preset' = rawMode === 'preset' ? 'preset' : 'global'
 
 ---
 
-## 十、相关 DSH 源码
+## 十一、通用轻度语法修复纯函数范式 (Generic JSON Syntax Healer)
+
+当复杂插件同时管理多个本地私有持久化 JSON 文件时（例如：主回退配置 `config.json`、多会话隔离状态映射表 `session-states.json`、跨轮次缓存快照等），文件遭遇掉电半截断、末尾缺失闭合符号是跨平台通用的物理现象。
+
+### 1. 架构反模式：各存储模块各自手写修补 (Duplicated Repair)
+在每个需要读写 JSON 的模块内部，各自使用内联的循环、栈或手写正则进行括号计数与字段提取。这直接违反了 DRY 原则，造成严重的 **Duplicated Code** 与 **Shotgun Surgery**。一旦需要增强语法清洗规则（如增加转义字符感知或 BOM 头清洗），开发者极易改漏其他存储点。
+
+### 2. 标准工程范式：提取零 I/O 纯函数单一真源
+将轻度语法修补逻辑纯化为一个无状态纯函数 `repairJsonSyntax(raw: string): string`，并在通用设置/存储工具模块中导出：
+
+```ts
+/**
+ * 通用 JSON 语法轻度清洗与未闭合括号对齐补全（自愈第一阶纯函数，零 I/O）
+ */
+export function repairJsonSyntax(raw: string): string {
+  const clean = String(raw ?? '').replace(/^\uFEFF/, '').trim()
+  if (!clean) return ''
+  // 清除尾部悬挂逗号：, } -> } 以及 , ] -> ]
+  let healed = clean.replace(/,\s*([}\]])/g, '$1')
+  let openBraces = 0
+  let closeBraces = 0
+  let openBrackets = 0
+  let closeBrackets = 0
+  let inString = false
+  let escaped = false
+  for (let i = 0; i < healed.length; i++) {
+    const char = healed[i]
+    if (escaped) {
+      escaped = false
+      continue
+    }
+    if (char === '\\') {
+      escaped = true
+      continue
+    }
+    if (char === '"') {
+      inString = !inString
+      continue
+    }
+    if (!inString) {
+      if (char === '{') openBraces++
+      else if (char === '}') closeBraces++
+      else if (char === '[') openBrackets++
+      else if (char === ']') closeBrackets++
+    }
+  }
+  // 对称补全缺失的括号
+  if (openBrackets > closeBrackets) {
+    healed += ']'.repeat(openBrackets - closeBrackets)
+  }
+  if (openBraces > closeBraces) {
+    healed += '}'.repeat(openBraces - closeBraces)
+  }
+  return healed
+}
+```
+
+所有管理持久化 JSON 的存储模块，在标准 `JSON.parse` 失败时，第一步均单向调用此通用纯函数尝试语法复苏，消除模块间的代码分化。
+
+---
+
+## 十二、损坏现场留样备份的时序陷阱 (Backup-on-Error Timing Trap)
+
+在实现“语法修补 + 正则模式兜底提取 + 现场留样备份”的多阶自愈管线时，存在一个极其隐蔽的时序逻辑漏洞：
+
+### 1. 致命缺陷：留样备份放错位置
+如果将现场留样备份调用（`backupCorruptedFile`）放置在第一阶语法修补之后、第二阶正则抢救之前：
+
+```ts
+// 错误示例：留样备份时机滞后！
+try {
+  return JSON.parse(raw)
+} catch {
+  try {
+    const healed = repairJsonSyntax(raw)
+    const parsed = JSON.parse(healed)
+    if (parsed) {
+      safeAtomicWriteFile(filePath, JSON.stringify(parsed, null, 2))
+      return parsed // 致命缺陷：第一阶成功后直接返回，跳过了下方的备份调用！
+    }
+  } catch {}
+
+  backupCorruptedFile(filePath, raw) // 仅当第一阶语法修补失败时才被执行！
+  // ... 正则提取 ...
+}
+```
+
+**危害分析**：在实际生产中，超过 80% 的损坏场景是掉电导致文件尾部丢失闭合括号 `}`。由于 `repairJsonSyntax` 自愈能力极强，在第一阶就能完美补全并成功解析，直接触发 `return`！结果导致：**文件虽然被原地自愈重写了，但原始损坏现场从未被留样备份**！开发者和运维人员完全无法复盘文件究竟何时、因何被截断破坏。
+
+### 2. 黄金法则：Catch 入口第一时间留样 (Backup First)
+只要标准 `JSON.parse(raw)` 抛出 SyntaxError，即板上钉钉证明磁盘上的原始物理文件遭遇了非预期损坏。必须在进入 catch 块的第一行立即执行留样备份，随后再进行第一阶与第二阶的自愈修补：
+
+```ts
+// 正确范式：标准解析一旦失败，第一时间留存案发现场
+try {
+  return JSON.parse(raw)
+} catch {
+  // 1. 第一步：第一时间现场留样备份原始文件（最多轮转保留 3 份）
+  backupCorruptedFile(filePath, raw)
+
+  // 2. 第二步：调用通用语法修补纯函数进行第一阶抢救
+  try {
+    const healed = repairJsonSyntax(raw)
+    const parsed = JSON.parse(healed)
+    if (parsed && typeof parsed === 'object') {
+      safeAtomicWriteFile(filePath, JSON.stringify(parsed, null, 2))
+      return parsed
+    }
+  } catch {
+    // 语法修补未果，进入第三步模式正则提取
+  }
+
+  // 3. 第三步：字段级模式正则深度提取 ...
+}
+```
+
+---
+
+## 十三、清洗文本与留样断言的 Trim 对齐规范 (Normalization vs Exact Assertion)
+
+在读取磁盘文本时，为了防止首尾多余换行符污染后续的流式分析，存储层通常会执行 `const raw = readFileSync(path, 'utf8').trim()`。
+
+### 1. 常见测试断言破裂
+当测试用例向文件写入带有尾部换行或缩进空格的损坏文本（如 `const broken = '{\n  "key": "val"\n  '`）时：
+- 存储层读取并传入 `backupCorruptedFile(path, raw)` 的是经过 `.trim()` 后的字符串；
+- 测试用例断言备份文件内容时，若直接使用原始输入 `assert.equal(backupContent, broken)`，就会因尾部换行或空格产生断言失败（如 `actual !== expected`）。
+
+### 2. 工程对齐标准
+1. **测试断言显式对齐清洗语义**：断言必须写为 `assert.equal(backupContent, broken.trim())`，清晰表达被留样的文本受过基础首尾清洗；
+2. **或备份器持有真源 raw 字节**：若业务要求案发现场必须逐字节（Byte-identical）一模一样保留，存储层在读取时必须区分未清洗的 `rawContent` 与供解析使用的 `cleanContent`，并将未经任何篡改的 `rawContent` 传入备份器。
+
+---
+
+## 十四、相关 DSH 源码
 
 ```text
 packages/dsh-settings/src/index.ts            <-  @deepseek-ai/dsh-settings

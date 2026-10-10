@@ -311,3 +311,49 @@ consumeSessionTransition(sessionId?: string): SessionTransitionResult {
 1. **统一抽象 Sink 接缝**：定义统一的配置通道接口 `PluginConfigSink`（具备 `readConfig`、`writeConfig`、`reset` 等标准正交方法）；
 2. **物理磁盘 I/O 独占收归 FileSink**：所有底层的物理文件读取、字段级合并（merge）与崩溃安全原子写盘逻辑，**完全且独占**内聚在 `createFileSink` 内部；
 3. **配置定义模块彻底纯化**：将配置定义模块纯化为 100% 无副作用的纯类型、纯常量与路径计算模块；若为了向后兼容必须保留旧函数签名，内部坚决改为委托给 `createFileSink()` 处理，彻底封死旁路直接写盘后门。
+
+---
+
+## 十二、多通道宿主上下文目标解构的单一真源与依赖拓扑消环 (Context Target Resolution & DAG Topology)
+
+在 Cordis / DSH 插件体系中，宿主回调（如 `agent/pre-step`、`session/event`、`systemPrompt.section` 等）传入的上下文载体（Payload / Context）存在多层异构变体（例如 `payload.agent?.session?.id`、`payload.scope?.session?.id`、或直接 `payload.session?.id`）。
+
+### 1. 典型坏味道与循环依赖陷阱
+各个消费子模块（如轮次拦截协作者 `TurnCoordinator`、提示词引擎 `SystemPromptSection`、事件监听器等）极易在内部各自手写复杂的内联可选链探针。
+当试图消除这处重复代码时，开发者通常直觉地在轮次协作者模块中定义并导出提取函数（如 `resolveSessionTarget`），并在提示词模块中反向导入它。
+**致命架构陷阱**：
+由于轮次拦截协作者往往需要导入提示词引擎的动态提醒构造函数（如 `renderModeNotice`），若提示词引擎反向导入轮次协作者的会话提取函数，就会在标准 ESM 模块系统下引发**不可调和的双向循环依赖 (Circular Dependency)**，在打包构建或某些测试运行时下导致未初始化的导出变量或不可预测的死锁！
+
+### 2. 标准架构范式：单一真源下沉与单向有向无环图 (DAG)
+1. **下沉至最底层无状态模块**：将多通道上下文提取器抽取为零副作用纯函数 `resolveSessionTarget(target: unknown): string | undefined`，下沉至基础常量/配置工具模块中，成为全仓该契约的**唯一真源**；
+2. **上层消费者单向引用**：提示词引擎直接从底层模块单向导入，消除内联脏探针；
+3. **拦截器向前兼容重导出**：轮次协作者模块同样从底层导入，并通过 `export { resolveSessionTarget }` 重导出，保持公开 API 表面稳定；
+4. **依赖拓扑绝对单向无环**：
+   ```text
+   PromptEngine -----> BaseConfig (resolveSessionTarget)
+        ^                     ^
+        |                     |
+   TurnCoordinator -----------+
+        ^
+        |
+   HostEntry (apply)
+   ```
+
+---
+
+## 十三、Windows PowerShell 自动化脚本环境下的命令链分号兼容规范 (PowerShell Chaining Semicolon Rule)
+
+在 DSH 插件的自动化测试、构建门禁脚本或 CI 执行器中，经常需要依次执行多条连续的 Git/CLI 终端命令（如提交并推送、打包并测试）。
+
+### 1. 致命语法报错机制
+在 Linux/macOS Bash 环境下，惯用 `cmd1 && cmd2` 实现前序命令成功后执行后序命令。
+但在 Windows 平台下，若调用环境是早期 Windows PowerShell（如 PowerShell 5.1）或某些受限的执行管道解析器时，`&&` 操作符会被标记为非法语法符号并直接抛错：
+```text
+ParserError: 标记“&&”不是此版本中的有效语句分隔符。
+FullyQualifiedErrorId : InvalidEndOfLine
+```
+
+### 2. 标准工程准则
+在面向跨平台与 Windows 宿主环境编写自动化工具或流水线命令时：
+1. **优先使用标准分号 `;` 分隔**：`git add . ; git commit -m "..."`，语法在全版本 PowerShell、pwsh 及跨平台环境中均能原生兼容；
+2. **或拆分为独立的命令调用执行**：在自动化脚本中分别调度 `tools.pwsh`，并根据前一个调用的 `exitCode === 0` 显式裁决是否继续执行后续步骤，从根源杜绝命令行解析器方言带来的意外中断。

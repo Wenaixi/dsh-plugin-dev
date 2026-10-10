@@ -33,6 +33,7 @@
 - [sandbox-process-and-pipe-traps.md](./sandbox-process-and-pipe-traps.md)：Windows 沙箱环境下子进程命名管道受限 EPERM 陷阱与 node:vm 纯内存语法校验实践。
 - [client-controller-architecture-and-headless-testing.md](./client-controller-architecture-and-headless-testing.md)：双面客户端控制器深度架构与 node:vm 脱机纯内存状态机单测实践——消除多参数提交泥球、PanelController 深度抽象、单次原子 mutate 批处理、React 18 `useSyncExternalStore` 零撕裂渲染、以及在无真实浏览器环境下 50ms 极速覆盖全量状态机用例。
 - [shared-contract-capability-boundaries.md](./shared-contract-capability-boundaries.md)：当「同一个数据要按调用方给出不同表现」的需求撞上一个改不动的上游时，先沿链路收敛——枚举全部消费方、追到投影函数的字段白名单、抄缓存键的构成维度、核对作用域参数能否区分调用方。四条全过才有受支持路径；不过就是上游数据模型不支持。不可行时的三条覆写路径（接受同源 / 并列注册 / 运行时改写上游对象）各自的代价、失效形态与门禁写法，含「为省条目而改可见性标志会砍掉主功能」这一常见否决项。
+- [config-resilience-and-atomic-self-healing.md](./config-resilience-and-atomic-self-healing.md)：配置韧性、多阶损坏提取与崩溃安全自愈架构——物理崩溃安全原子写盘（Temp + Atomic Rename）、双阶启发式抢救提取流水线（语法修补与字段级模式深度提取）、**YAML 补丁与组合层 (Bundle Patch) 的物理损坏提取与行级状态机抢救**、**截断写入引发的「Null 毒丸」伪正常解析防御**、**运行时内存配置深度体检与宿主持久层 (Settings) 自愈闭环**、**配置重生成时的反引号嵌套与转义陷阱**、**双面客户端 (Client UI) 防崩与防白屏契约**、现场留样备份轮转与破坏注入测试设计范式。
 
 通用专题与具体版本资料冲突时，以目标运行时和源码为准。**每篇专题末尾都有「相关 DSH 源码」清单**，列出上游仓库相对路径与版本号，版本升级后必须重新读源码核对。
 
@@ -60,6 +61,8 @@
   插件解剖学——三种插件形态、Context Proxy 与 `extend`/`isolate`/`intercept`、可逆副作用生命周期管理（`ctx.effect`）、五大派发模式、四角色模型、设置表单与配置持久化契约。
 
 ### 三、配置系统与补丁机制 (Configuration & Patches)
+- **[config-resilience-and-atomic-self-healing.md](./config-resilience-and-atomic-self-healing.md)**：
+  配置韧性、多阶损坏提取与崩溃安全自愈架构——崩溃安全原子写盘、JSON/YAML 双格式损坏提取流水线、断电截断 Null 毒丸防御、运行时 Settings 持久化自愈回写闭环、配置重生成反引号转义隔离、客户端插槽防崩防白屏规范与现场留样轮转备份。
 - **[config.md](./config.md)**：
   Schemastery 强类型配置规范、代码级四层补丁生效落点（bundles -> profile -> global -> `--patch` overlays）、全量替换（Wholesale Replacement）语义、`- insert:` 分组插入机制、`!!js` 动态表达式求值沙盒、`--dump-config` 假阳性避坑与三步真实启动验证；**写入前的反向覆盖闸门**（落盘前深比较「组合结果 vs 提交值」，不等即拒写并抛 `is overridden by ...`，因此 bundle patch 必须写全字段且与 schema 默认值逐字段一致）；设置表单三种写入语义与乐观版本控制；**Volatile 字段底层判定机制**（`isVolatilePath` 递归校验与 `volatileForm` 模式提取，非 volatile 路径直接拒写）；**复合/联合字段设计与解包陷阱**（Loader 校验后 volatile 字段解析为带 `.get()` 的引用对象，宿主代码必须解包提取真实值，不设默认值保留三态语义）；**volatile 的嵌套位置限制只在解析期生效**（构造 schema 不报错，`resolve` 才抛 `volatile fields require a fixed object path`，因此含 volatile 的 schema 必须有一条真走 `resolve` 的测试）；**解析非法值抛 `ValidationError` 而非返回错误数组**（写 `const [, errors] = Schema.resolve(...)` 会得到恒假的空门禁）；**`toJSON()` 返回引用表 `{uid, refs}` 而非展开树**（直读 `json.dict` 得到 `undefined`，形态门禁因此永远为假）。
 

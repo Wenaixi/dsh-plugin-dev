@@ -63,11 +63,19 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - **状态跃迁原子事务**：拦截器中的状态变动检测与已发射标记回写严禁拆分为多步外泄调用，必须由状态机深模块提供原子跃迁接口（`consumeSessionTransition`）自闭环消费，对比判定与标记回写在单个原子事务内完成，“问一次即完成消费”，彻底捍卫单通知幂等不变量并免疫重试流水线撕裂。详见 [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十。
 - **持久化单向接缝**：多通道持久化（如 Settings 官方通道与文件回退通道）必须收敛于统一的 `ConfigSink` 接口接缝，底层磁盘 I/O 独占内聚在 `FileSink` 内部，配置定义模块彻底纯化为无状态模块，严禁上层暴露裸写盘函数形成旁路写盘双轨制漏洞。详见 [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十一。
 - **跨 Realm 断言拍平**：在纯 Node 环境下使用 `node:vm` 脱机测试客户端控制器时，沙箱内对象跨 Realm 比对因原型链隔离会被 `assert/strict` 拒绝（报 `Values have same structure but are not reference-equal`）；断言前必须使用 `toJson = (v) => JSON.parse(JSON.stringify(v))` 拍平数据结构，杜绝假失败误判。详见 [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md) §六。
+- **YAML 损坏截断与空值毒丸防御**：YAML 补丁（`cordis.patch.yml`）遭遇断电截断时未写完的列表项（如 `- `）会被解析器静默转为 `null`，数组提取与清洗必须强制施加 `typeof === 'string'` 过滤，杜绝静默注入引发空指针；语法损坏时自动切换为行级启发式状态机抢救。详见 [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §六。
+- **运行时持久化自愈回写闭环**：`apply` 入口深度清洗内存配置，若检测到修正且宿主 `settings` 就绪，必须通过 `settings.update` 自动将纯净 volatile 字段回写宿主，消除宿主存储中的持久化脏数据。详见 [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §七。
+- **配置重生成反引号转义隔离**：生成包含 `!!js` 动态表达式（含内层反引号）的配置文件时，严禁使用外层模板字符串直拼，一律采用字符串数组 `join('\n')` 物理隔离，杜绝反引号提前闭合截断文件与引发编译崩溃。详见 [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §八。
+- **客户端插槽防崩与防白屏守卫**：双面客户端组件严禁直接解构不可信的 `state.user`/`value`，必须使用防污解构与 `strArray` 清洗器兜底，杜绝组件崩溃被宿主降级为静默 `<div data-slot-error>`。详见 [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §九。
 
 ## 场景路由
 
 | 需求或症状 | 先读 |
 | --- | --- |
+| YAML 补丁损坏截断、YAML 解析出 null 空值毒丸、启发式状态机抢救 | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §六 |
+| 插件启动时发现配置有脏数据、自动写回宿主 settings 持久层自愈闭环 | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §七 |
+| 生成带 !!js 动态表达式的配置时反引号提前闭合、TS1005 编译报错或文件被截断 | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §八 |
+| 客户端配置面板打开空白、渲染被替换为 `<div data-slot-error>`、state.user 防污 | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §九 |
 | 本地私有配置文件掉电截断、损坏时抢救提取数据、留样备份与自动自愈重新生成 | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) |
 | 拦截器状态变动比对与标记回写时序外泄、重试管道重复追加通知、原子跃迁事务 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十 |
 | 多环境配置持久化双轨撕裂、消灭旁路直接写盘、单一 ConfigSink 接缝范式 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十一 |

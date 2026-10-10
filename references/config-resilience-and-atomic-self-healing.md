@@ -313,3 +313,252 @@ test('配置韧性自愈: 极端损坏文本抢救、留样备份与合法重生
   assert.equal(await readFile(join(testDir, backups[0]), 'utf8'), corrupted)
 })
 ```
+
+---
+
+## 六、YAML 补丁与组合层 (Bundle Patch / Cordis Patch) 的物理损坏提取与自愈模型
+
+在 DSH 插件体系中，很多插件以 Bundle 组合包形态分发，通过 `cordis.patch.yml` 或 `cordis.yml` 向宿主注入插件行与工具依赖。与私有 JSON 文件相比，YAML 格式在物理破坏下具有完全不同的破坏特征与更严峻的脆弱性。
+
+### 1. YAML 格式的物理破坏三大特征
+1. **缩进敏感与制表符破坏**：断电、截断或外部手动编辑极易引入缩进错位或制表符 Tab，直接引发 `YAMLParseError` 导致宿主 Loader 崩溃无法启动；
+2. **截断写入引发的「Null 毒丸」伪正常解析**：
+   当物理写盘在写入列表项中途截断（例如截断在 `- `），标准 YAML 解析器**不会抛出语法错误**，而是将未完成的空项目静默解析为 `null`！
+   若后续逻辑直接使用该数组，未进行非空与类型防御，就会在执行 `item.trim()` 或 `item.toLowerCase()` 时爆发未捕获的空指针异常（`TypeError: Cannot read properties of null`）；
+3. **未闭合的内联容器**：如 `disabledList: [itemA, itemB` 缺失闭合中括号引发不可恢复解析异常。
+
+### 2. 双阶段 YAML 容错抢救范式 (Two-Phase YAML Salvage)
+
+```ts
+import { parse } from 'yaml'
+
+export interface ExtractedPatchConfig {
+  pluginConfig: Record<string, unknown>
+  upstreamConfig: Record<string, unknown>
+  repairs: string[]
+}
+
+/**
+ * 清洗并验证字符串列表，坚决杜绝截断引入的 null 毒丸与非法元素
+ */
+export function sanitizeStringList(raw: unknown, validator?: (v: string) => boolean): string[] {
+  if (!Array.isArray(raw)) return []
+  const result: string[] = []
+  const seen = new Set<string>()
+  for (const item of raw) {
+    if (typeof item === 'string') {
+      const trimmed = item.trim()
+      if (trimmed.length > 0 && (!validator || validator(trimmed))) {
+        if (!seen.has(trimmed)) {
+          seen.add(trimmed)
+          result.push(trimmed)
+        }
+      }
+    }
+  }
+  return result
+}
+
+/**
+ * YAML 补丁损坏提取器
+ */
+export function extractCorruptedYamlPatch(corruptedText: string): ExtractedPatchConfig {
+  const repairs: string[] = []
+  const clean = String(corruptedText ?? '').replace(/^\uFEFF/, '').trim()
+
+  // 阶段一：尝试宽松标准解析
+  try {
+    const parsed = parse(clean)
+    if (parsed && typeof parsed === 'object') {
+      const rows: any[] = []
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+          if (Array.isArray(item?.insert)) rows.push(...item.insert)
+          else if (item?.id) rows.push(item)
+        }
+      } else if (Array.isArray((parsed as any).insert)) {
+        rows = (parsed as any).insert
+      }
+
+      const pluginConfig: Record<string, unknown> = {}
+      const upstreamConfig: Record<string, unknown> = {}
+
+      for (const row of rows) {
+        if (!row || typeof row !== 'object') continue
+        // 关键防护：对提取出的列表字段必须使用 sanitizeStringList 清洗，消除截断引入的 null
+        const cfg = row.config || row
+        for (const [k, v] of Object.entries(cfg)) {
+          if (Array.isArray(v)) {
+            cfg[k] = sanitizeStringList(v)
+          }
+        }
+        if (row.id === '<plugin-id>') Object.assign(pluginConfig, cfg)
+        else if (row.id === '<upstream-id>') Object.assign(upstreamConfig, cfg)
+      }
+
+      repairs.push('标准 YAML 解析成功，已完成列表元素空值过滤')
+      return { pluginConfig, upstreamConfig, repairs }
+    }
+  } catch (err) {
+    repairs.push(`标准 YAML 解析失败 (${(err as Error).message})，切换至行级状态机扫描器`)
+  }
+
+  // 阶段二：行级启发式状态机扫描器 (Heuristic Line State Machine)
+  return scanCorruptedYamlLines(clean, repairs)
+}
+```
+
+### 3. 行级启发式状态机扫描器实现要点
+当 YAML 语法彻底崩溃时，使用逐行状态机跳过语法垃圾行，专注提取已知键：
+- **内联数组提取**：正则匹配 `^(\w+)\s*:\s*\[(.*?)\]`，按逗号切分并调用消毒器；
+- **块级列表扫描状态**：当某行匹配 `^(\w+)\s*:$` 时，状态机进入该字段的「列表收集态」；后续遇到 `^\s*-\s*['"]?([^'"]+)['"]?` 时收集元素；当遇到新的冒号键 `^\s*\w+:` 时安全退出列表收集态；
+- **标量与枚举提取**：正则匹配 `^(\w+)\s*:\s*['"]?([a-zA-Z0-9_-]+)['"]?`。
+
+---
+
+## 七、运行时内存配置深度体检与宿主持久层 (Settings) 自愈闭环
+
+外部传入的配置不可信。无论是在插件 `apply(ctx, rawConfig)` 入口还是通过 RPC/事件传入的配置对象，都必须进行防御性体检与持久化自愈。
+
+### 1. 懒求值函数防御性展开 (Lazy Function Unrolling)
+在 DSH 中，volatile 字段在宿主启动阶段（`app-boot`）常以懒求值函数形式流转（`() => value`）。如果直接使用 `Array.isArray(config.list)` 会因其为函数而判定为 false，造成配置意外丢失；同时必须防范嵌套函数自引用引发死循环栈溢出：
+
+```ts
+export function unwrapLazy<T>(raw: unknown, defaultValue: T, maxDepth = 4): T {
+  let value: unknown = raw
+  for (let i = 0; i < maxDepth && typeof value === 'function'; i += 1) {
+    try {
+      value = (value as () => unknown)()
+    } catch {
+      return defaultValue
+    }
+  }
+  return (value === undefined || value === null) ? defaultValue : (value as T)
+}
+```
+
+### 2. 内存清洗纯函数 (`healConfig`)
+- 标量与数字：校验 `Number.isFinite(num)`，对 NaN 或非法值回退为安全默认值；
+- 枚举模式：白名单校验，未知字符串优雅回退；
+- 列表字段：经过 `sanitizeStringList` 清除脏数据并去重；
+- 记录变更明细（`changed: boolean`, `repairs: string[]`）。
+
+### 3. 宿主持久层自动回写自愈闭环 (Persistence Write-Back Loop)
+**核心工程洞察**：仅在插件内存中将配置清洗为正常值是不够的！若宿主的持久化配置文件中继续保留损坏或非法的旧字段，每次重启或配置热重载（`settings/document-updated`）时脏配置会再次传入。
+
+**自愈闭环实现范式**：
+```ts
+export function apply(ctx: Context, rawConfig: PluginConfig): void {
+  const { config: healed, changed, repairs } = healConfig(rawConfig)
+  if (changed) {
+    ctx.logger?.info?.('[plugin] 侦测到非标准或损坏配置，已自动完成自愈清洗: ' + repairs.join('; '))
+  }
+
+  // 关键闭环：若检测到清洗修复且宿主 settings 接口可用，自动回写纯净 volatile 字段持久化
+  const settings = ctx.settings
+  if (changed && settings && typeof settings.update === 'function') {
+    void settings.update('<namespace>', {
+      loadMode: healed.loadMode,
+      enabledItems: healed.enabledItems,
+    }).catch(() => {})
+  }
+
+  // 后续使用 healed 安全驱动插件核心逻辑
+}
+```
+
+---
+
+## 八、配置重生成时的反引号嵌套与转义陷阱 (The Backtick Escaping Trap)
+
+### 1. 致命踩坑机制
+在自动化重新生成包含动态求值脚本或模板语法的 YAML 补丁时（例如 DSH MCP 客户端授权头中合法的动态求值语法：`Authorization: !!js '`Bearer ${process.env.TOKEN}`'`）：
+如果代码生成器在外层使用了 ES6 多行模板字符串（反引号包裹）：
+```ts
+// 错误示例：反引号嵌套引发静默截断或编译失败！
+return `
+- insert:
+    - id: mcp-client
+      config:
+        headers:
+          Authorization: !!js '`Bearer \${process.env.TOKEN}`'
+`
+```
+**破坏机理**：内层单引号包裹的 **反引号** 会在外层模板字符串解析阶段直接**提前闭合**外层模板字符串！
+- TypeScript 编译器会报告：`error TS1005: ';' expected. error TS1434: Unexpected keyword or identifier`；
+- 在运行时生成的字符串会在该反引号处被生硬截断，导致配置文件丢失后半截插件定义，宿主加载时爆发不可恢复的语法损坏！
+
+### 2. 彻底根治的最佳实践：行数组隔离生成
+严禁在多行模板字符串中直接内嵌未隔离的反引号。一律将特殊行抽取为双引号字符串常量，并使用数组 `join('\n')` 物理隔离：
+
+```ts
+export function generateCompliantPatchYaml(options: PatchOptions): string {
+  const authHeader = "          Authorization: !!js '`Bearer ${process.env.TOKEN}`'"
+
+  const lines = [
+    '# 自动生成的标准 DSH 补丁配置',
+    '- insert:',
+    '    - id: mcp-client',
+    '      name: \'@deepseek-ai/dsh-mcp-client\'',
+    '      config:',
+    '        url: https://api.example.com/mcp',
+    '        headers:',
+    authHeader, // 安全无转义冲突
+    '        failOnStartupError: false',
+    '',
+    '    - id: my-plugin',
+    '      name: \'<package-name>\'',
+    '',
+  ]
+
+  return lines.join('\n')
+}
+```
+
+---
+
+## 九、双面客户端 (Client UI) 防崩溃与防白屏契约
+
+在 DSH 双面插件体系中，客户端半侧（如挂载在 `plugins.row.config` 插槽的 React 表单组件）直接承载用户的开关与配置交互。
+
+### 1. 宿主静默失效陷阱 (Silent Slot Error Trap)
+第三方客户端组件运行在宿主的主渲染树中。如果组件内部发生未捕获异常（例如解构 `undefined` 或对非数组使用 `.map()`），宿主外层 ErrorBoundary 会捕获该异常，并将整个插槽渲染为**空的 `<div data-slot-error>`**：
+- 控制台通常**没有任何报错提示**；
+- 用户端表现为整个配置面板白屏、消失或无法交互；
+- 排查成本极高，需要接入 CDP 抓取底层渲染日志。
+
+### 2. 客户端三层防污与降级规范
+在组件接收 `form.state` 时，必须实施三层防污隔离：
+
+```ts
+// 1. 字典根对象防污：杜绝 null、非对象与数组冒充字典
+const state = form?.state
+const user = (state?.user && typeof state.user === 'object' && !Array.isArray(state.user) ? state.user : {}) as Record<string, unknown>
+const value = (state?.value && typeof state.value === 'object' && !Array.isArray(state.value) ? state.value : {}) as Record<string, unknown>
+
+// 2. 列表字段消毒：严格过滤非字符串，trim 并去空
+function strArray(v: unknown): string[] {
+  if (!Array.isArray(v)) return []
+  return v
+    .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    .map((item) => item.trim())
+}
+
+const disabledItems = strArray(user.disabledItems)
+const activeItems = strArray(value.availableItems)
+
+// 3. 枚举状态多级安全降级链
+const rawMode = user.mode ?? value.mode
+const mode: 'global' | 'preset' = rawMode === 'preset' ? 'preset' : 'global'
+```
+
+---
+
+## 十、相关 DSH 源码
+
+```text
+packages/dsh-settings/src/index.ts            <-  @deepseek-ai/dsh-settings
+packages/dsh-app-boot/src/config.ts           <-  @deepseek-ai/dsh-app-boot
+packages/dsh-schemastery/src/index.ts         <-  @deepseek-ai/schemastery
+packages/dsh-client-ui-primitives/src/index.ts <- @deepseek-ai/dsh-client-ui-primitives
+```

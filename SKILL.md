@@ -88,6 +88,8 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - **非 React 交互浮层深模块化与离线单测**：当交互浮层受限于键盘焦点必须锁定在输入框而无法使用 React Portal 时，严禁手写散落的全局 DOM 变量与命令式突变；必须抽象为独立的 `OverlayController` 深模块，将 DOM 骨架挂载、视口定位计算与事件委托统一内聚；将文本高亮切片（`splitHighlighted`）、多行文本截断预览与视口边界避让算法提炼为零 I/O 纯函数，实现纯 Node 环境下无需伪造 JSDOM 的毫秒级脱机单测（The interface is the test surface）。详见 [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §三。
 - **输入交互外壳 Coordinator 模式与 Hooks 正交解耦**：输入框增强类插件涉及按键拦截、右键粘贴、选区浮动工具栏、会话消息同步等多重关注点时，严禁揉成单一庞大 React 组件（发散式变化坏味道）；主组件仅作为协调器（Coordinator），维护单一的 `liveRef` 避免闭包过期，将其穿透至若干专注的子 Hooks；所有捕获期全局事件监听器的依赖项一律设为 `[]`，彻底消除按键输入过程中的事件解绑重绑抖动与 Fiber 重新调度开销。详见 [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §四。
 - **非必要文档写死版本与度量指标去中心化**：面向最终用户的说明文档（`README`）严禁充斥如 `（vX.Y.Z 新增）` 等历史版本标注，或写死的测试用例具体数字；版本变更全量收敛至 `CHANGELOG.md`，测试保障以自动化门禁脚本为单一真源；消除每次版本发布时对说明文档的散弹式修改（Shotgun Surgery）。详见 [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §五。
+- **元数据资源硬边界**：`package.json` 引用的静态资源（如 `icon`）必须严格受控于宿主硬限制（≤256 KiB，安全水位 ≤100 KiB）；图标采用 256×256 高保真重采样压制，并在门禁中断言物理大小，杜绝宿主引导期元信息崩溃。详见 [packaging.md](references/packaging.md) §七、[host-semantic-gates.md](references/host-semantic-gates.md) §2.9。
+- **构建钩子与输出流管道隔离**：自动化校验 `npm pack --json` 时，必须防范 `prepare`/`prepack` 钩子向 stdout 打印构建日志导致的标准输出污染；采用结构锚点切片提取（`raw.slice(start, end)`）防御，杜绝门禁 JSON 解析假崩溃。详见 [packaging.md](references/packaging.md) §八。
 
 ## 场景路由
 
@@ -154,6 +156,8 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 | schema 形态门禁从不红 / volatile 嵌套才在宿主炸 | [config.md](references/config.md)（嵌套位置限制、引用表形状）、[silent-failure-and-gate-design.md](references/silent-failure-and-gate-design.md)（破坏实测） |
 | 非负整数配置字段（`integer()` 不存在、用 `z.natural()`） | [config.md](references/config.md) §7.8 |
 | 插件改 scoped 名、改名后多处对不上 | [packaging.md](references/packaging.md)（scoped 化六件套）、[config.md](references/config.md)（patch name 引号） |
+| 插件启动或安装报包元信息错误、icon exceeds 256 KiB、图标过大宿主加载崩溃 | [packaging.md](references/packaging.md) §七、[host-semantic-gates.md](references/host-semantic-gates.md) §2.9 |
+| 自动化验包报 Unexpected token ℹ、prepare 钩子日志污染 npm pack --json | [packaging.md](references/packaging.md) §八 |
 | 搭 CI 流水线、tag 发版、npm 发布失败 | [ci-release-workflow.md](references/ci-release-workflow.md)、[publish-npm-verification.md](references/publish-npm-verification.md) |
 | 没有报错但功能不生效 | [silent-failure-and-gate-design.md](references/silent-failure-and-gate-design.md)、[debugging-and-troubleshooting.md](references/debugging-and-troubleshooting.md) |
 | 点击按钮/开关毫无反应、表单静默失败、热重载后表单 disposed 假死 | [silent-failure-and-gate-design.md](references/silent-failure-and-gate-design.md)、[official-settings-form-pattern.md](references/official-settings-form-pattern.md) |

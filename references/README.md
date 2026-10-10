@@ -23,7 +23,7 @@
 - [dual-face-ui.md](./dual-face-ui.md)：Host/Browser 数据流、插槽和真实 UI 验收。
 - [patch-packaging-release.md](./patch-packaging-release.md)：补丁、构建、打包、安装和发布真值。
 - [silent-failure-debugging.md](./silent-failure-debugging.md)：零报错失效的证据驱动排查。
-- [host-semantic-gates.md](./host-semantic-gates.md)：静态断言测不到的宿主语义门禁清单——写入闸门、表单处置态、注册表仲裁、缓存失效实时性、产物缓存时序、生命周期、插槽静默注册、只读态；附真机判据的组织方式与验收矩阵。
+- [host-semantic-gates.md](./host-semantic-gates.md)：静态断言测不到的宿主语义门禁清单——写入闸门、表单处置态、注册表仲裁、缓存失效实时性、产物缓存时序、生命周期、插槽静默注册、只读态、**插件元信息与图标体积硬边界（≤256 KiB 真机硬拦截）**；附真机判据的组织方式与验收矩阵。
 - [runtime-truth-and-external-contracts.md](./runtime-truth-and-external-contracts.md)：七类假来源（构建期常量、编译期写死清单、Schema 默认值、受控控件隐式下标、文档历史结论、形状错误的 schema 门禁、未解包的远程返回值）与各自的运行时真值取证位置；跨端命名空间显式挂载、codec 契约的实际宽度、远程返回值的信封形状与失败双形态、描述长度上限来自宿主配置、配置归属维度、卸载与更新的逐项覆盖面；**受控控件的选项集合跨配置状态必须恒定**（条件追加会让用户选过一次后该状态不可达；「合法配置态」与「未配置标记」两类段外观相同语义相反，不能照抄相邻控件写法）。
 - [config-field-lifecycle.md](./config-field-lifecycle.md)：配置字段的新增（三态表达、volatile 与否）、废弃（声明与 volatile 标注两个都不能动）、迁移（启动期/惰性/只读兼容三选一）与批次失败范围；**集合/字典型字段惰性迁移的局部操作陷阱与原子继承（Atomic Carryover）**——单开关操作时必须将旧表中其余有效项一同作为 set 带入新表，杜绝历史配置被意外物理抹除与技能意外复活。
 - [config-field-migration-selfcheck.md](./config-field-migration-selfcheck.md)：迁移逻辑的自检写法——语义转换表穷举、新旧优先双向断言、幂等断言、批次形状自检、负向样例，以及「漏了一个场景」为何破坏实测抓不到。
@@ -105,7 +105,7 @@
 - **[llm-adapter.md](./llm-adapter.md)**：
   `ctx.llm`（LlmRuntime Seam）抽象协议、`LlmAdapter` 继承与 `stream()` 实现、7 种 `StreamChunk` 封闭判别联合完整定义代码。
 - **[packaging.md](./packaging.md)**：
-  Bundle 与 Profile 互斥模型、`package.json` 规约、npm `--legacy-peer-deps` 规避 OOM 实战、`allow-version` 风险豁免机制、多包 Monorepo 工作区联调；**[publish-npm-verification.md](./publish-npm-verification.md)**（npm 发布验证权威指南——本地镜像假阴性避坑、npm 跨区域分发 1-2 分钟时延与 **E409 Staged 冲突锁死防御**、以及发布真源四件套核验标准与真实 Tarball 解包 SHA256 逐文件数字验签）。
+  Bundle 与 Profile 互斥模型、`package.json` 规约、**插件元信息与图标体积硬边界（≤256 KiB 宿主硬约束、256×256 高保真重采样与 ≤100 KiB 安全水位）**、**构建产物校验中的 prepare 管道日志污染与 JSON 切片防御**、npm `--legacy-peer-deps` 规避 OOM 实战、`allow-version` 风险豁免机制、多包 Monorepo 工作区联调；**[publish-npm-verification.md](./publish-npm-verification.md)**（npm 发布验证权威指南——本地镜像假阴性避坑、npm 跨区域分发 1-2 分钟时延与 **E409 Staged 冲突锁死防御**、以及发布真源四件套核验标准与真实 Tarball 解包 SHA256 逐文件数字验签）。
 
 ### 八、系统提示词注入、会话事件流与状态投影 (Prompt & Projections)
 - **[system-prompt-and-projections.md](./system-prompt-and-projections.md)**：

@@ -246,6 +246,73 @@ pnpm link --global dsh-plugin-foo
 
 改名后逐项核对：`npm pack --dry-run` 看 tarball 里的 `package.json` 与 `cordis.patch.yml`，再在隔离 profile 里走一遍「add → 启动 → 浏览器看注册 id」三查。六处全部一致才算 scoped 化完成。
 
+## 插件包元信息与图标体积硬边界 (Plugin Metadata & Icon Resource Boundary)
+
+### 1. 宿主硬性契约与报错特征
+DSH 宿主在插件管理子系统（`@deepseek-ai/dsh-plugin-manager`）扫描、发现或加载插件的 `package.json` 时，不仅校验 JSON 格式，还会对 `"icon"` 属性所指向的物理静态资源（如 `assets/icon.png`）施加物理体积检查。
+宿主施加了硬性上限约束：**资源文件不得超过 256 KiB**。
+
+若插件打包时误将未经压缩或超高分辨率（如 1024×1024 原始切图，体积常在 800 KiB ~ 1.5 MiB）的图标打包发布，宿主在引导扫描时将直接抛出致命异常：
+```text
+Plugin metadata for <package-name>: Error: <path>/package.json: icon exceeds 256 KiB
+```
+该错误会导致插件元信息提取中断、插件在 UI 管理列表中呈现为损坏状态，甚至阻断插件的正常挂载激活。
+
+### 2. 图标规格与高保真压缩规范
+插件图标在 DSH 桌面端与 Web 端各插槽（设置面板头、插件管理列表、触发器卡片）的呈现尺寸通常在 24×24 至 64×64 之间。为满足高分屏（Retina / 4K）抗锯齿超清显示，标准工程规格建议如下：
+1. **基准分辨率**：采用 256×256（或 128×128）像素；
+2. **重采样算法**：使用高质量抗锯齿重采样算法（如 Lanczos / Mitchell-Netravali），严禁粗暴低阶采样丢失边缘锐度；
+3. **PNG 编码优化**：启用无损压缩与调色板/Alpha通道优化（如 Pillow `optimize=True` 或 pngquant），将 256×256 图标体积稳定压制在 30 KiB ~ 80 KiB；
+4. **工程安全水位**：设定物理文件体积 ≤ 100 KiB 的安全警戒线，保留 156 KiB 充裕余量，杜绝踩碰 256 KiB 宿主硬熔断边界。
+
+### 3. 打包白名单与自动化体积门禁
+1. **发布白名单**：`package.json` 的 `files` 字段必须显式声明图标路径（如 `"assets/icon.png"` 或 `"assets/*"`），避免 npm 发布时漏打资源导致宿主报 ENOENT。
+2. **自动化防回退测试**：在门禁测试或构建后检查中建立对图标物理体积的断言守护，防止后续 UI 资源迭代发生体积回退：
+```ts
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+
+const iconPath = 'assets/icon.png';
+if (fs.existsSync(iconPath)) {
+  const { size } = fs.statSync(iconPath);
+  assert(size <= 256 * 1024, `Icon size ${size} bytes exceeds DSH host limit of 256 KiB`);
+  assert(size <= 100 * 1024, `Icon size ${size} bytes exceeds safe watermark of 100 KiB`);
+}
+```
+
+---
+
+## 构建产物校验脚本中的管道日志污染陷阱 (CLI Output Stream Pollution in npm pack --json)
+
+### 1. 陷阱场景：prepare 钩子输出混入标准输出流
+在自动化门禁流水线中，通常使用 `npm pack --dry-run --json` 检查待发布 tarball 的文件完整性、发布白名单与解包体积。
+然而，当 `package.json` 的 `scripts` 配置了 `prepare` 或 `prepack` 钩子（例如 `"prepare": "pnpm build"`）时，`npm pack` 会在打包前隐式触发该构建钩子。
+构建工具（如 `tsdown`, `tsc`, `vite`, `esbuild` 等）在执行期间会向控制台标准输出（`stdout`）打印进度与构建耗时日志（例如 `ℹ tsdown v...`, `✔ Build complete in 50ms`）。
+
+### 2. 致命破坏
+这些构建日志会直接追加在 JSON 字符串前面输出，使得整个进程输出流不再是以纯 `[` 或 `{` 开头的合法 JSON 文本。如果门禁脚本直接执行：
+```ts
+// 错误写法：直接解析整体输出流
+const result = JSON.parse(execSync('npm pack --dry-run --json', { encoding: 'utf8' }));
+// 崩溃报错：SyntaxError: Unexpected token 'ℹ', ... is not valid JSON
+```
+这会导致门禁脚本发生假阳性崩溃。
+
+### 3. 通用解决方案：结构锚点切片提取与脚本解耦
+1. **切片提取容差解析**：定位标准输出中外层 JSON 结构的首末字符（数组 `[` 到 `]` 或对象 `{` 到 `}`）进行安全切片后再解析：
+```ts
+const raw = execSync('npm pack --dry-run --json', { encoding: 'utf8' });
+const jsonStart = raw.indexOf('[');
+const jsonEnd = raw.lastIndexOf(']') + 1;
+if (jsonStart === -1 || jsonEnd === 0) {
+  throw new Error(`Failed to locate JSON output in npm pack stream: ${raw}`);
+}
+const packManifest = JSON.parse(raw.slice(jsonStart, jsonEnd));
+```
+2. **测试或预检时规避重复构建**：在本地脱机快速门禁中，已显式执行过独立 `pnpm build` 步骤的前提下，验包命令可附加 `--ignore-scripts`，物理隔离构建钩子日志对管道流的干扰。
+
+---
+
 ## 常见误解
 
 - 把 patch 当作深合并——它是整行 config **整体替换**。

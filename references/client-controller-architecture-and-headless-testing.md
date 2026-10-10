@@ -477,3 +477,230 @@ export class PanelController {
    - 控制器仅需约 70 行代码，没有任何冗余抽象；
    - 彻底摆脱了复杂的事件分发管理，纯状态机直接暴露给纯 Node 脱机测试（毫秒级执行）；
    - 代码行数负增长，圈复杂度降至最低。
+
+---
+
+## 九、React 18 useSyncExternalStore 快照未缓存无限重渲染死循环与事件驱动缓存模式
+
+### 1. 现实痛点：为什么点击插件卡片会导致界面瞬间冻结卡死（CPU 100%）？
+
+在 DSH 双面插件配置面板中，当开发者将领域控制器接入 React 18 的 `useSyncExternalStore` 时，常会遭遇一个灾难性的生产故障：
+**在插件管理页点击插件卡片展开详情时，整个宿主界面瞬间失去响应、CPU 跑满 100%、浏览器提示页面无响应（Page Unresponsive）并最终崩溃**。
+
+#### 核心机理剖析：React 18 快照引用恒等检查
+在 React 18 的并发与同步外部存储订阅机制中，`useSyncExternalStore` 会在组件渲染（render）与提交（commit）阶段持续校验外部状态一致性：
+```javascript
+// React 内部 checkIfSnapshotChanged 伪代码
+function checkIfSnapshotChanged(inst) {
+  const latestGetSnapshot = inst.getSnapshot;
+  const prevValue = inst.value;
+  try {
+    const nextValue = latestGetSnapshot();
+    return !Object.is(prevValue, nextValue);
+  } catch (error) {
+    return true;
+  }
+}
+```
+- 若控制器的 `getSnapshot()` 未做引用缓存，每次调用都会通过对象字面量重新组装并返回一个全新的对象 `return { status, writable, data: ... }`；
+- 每次调用后 `Object.is(prevValue, nextValue)` 恒为 `false`；
+- React 误判外部存储在组件渲染期间发生了并发突变，立即调度下一次重新渲染以确保数据一致性；
+- 下一次渲染再次调用 `getSnapshot()` 又得到全新引用，导致组件陷入无限同步重渲染死循环（`Maximum update depth exceeded`）。
+
+#### 致命复合陷阱：Render 期调用 updateScope 无条件触发 _notify()
+更隐蔽的死锁陷阱发生在组件重新渲染时控制器与作用域的同步逻辑中：
+```javascript
+function PluginConfigPanel(props) {
+  const form = (props?.actions?.form) ?? props?.form;
+  const modelRef = React.useRef(null);
+  if (!modelRef.current) {
+    modelRef.current = new PanelModel(form);
+  } else {
+    modelRef.current.updateScope(form); // 致命陷阱：在组件 render 函数体内直接执行
+  }
+}
+```
+若控制器的 `updateScope(nextScope)` 没有做作用域恒等检查，而是无条件执行 `this._notify()`：
+- `_notify()` 会在 JavaScript 同步执行栈中直接遍历调用 `useSyncExternalStore` 注册的订阅监听器；
+- 在 React 正在进行渲染计算的周期内，强行向 React 派发重绘信号；
+- 这一同步更新信号与未缓存快照的死循环产生共振，瞬间把浏览器主线程彻底锁死！
+
+---
+
+### 2. 标准解法：事件驱动失效快照缓存模式 (Event-Driven Snapshot Memoization)
+
+外部存储控制器（Observable Store）的本质是**事件驱动模型**。在底层数据源未派发变更通知、且用户未发生主动交互前，快照对象的引用必须保持**绝对恒等**。
+
+#### 核心状态机生命周期契约
+快照缓存（`_cachedSnapshot`）**仅在以下四类离散事件发生时置空失效**：
+1. **底层数据源变动事件**：`this.scope.subscribe` 注册的回调被宿主触发；
+2. **作用域真实跃迁**：`updateScope(nextScope)` 检测到 `this.scope !== nextScope`；
+3. **用户主动交互导致内部状态变更**：如搜索关键词过滤变更、开关操作中等待态（pending）开启/解除、错误信息字典更新等；
+4. **数据提交完成或失败回滚**。
+
+其余任何时间调用 `getSnapshot()`，必须直接返回已存在的 `_cachedSnapshot` 引用。
+
+---
+
+### 3. 通用标准控制器实现模板
+
+```javascript
+export class PanelModel {
+  constructor(scope, options) {
+    this.scope = scope;
+    this.t = (options && options.t) || ((k) => k);
+    this.keyword = '';
+    this.pending = {};
+    this.failures = {};
+    this.listeners = new Set();
+    this.unsubscribe = null;
+
+    // 快照缓存字段
+    this._cachedSnapshot = null;
+
+    this._bindScope(scope);
+  }
+
+  _bindScope(scope) {
+    if (this.scope !== scope) {
+      if (this.unsubscribe) {
+        this.unsubscribe();
+        this.unsubscribe = null;
+      }
+      this.scope = scope;
+      this._cachedSnapshot = null; // 作用域切换立即失效缓存
+    }
+    if (this.scope && typeof this.scope.subscribe === 'function' && !this.unsubscribe) {
+      this.unsubscribe = this.scope.subscribe(() => {
+        this._cachedSnapshot = null; // 外部变更广播驱动失效
+        this._notify();
+      });
+    }
+  }
+
+  // 严密的作用域恒等守卫：未变动绝不广播，杜绝 render 期死锁
+  updateScope(nextScope) {
+    if (this.scope !== nextScope) {
+      this._bindScope(nextScope);
+      this._cachedSnapshot = null;
+      this._notify();
+    }
+  }
+
+  subscribe(listener) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  _notify() {
+    this.listeners.forEach((fn) => {
+      try { fn(); } catch (e) {}
+    });
+  }
+
+  // 事件驱动快照读取
+  getSnapshot() {
+    // 只要缓存有效且当前处于可订阅状态，直接返回稳定缓存
+    if (this._cachedSnapshot && this.scope && typeof this.scope.subscribe === 'function') {
+      return this._cachedSnapshot;
+    }
+
+    const raw = (this.scope && typeof this.scope.getSnapshot === 'function')
+      ? this.scope.getSnapshot()
+      : { status: 'loading', writable: false, value: {} };
+
+    // 执行领域数据提取与归一化计算...
+    const cleanData = this._extractData(raw.value);
+
+    this._cachedSnapshot = {
+      status: raw.status || 'ready',
+      writable: raw.writable !== false && raw.mode !== 'memory',
+      data: cleanData,
+      keyword: this.keyword,
+      pending: this.pending,
+      failures: this.failures,
+    };
+    return this._cachedSnapshot;
+  }
+
+  // 交互状态驱动失效
+  setKeyword(query) {
+    const next = String(query || '');
+    if (this.keyword !== next) {
+      this.keyword = next;
+      this._cachedSnapshot = null;
+      this._notify();
+    }
+  }
+
+  _setPending(id, isPending) {
+    const next = Object.assign({}, this.pending);
+    if (isPending) next[id] = true;
+    else delete next[id];
+    this.pending = next;
+    this._cachedSnapshot = null;
+    this._notify();
+  }
+
+  // 属性解构防御性支持：安全解构 props 中的 form
+  dispose() {
+    if (this.unsubscribe) {
+      this.unsubscribe();
+      this.unsubscribe = null;
+    }
+    this.listeners.clear();
+    this._cachedSnapshot = null;
+  }
+}
+```
+
+---
+
+### 4. 纯 Node 原生脱机单测断言范式
+
+依托 Node.js 原生 `node:test` 与 `node:assert/strict`，无需真实浏览器或 DOM，即可在 5ms 内对快照引用稳定性建立不可破坏的静态断言：
+
+```javascript
+test('TC-Snapshot: getSnapshot 引用稳定性与 updateScope 零无谓广播', async () => {
+  const { PanelModel } = await loadClientModel('src/client.js');
+  const form = createMockConfigForm({ items: { 'item-a': true } });
+  const model = new PanelModel(form);
+
+  // 1. 核心断言：未发生变更时连续多次读取必须返回完全恒等的对象引用
+  const snap1 = model.getSnapshot();
+  const snap2 = model.getSnapshot();
+  assert.equal(snap1, snap2, '未发生任何配置变更时，getSnapshot 必须严格引用恒等');
+  assert.equal(snap1.data, snap2.data, '嵌套数据字典引用也必须保持稳定');
+
+  // 2. 核心断言：updateScope 传入相同 scope 时绝不能触发 _notify 广播
+  let notified = false;
+  const off = model.subscribe(() => { notified = true; });
+  model.updateScope(form);
+  assert.equal(notified, false, 'updateScope 传入相同实例时绝不能广播，防止 render 期死锁');
+  off();
+
+  // 3. 核心断言：发生真实变更后快照必须正确更新为全新引用
+  await model.toggle('item-a', false);
+  const snap3 = model.getSnapshot();
+  assert.notEqual(snap1, snap3, '数据发生真实变更后快照必须更新为新引用');
+
+  model.dispose();
+});
+```
+
+---
+
+### 5. 视图层插槽注入属性防御性提取
+
+在 DSH 的 Web 插槽体系中（如 `plugins.bundle.config` 与 `plugins.row.config`），宿主在不同页面或不同入口下注入的参数形状可能略有差异（例如某些场景通过 `props.actions.form` 传递，另一些直接传递 `props.form`）。
+
+组件顶层严禁使用裸解构 `const form = props.actions.form`，一律采用防御性空值合并：
+```javascript
+function ConfigPanel(props) {
+  // 防御性解构：安全兼容不同插槽调用面，彻底免疫 TypeError: Cannot read properties of undefined
+  const form = (props && props.actions && props.actions.form) || (props && props.form);
+  const t = props?.t ?? ((k) => k);
+  // ...
+}
+```
+

@@ -576,6 +576,140 @@ export function extractCleanDictionary(value: unknown): Record<string, boolean> 
 
 ---
 
+---
+
+## 十、Schemastery 跨端 Schema 序列化禁忌：Schema.transform 函数闭包丢失与通道假死陷阱
+
+### 10.1 故障现象与外在表征
+
+在 DSH 双面插件开发中，当开发者在插件配置中加入了容灾自愈逻辑后，常会遇到一个极其迷惑的「通道假死」故障：
+- 插件在底层配置文件（如 `cordis.patch.yml`）中已正确挂载且条目配置完整；
+- 宿主命令行（如 `dsh --dump-config`）打印出的配置树完全正常，插件服务正常启动；
+- 浏览器端插件管理页也能正常列出该插件，点击展开详情卡片也未发生白屏崩溃；
+- **但配置面板固定显示提示文案：“当前宿主未提供本插件的配置通道，开关暂不可用”**；
+- 打开浏览器控制台，发现表单控制器的 `state.status` 永远停留在 `'unavailable'` 或 `'loading'`，配置面板的所有控件被直接禁用或降级隐藏。
+
+---
+
+### 10.2 跨端 JSON-RPC 调用链底层根因深度解密
+
+问题的根源出在**宿主向浏览器广播配置表单 Schema 时的跨端序列化机制**。
+
+```
+[Host 侧]
+插件声明 Config (含有 Schema.transform 闭包函数)
+   │
+   ▼
+dsh-settings.describe() 收集表单描述 (volatileForm)
+   │
+   ▼
+form.toJSON() 序列化为 JSON 字符串 (JavaScript 函数对象被静默丢弃！)
+   │
+   ▼  [跨端 JSON-RPC 传输通道]
+   │
+[Client 侧]
+settingsSchema.rehydrate(serialized) 执行 new Schema(serialized) 反序列化
+   │
+   ▼
+ConfigFormController.prototype.decode(view) 执行 this.schema.validate(rehydratedSchema, view.value)
+   │
+   ▼  【致命案发现场】
+Schemastery transform 节点试图执行 callback(val) -> 抛出 TypeError: callback is not a function！
+   │
+   ▼
+validate 捕获异常并返回错误文本 -> decode(view) 判定校验失败直接返回 undefined
+   │
+   ▼
+derive() 中 draft.status = 'ready' 被跳过 -> 状态永久卡在 unavailable / loading！
+```
+
+#### 1. 致命断裂点：Schemastery 序列化无法保留函数闭包
+开发者常试图在 Host 侧声明 Config 时使用 `Schema.transform` 拦截脏数据：
+```typescript
+// 典型反模式：在 volatile 字段上使用 Schema.transform
+export const Config = Schema.object({
+  disabled: Schema.transform(Schema.any(), (val) => cleanData(val)).default({}).volatile(),
+})
+```
+宿主端的 `dsh-api-settings-controller` 在响应前端 `settings.describe()` 时，调用 `dsh-settings.describe()`，其内部通过 `volatileForm(schema).toJSON()` 把表单 Schema 转换成 JSON 树传输。
+**JavaScript 函数闭包无法被 JSON 序列化**，序列化产物中的 transform 节点仅剩下 `{ type: "transform", inner: ... }`，`callback` 属性变为 `undefined`！
+
+#### 2. 客户端反序列化抛错与状态阻断
+浏览器端的 `ConfigFormController.prototype.decode` 源码如下：
+```javascript
+decode(view) {
+  if (this.spec.decode !== void 0) return this.spec.decode(view.value);
+  if (typeof view.value !== "object" || view.value === null || Array.isArray(view.value)) return void 0;
+  let failure;
+  try {
+    failure = this.schema.validate(this.schema.rehydrate(view.schema), view.value);
+  } catch (_malformedSchemaEnvelope) {
+    return;
+  }
+  return failure === void 0 ? view.value : void 0;
+}
+```
+当 `this.schema.validate` 运行时，Schemastery 递归到 transform 节点直接执行 `callback(val)`，瞬间抛出：
+```text
+TypeError: callback is not a function
+    at Schema.resolve (schemastery/lib/index.cjs:554:15)
+```
+该错误导致 `failure` 变成错误信息字符串，`decode(view)` 判定格式不合法返回 `undefined`！
+随后的 `derive()` 状态机更新逻辑中：
+```javascript
+const decoded = this.decode(view);
+this.store.update((draft) => {
+  draft.revision = view.revision;
+  draft.base = view.base;
+  draft.user = view.user;
+  draft.writable = writable;
+  if (decoded === void 0) return; // 致命断路：校验失败直接 return！
+  draft.status = "ready";
+  draft.value = decoded;
+});
+```
+`draft.status = "ready"` 永远无法被执行，表单状态永远保持在初始的 `'unavailable'` 或 `'loading'`，在界面上呈现为配置通道不可用。
+
+---
+
+### 10.3 架构避坑铁律与标准跨端范式
+
+要彻底根除跨端表单假死，必须遵循**声明与清洗关注点分离**原则：
+
+#### 铁律一：严禁在向前端暴露的 volatile 节点上使用 Schema.transform
+所有需要跨端推送到浏览器并由官方设置表单管理的字段，其 Schema 必须保持为**纯数据结构描述**，严禁绑定任何包含可执行代码的 `transform` 节点。
+
+#### 铁律二：使用无闭包的纯类型 Schema 声明
+对于易变字典、自由选项或容灾字段，统一声明为 `Schema.any().default(...).volatile()` 或基元联合类型：
+```typescript
+// 正确跨端声明：纯类型节点，100% 免疫 JSON 序列化闭包丢失
+export const Config = Schema.object({
+  // 字典型易变配置：使用 any 兜底，免去 Loader 校验崩溃，且 JSON 序列化无损
+  disabled: Schema.any().default({}).volatile(),
+  // 枚举型易变配置：使用基元联合类型或 any 兜底
+  language: Schema.any().default(undefined).volatile(),
+  // 历史废弃兼容字段：声明必须保留且带 volatile
+  legacyItems: Schema.any().default({}).volatile(),
+})
+```
+
+#### 铁律三：双侧纯函数运行时归一化分工
+数据清洗与容灾自愈不应侵入 Schema 声明，而应下沉为两端各自独立的无副作用纯函数：
+- **Host 侧**：在插件 Provider 或服务读取配置时，通过 `readConfig(ctx.config)` 纯函数调用清洗逻辑（如 `extractCleanData`），清洗非标值、剔除原型污染；
+- **Browser 侧**：在前端控制器（`PanelModel`）读取快照时，通过 `extractCleanData(rawSnap.value)` 纯函数调用清洗逻辑，向 React 视图输出安全干净的纯字典（使用 `Object.create(null)` 防御）。
+
+---
+
+### 10.4 方案对比矩阵
+
+| 评估维度 | Schema.transform 方案 (反模式) | 纯类型 Schema + 双侧纯函数方案 (标准架构) |
+| :--- | :--- | :--- |
+| **跨端 JSON-RPC 序列化** | **致命缺陷**：`callback` 闭包丢失，客户端报 `TypeError: callback is not a function` | **100% 兼容**：纯数据结构无损跨端反序列化 |
+| **表单就绪状态 (status)** | **永久卡死**：`decode` 返回 undefined，状态永远停留在 `unavailable` | **毫秒级就绪**：校验顺利通过，瞬间转入 `ready` |
+| **Loader 脏数据防崩** | 强绑定 Schemastery 运行时处理 | `Schema.any()` 天然接受任意脏类型，Loader 零崩溃 |
+| **原型链攻击防御** | 需在 transform 回调里小心处理 | 统一经 `Object.create(null)` 纯函数集中防御，零污染 |
+| **代码可测试性** | 强依赖 Cordis/Schemastery 容器环境 | 纯函数零依赖，纯 Node 环境毫秒级脱机单测 |
+
 ## 相关 DSH 源码
 
 上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。

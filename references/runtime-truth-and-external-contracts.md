@@ -16,6 +16,7 @@
 | 文档里的历史结论 | 教用户去改一个已退役的路径 | 源码与磁盘落点 |
 | 形状错误的 schema 门禁 | 断言写着、永远为假，从不红 | 破坏实测（人为打断一次证明它会红） |
 | 未解包的远程返回值 | 接口通、宿主无报错、界面永久「不可用」 | 传输层实现里 `return` 的实际形状 |
+| 跨端 Schema 里的 transform 闭包 | 配置面板永久显示「通道不可用」、状态卡在 unavailable | 宿主 describe 序列化产物与客户端 validate 报错 |
 
 ---
 
@@ -196,6 +197,29 @@ var value = configured ? A : C;   // 选中态仍然只反映配置值
 **补丁条目是高频漏项**：包管理器通常只清前三项，插件条目留在用户补丁里。宿主解析时对未知条目 id 的处理往往是**告警并跳过**（非致命），所以表现是「一切正常，只是启动日志里多了一行看不懂的告警」。
 
 **自查**：在包管理器源码里搜补丁文件的写操作。若唯一的写操作是「切换条目的启用/禁用」，那么它**没有删除条目的能力**——这是宿主能力缺口，插件侧修不了，只能如实告知用户手工清理。
+
+---
+
+## 九、跨端 volatile Schema 必须是无闭包纯数据结构（Schema.transform 传输丢失陷阱）
+
+宿主侧声明的插件 `Config` 会通过 `ctx.settings.describe()` 收集，经 `schema.toJSON()` 序列化后通过跨端 JSON-RPC 传输给浏览器。
+
+### 9.1 致命假象：以为 Schema.transform 可以跨端透传
+
+开发者常误以为在 Host 侧使用 `Schema.transform(Schema.any(), (val) => clean(val)).volatile()` 是完美的容灾清洗手段，既防 Loader 崩溃又完成数据归一化。
+**真实契约**：
+- `Schema.transform` 内部的 `callback` 是运行在 Node 进程里的 JavaScript 函数；
+- `toJSON()` 进行 JSON 序列化时，函数闭包被静默丢弃；
+- 浏览器客户端收到后执行 `new Schema(serialized)` 反序列化，得到一个 `callback === undefined` 的 transform 节点；
+- 客户端在校验配置草稿时执行 `rehydratedSchema(draft)`，递归到该节点直接抛出 `TypeError: callback is not a function`！
+- 宿主底层的 `ConfigFormController.prototype.decode(view)` 捕获该异常，判定校验不通过直接返回 `undefined`；
+- 最终导致 `draft.status = 'ready'` 被跳过，状态永远卡死在 `'unavailable'` 或 `'loading'`，界面显示“当前宿主未提供本插件的配置通道，开关暂不可用”。
+
+### 9.2 跨端 Schema 纯数据声明铁律
+
+1. **volatile 节点严禁绑定 transform**：凡是暴露给前端表单的易变字段，Schema 必须保持为纯类型（`Schema.any().default(...).volatile()` 或联合字面量）；
+2. **清洗下沉为双端独立纯函数**：数据清洗与容灾提取逻辑坚决不写进 Schema 回调，下沉为 Host 读配置与 Client 读快照两端各自独立的纯函数，实现跨端与容灾的双赢。
+
 
 **产物指纹的冻结语义**也要一并核清：条目指纹常在进程启动时算好并冻结。**新增条目**会让宿主投递新指纹（刷新即生效），但**替换已有条目的内容不会**触发重算。原地升级要么重启宿主，要么先移除再添加（让条目数量变化触发完整重挂载）。
 

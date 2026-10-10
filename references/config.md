@@ -14,6 +14,7 @@
 - [六、生成器目录规则 (Generator Catalogs)](#六生成器目录规则-generator-catalogs)
 - [七、设置表单与配置持久化](#七设置表单与配置持久化)
 - [八、多来源优先级与可诊断化](#八多来源优先级与可诊断化)
+- [九、配置稳定性保障、容灾提取与自动重生指南 (Config Resilience & Auto-Regeneration)](#九配置稳定性保障容灾提取与自动重生指南-config-resilience--auto-regeneration)
 
 ---
 
@@ -447,6 +448,131 @@ export function resolvePriority(input: {
 | 未设置语义没被 Schema 吃掉 | 该字段无 `.default()`，或判定用 raw config |
 | 自有数据根跟随宿主 | 改 `$DSH_HOME` 后插件读写随之改变 |
 | 兼容读不产生双真值 | 全仓 grep 旧路径，只有只读分支命中 |
+
+---
+
+## 九、配置稳定性保障、容灾提取与自动重生指南 (Config Resilience & Auto-Regeneration)
+
+在真实工程环境中，外部持久化配置文件（如 `cordis.patch.yml`）极易遭遇不可控的破坏：用户手动编辑手滑、不同客户端写入格式差异、升级迁移半状态、甚至意外注入了非标准数据类型。
+一个工业级健壮的 DSH 插件必须具备**「配置即使损坏也能安全提取意图，并在适当时机自动重新生成标准配置」**的自愈能力。
+
+### 9.1 宿主 Loader 引导强校验陷阱与 `Schema.transform` 引导防崩
+
+#### 1. 致命痛点：严苛 Schema 导致插件无法加载
+DSH 插件的 `Config` 通常声明为 `Schema.dict(Schema.boolean())` 或严格字面量的 `Schema.union(['a', 'b'])`。
+实战中，若用户在 `cordis.patch.yml` 中：
+- 把字典字段误写成了字符串（如 `disabled: "bad"`）或数组；
+- 把布尔值写成了字符串（如 `"true"`）或数字（`1`）；
+- 把枚举字段写成了常见区域别名（如将语言代码写成 `"zh-CN"` 或 `"en-US"`）；
+
+**Cordis Loader 在插件加载引导阶段就会直接抛出致命异常：**
+```text
+invalid config:
+  - $.disabled expected object but got string
+  - $.language expected "zh" | "en" but got "zh-CN"
+```
+**后果**：插件激活直接失败（`plugin failed to load`），插件生命周期的 `apply` 根本无法执行，整个插件连同错误处理与 UI 完全瘫痪！
+
+#### 2. 通用解法：利用 `Schema.transform` 构造自愈容灾节点
+不要在 Schema 入口层写死脆弱的强类型校验，利用 `@deepseek-ai/schemastery` 的静态 `Schema.transform` 方法，将易受外部编辑破坏的字段包装为自愈节点：
+
+```ts
+export const Config = Schema.object({
+  // 容灾字典：接收 any 输入，通过纯函数提取合法项，非法输入安全回退为干净字典，绝不抛错
+  switches: Schema.transform(Schema.any(), (val) => extractCleanDictionary(val))
+    .default({})
+    .volatile(),
+
+  // 容灾枚举：接收非标别名（如 zh-CN），自动清洗归一化为合法字面量
+  preference: Schema.transform(Schema.any(), (val) => normalizePreference(val))
+    .default(undefined)
+    .volatile(),
+})
+```
+
+- **第一道防线**：任何非对象、数字布尔值、脏字符串在进入 Loader 时已被安全归一化为合法结构，宿主引导 100% 成功；
+- **守住写入闸门**：必须在末尾保留 `.volatile()` 标注！宿主 `SettingsService` 校验写入时逐条验证 `op.path` 是否落在 volatile 节点下，少一个 `.volatile()`，后续所有的自愈修复写入（`form.mutate`）都会被宿主闸门直接拒绝。
+
+---
+
+### 9.2 纯字典原型防御陷阱：`Object.create(null)` 与原型链假阳性
+
+#### 1. 致命陷阱：普通对象的原型继承
+在 JavaScript 中，若用对象字面量 `const clean = {}` 存放清洗后的字典：
+当外部输入包含 `constructor`、`toString`、`valueOf` 等属性，或者调用方代码使用 `clean['constructor']` 探测某个键是否被配置时：
+```js
+const clean = {};
+console.log(clean['constructor']); // 输出 [Function: Object]，而不是 undefined！
+```
+由于普通对象继承自 `Object.prototype`，任何对原型属性名的访问都会返回真值（truthy），造成致命的**假阳性判定**与**原型污染隐患**！
+
+#### 2. 通用解法：使用 `Object.create(null)` 创建无原型纯字典
+所有从外部可能损坏的配置中提取键值字典时，字典容器必须使用 `Object.create(null)` 初始化：
+
+```ts
+export function extractCleanDictionary(value: unknown): Record<string, boolean> {
+  const unwrapped = unwrapValue(value)
+  if (typeof unwrapped !== 'object' || unwrapped === null || Array.isArray(unwrapped)) {
+    return Object.create(null)
+  }
+  const clean: Record<string, boolean> = Object.create(null)
+  for (const [key, val] of Object.entries(unwrapped)) {
+    // 拦截原型污染键与未知非法键
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue
+    if (!VALID_KEYS_SET.has(key)) continue
+    
+    // 宽容识别非标真值
+    if (val === true || val === 'true' || val === 1 || val === '1' || val === 'yes' || val === 'on') {
+      clean[key] = true
+    }
+  }
+  return clean
+}
+```
+**收益**：`clean['constructor']` 严格等于 `undefined`，既彻底消灭原型属性的假阳性误判，又对原型污染攻击天然免疫。
+
+---
+
+### 9.3 容灾清洗提取与自动重生闭环 (Self-Healing Pipeline)
+
+仅在内存中容忍损坏是不够的，底层的脏数据会一直滞留在持久化文件（`cordis.patch.yml`）中。必须构建「损坏感知 → 提取意图 → 原子重生」的闭环。
+
+#### 1. 损坏感知纯函数 (`isConfigCorrupted`)
+提供零副作用的纯函数，明确定义何为配置损坏：
+- 字段类型非法（本该是字典却为字符串/数组/数字）；
+- 字典内部包含了非已知白名单键或原型污染键；
+- 字典内部包含了非标值（如保留了 `false` 残留、字符串布尔值）；
+- 枚举字段包含非标格式或无法识别的值。
+
+#### 2. 自动重生 Operations 派发 (`buildRepairOps`)
+当检测到配置损坏时，控制器自动派发单次原子批处理操作（Flattening Pattern）：
+1. 对提取出的合法有效项派发规范的 `{ op: 'set', path: ['field', key], value: true }`；
+2. 对底层文件中残留的未知脏键、非法项派发 `{ op: 'unset', path: ['field', key] }`；
+3. 对已废弃的历史遗留字段派发 `{ op: 'unset', path: ['legacyField'] }`；
+4. 对枚举项派发规范化后的值（或在缺省时派发 `unset`）。
+
+---
+
+### 9.4 挂载零副作用准则 (No Side-effect on Mount)
+
+#### 致命陷阱：组件挂载自发 mutate 导致乐观锁竞争与状态撕裂
+切忌在前端组件挂载（`useEffect`）或控制器构造函数（`constructor`）中**自发调用后台写入（`scope.mutate`）**进行配置自愈！
+
+- **根因**：DSH 宿主 `SettingsService` 维护单调递增的 `revision` 版本号。在 React 18+ 严格模式（Strict Mode）或开发期页面热重载下，组件可能在同一微秒内被初始化多次；自发发起的后台 mutate 会意外抢占和消耗版本号，导致用户并发操作遭遇乐观锁冲突（`State Tearing`），并产生意料之外的保存失败报错。
+- **正解**：
+  - **挂载保持纯观察者**：初始化时只读出清洗后的内存安全快照，界面零报错、零白屏；
+  - **操作即自愈（Lazy Healing on Mutation）**：用户在界面进行任何一次正常操作（如开关切换、下拉选择）时，控制器在 `_buildOps` 中顺手融合修复操作，一次 RPC 完成用户动作与配置规范化重写；
+  - **提供显式自愈动作**：若必须独立自愈，由外部动作或专用的 `repairConfig()` 显式触发，绝不静默在挂载时偷跑。
+
+---
+
+### 9.5 历史兼容字段 vs 破坏性脏数据的边界隔离
+
+在实现自愈逻辑时，最容易犯的错误是**将「历史遗留废弃字段（Legacy fields）」误判为「配置损坏（Corrupted config）」**：
+
+- **历史遗留字段**：是插件版本演进中合法的向后兼容机制（用户刚从上一版本升级上来）。应遵循「新表为空时并入旧表，用户操作时原子继承新表并清除旧表」的兼容契约；**绝不能在无操作时强行清除旧表**，否则单次读操作就会把历史用户的配置直接抹除！
+- **破坏性脏数据**：是指非对象结构、非法字符串布尔、原型污染键、未知非法键等真正的错误格式。
+- **判定规则**：旧表存在且新表为空属于合法的未迁移兼容态，不属于配置损坏；只有当数据类型错乱或存在脏键时，才标记为损坏。
 
 ---
 

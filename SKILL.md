@@ -57,17 +57,30 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - **包引擎与 CI 兼容基线**：`package.json.engines` 仅声明 Node 基础运行底座（`node: ">=20"`），严禁锁死 `engines.pnpm`（防 CI 触发 `ERR_PNPM_UNSUPPORTED_ENGINE` 与 `ERR_UNKNOWN_BUILTIN_MODULE` 恶性死锁）。详见 [ci-release-workflow.md](references/ci-release-workflow.md) §三。
 - **控制器深度抽象**：双面客户端配置交互必须抽象为领域控制器深模块（`CardController` / `PanelModel`），统一封装 `ConfigForm` 交互与单次原子 ops 拍平，React 视图仅通过 `useSyncExternalStore` 接入不可变快照，从根源杜绝并发渲染状态撕裂；并在纯 Node 环境下利用 `node:vm` 建立毫秒级脱机单测（The interface is the test surface）。详见 [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md)。
 - **重置边界正交隔离**：列表工具条上的批量重置操作严格局限于该列表项字典路径，严禁越权侧漏抹除用户独立的全局标量配置（如语言或主题偏好）。详见 [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §十。
+- **配置容灾与自愈闭环**：外部配置不可信。Loader 引导阶段的易变或字典字段使用 `Schema.transform` 拦截清洗脏数据，杜绝 Loader 抛 `invalid config` 崩溃使插件完全瘫痪；容灾提取键值字典必须使用 `Object.create(null)` 彻底免疫 `constructor` 原型假阳性与原型污染；自愈重生回写聚合为单次原子批处理，组件挂载与控制器构造严禁自发发起写入副作用（No Side-effect on Mount）。详见 [config.md](references/config.md) §九。
+- **崩溃安全原子写盘**：插件私有本地文件（配置、状态、缓存）物理写盘严禁直接调用 `writeFileSync` 原地覆写，一律使用“同目录唯一临时文件写入 -> `renameSync` 原子替换”；在 Windows 极端文件占用环境下若 rename 失败安全回退直写并清理临时文件，从物理底层彻底消除由于掉电或进程中断导致的 0 字节与半截断破坏。详见 [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §一。
+- **配置损坏自愈与留样备份**：物理配置文件读取严禁在 `JSON.parse` 报错时直接丢弃用户数据回退空对象；必须通过轻度语法修补（清洗控制字符、去悬挂逗号、补齐闭合大括号）与模式正则深度提取进行多阶启发式抢救，现场留样备份损坏文件（`.corrupted.<timestamp>`，轮转保留 ≤3 份），并原地自动自愈重写为合法标准 JSON，使系统和后续外部读取平滑自愈。详见 [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §二、§三。
+- **状态跃迁原子事务**：拦截器中的状态变动检测与已发射标记回写严禁拆分为多步外泄调用，必须由状态机深模块提供原子跃迁接口（`consumeSessionTransition`）自闭环消费，对比判定与标记回写在单个原子事务内完成，“问一次即完成消费”，彻底捍卫单通知幂等不变量并免疫重试流水线撕裂。详见 [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十。
+- **持久化单向接缝**：多通道持久化（如 Settings 官方通道与文件回退通道）必须收敛于统一的 `ConfigSink` 接口接缝，底层磁盘 I/O 独占内聚在 `FileSink` 内部，配置定义模块彻底纯化为无状态模块，严禁上层暴露裸写盘函数形成旁路写盘双轨制漏洞。详见 [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十一。
+- **跨 Realm 断言拍平**：在纯 Node 环境下使用 `node:vm` 脱机测试客户端控制器时，沙箱内对象跨 Realm 比对因原型链隔离会被 `assert/strict` 拒绝（报 `Values have same structure but are not reference-equal`）；断言前必须使用 `toJson = (v) => JSON.parse(JSON.stringify(v))` 拍平数据结构，杜绝假失败误判。详见 [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md) §六。
 
 ## 场景路由
 
 | 需求或症状 | 先读 |
 | --- | --- |
+| 本地私有配置文件掉电截断、损坏时抢救提取数据、留样备份与自动自愈重新生成 | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) |
+| 拦截器状态变动比对与标记回写时序外泄、重试管道重复追加通知、原子跃迁事务 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十 |
+| 多环境配置持久化双轨撕裂、消灭旁路直接写盘、单一 ConfigSink 接缝范式 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十一 |
+| node:vm 脱机单测报 not reference-equal 假失败、跨 Realm 原型链隔离拍平 | [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md) §六 |
 | 会话内动态切档、插件自身模式切换与大模型 Prompt Cache 零破坏 | [session-prompt-cache-and-catalog-update.md](references/session-prompt-cache-and-catalog-update.md) §六 |
 | agent/pre-step 轮次拦截胶水代码膨胀、TurnCoordinator 深模块收敛与 6 大不变量 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §八 |
 | 状态模块硬编码 node:fs 导致测试污染磁盘、StateStorageAdapter 纯内存虚拟化 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §九 |
 | CI 安装报 ERR_PNPM_UNSUPPORTED_ENGINE、PowerShell CLI 管道符 | 语法截断 | [ci-release-workflow.md](references/ci-release-workflow.md) §三 |
 | 双面客户端控制器深模块重构、`useSyncExternalStore` 接入、纯 Node 脱机状态机单测 | [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md) |
 | 列表批量重置意外抹掉语言/主题偏好、正交隔离准则 | [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §十 |
+| 手动改坏 cordis.patch.yml 报 invalid config 崩溃、配置损坏自愈提取与自动重生 | [config.md](references/config.md) §九 |
+| 字典型配置提取命中 constructor 属性、原型链假阳性、Object.create(null) 防御 | [config.md](references/config.md) §9.2 |
+| 前端组件挂载时自动写入导致 revision 冲突与乐观锁状态撕裂、挂载零副作用 | [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §11.3 |
 | Tag 指针漂移导致 CI 发布旧代码、发版前三步核验与标准纠偏序列 | [publish-npm-verification.md](references/publish-npm-verification.md) §三 |
 | 全局改配置是否影响已有会话、动态条目更新与 LLM Prompt Cache 保全 | [session-prompt-cache-and-catalog-update.md](references/session-prompt-cache-and-catalog-update.md) |
 | Windows 沙箱下管道 EPERM 报错、node --check 崩溃、纯内存语法校验 | [sandbox-process-and-pipe-traps.md](references/sandbox-process-and-pipe-traps.md) |
@@ -196,3 +209,11 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - 在 React 组件内部将多个 `useState` 状态更新器深传给散落的提交函数中，形成高耦合浅模块（Shallow Module），导致测试必须强依赖启动真实的 Chromium/Playwright 进程，无法建立毫秒级的脱机状态机单元测试。
 - 列表工具条的「恢复默认」在清理条目字典时，私自向独立的全局标量字段派发 `unset`，违反最小惊讶原则，意外抹杀用户显式配置的全局偏好设置。
 - 重新发版前未核对本地与远程 tag 的提交指针（`git rev-parse <tag>` vs `HEAD`），导致本地残留旧 tag 并触发 CI 流水线发布未经修复的历史旧产物。
+- 在声明插件 Config 时对易被用户手动编辑的字典或枚举字段使用严苛强校验 Schema，导致底层配置文件一旦出现脏数据、类型不符或非标别名时 Loader 直接抛出 invalid config 致命崩溃使插件激活完全失败。
+- 容灾提取键值字典时直接使用普通对象字面量 `{}`，导致外部包含原型属性名时触发 `constructor` 等原型链继承假阳性与原型污染隐患。
+- 为了实现所谓的“自动修复损坏配置”，在前端组件挂载（useEffect）或控制器构造函数中自发调用 `scope.mutate`，在 React 严格模式和热重载下微秒级并发消耗宿主版本号 revision，引发乐观锁冲突与严重的状态撕裂。
+- 将合法的向后兼容历史废弃字段（Legacy fields）误判为破坏性配置损坏，在挂载时擅自抹杀清理，破坏「操作即迁移、单开关原子继承」的向后兼容契约。
+- 在写盘持久化时直接调用 `writeFileSync` 原地覆写文件，导致进程在写入中途被操作系统杀死或系统掉电时留下 0 字节或半截断破损坏文件。
+- 读取物理配置文件时仅使用简单的 `try { JSON.parse() } catch { return {} }`，在遇到截断损坏或手改括号缺失时粗暴丢弃用户的全部历史有效配置。
+- 在拦截器或中间件中将状态变动比对与发射标记回写拆散为两步独立调用，导致同轮发生内部重试流水线时漏标已发射状态并反复追加冗余通知消息。
+- 在纯 Node 环境下使用 `node:vm` 脱机运行客户端控制器时，直接使用严格深度断言比较跨 Realm 输出的数组或对象，遭遇 V8 原型链隔离报错误判为业务逻辑缺陷。

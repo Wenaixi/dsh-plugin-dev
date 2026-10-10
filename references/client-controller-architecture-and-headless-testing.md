@@ -315,3 +315,52 @@ test('防静默失败：form.mutate 抛错必须打印原生控制台堆栈', as
 | **并发安全性** | React 多个 useState 存在状态撕裂与幽灵更新风险 | `useSyncExternalStore` + 代际计数彻底杜绝撕裂 |
 | **断言精度** | 只能感知外层 DOM 按钮高亮，测不到底层 ops 数组形状 | 深度断言：精细验证 ops 扁平性、旧表迁移与 disposed 边界 |
 | **开发反馈循环** | 慢速门禁，开发期极少全量运行 | 秒级即时 TDD 校验，可无缝接入门禁或 pre-commit |
+
+---
+
+## 六、跨 Realm 对象深比较断言陷阱与拍平范式 (Cross-Realm Equality Pitfall)
+
+在纯 Node 环境下使用 `node:vm` 脱机运行客户端 Bundle 并测试 Controller 的返回值时，开发者极易遭遇一个极其迷惑的断言报错：
+
+### 1. 典型假失败现象
+```text
+AssertionError [ERR_ASSERTION]: Values have same structure but are not reference-equal:
+[
+  { op: 'set', path: [ 'defaultMode' ], value: 'ultra' }
+]
+operator: 'deepStrictEqual'
+```
+控制台打印出来的数据结构与期望值逐字完全一样，甚至手写属性比对全部相等，但 `node:assert/strict` 却判定断言失败！
+
+### 2. 底层根因分析：V8 独立 Realm 原型链隔离
+`node:vm.createContext(sandbox)` 在 V8 引擎内部创建了一个全新的独立执行域（JavaScript Realm）。
+- 沙箱内 `CardController` 执行返回的数组和对象字面量（`[]` 与 `{}`），其原型链指向沙箱 Realm 内部的 `sandbox.Array.prototype` 与 `sandbox.Object.prototype`；
+- 测试用例代码处于宿主主进程的 Realm（指向 `globalThis.Array.prototype`）；
+- `node:assert/strict` 的 `deepEqual` / `deepStrictEqual` 在进行深度结构比对时，会递归校验对象构造器与原型的恒等性（`actual.constructor === expected.constructor`）。跨 Realm 对象的构造器引用不同，因此被严格模式无情拒绝！
+
+### 3. 标准通用解法：JSON 数据结构拍平范式 (Flattener Pattern)
+在脱机单测中，我们关注的是 Controller 产出的**数据形状（Data Shape）与字段值**，而非 V8 内部的 Realm 原型链。
+
+标准优雅的解法是在断言前引入单行拍平辅助函数：
+```javascript
+// 跨 vm 沙箱 Realm 统一经 JSON 结构拍平断言
+const toJson = (v) => JSON.parse(JSON.stringify(v));
+
+// 深度校验原子 ops 数组形状与字段值：100% 免疫跨域原型链误伤
+assert.deepEqual(
+  toJson(controller.buildSetModeOps('ultra')),
+  [{ op: 'set', path: ['defaultMode'], value: 'ultra' }]
+);
+
+assert.deepEqual(
+  toJson(controller.buildResetOps()),
+  [
+    { op: 'unset', path: ['defaultMode'] },
+    { op: 'unset', path: ['disabledSkills'] },
+    { op: 'unset', path: ['skillDescriptionLang'] },
+  ],
+  '重置操作必须平铺为单次原子 mutate ops，杜绝并发乐观锁撕裂'
+);
+```
+
+**避坑总结**：在任何基于 `node:vm` 的纯内存脱机单测中，只要断言沙箱输出的复合对象或数组，一律使用 `toJson()` 消除 Realm 差异，绝不应误判为“业务逻辑写错”或被迫回退去拉起笨重的真实浏览器！

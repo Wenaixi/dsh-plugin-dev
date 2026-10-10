@@ -438,6 +438,42 @@ function submit(form, t, names, op, setPending, setFailures, opsOverride) {
 
 ---
 
+## 十一、配置损坏感知与自动重生回写规范 (Self-Healing Auto-Regeneration Pattern)
+
+双面插件的客户端控制器（`CardController` / `PanelModel`）直接消费来自宿主 `ConfigForm` 的快照。在复杂环境下，底层持久化数据可能因为外部误操作而损坏（例如字典字段被误改写为非对象、出现脏键或非标布尔类型）。
+工业级的前端控制器必须具备**「损坏感知、安全快照隔离与单次原子重生」**能力。
+
+### 11.1 前端控制器的容灾快照清洗
+
+- **致命隐患（数字下标污染）**：
+  若控制器在未经验证的情况下直接对底层字段执行 `Object.keys(value.dictionary || {})`：
+  当底层字段被意外写入字符串（如 `"corrupted"`）时，JavaScript 会对字符串包装对象枚举出数字下标 `['0', '1', '2', ...]`！
+  后续的单条切换或批量操作若以此为依据构造 ops，会向宿主发出 `path: ['dictionary', '0']` 的灾难性操作，导致配置文件被彻底污染损坏！
+- **通用解法**：
+  控制器派生快照前，必须先经由纯函数清洗（`extractCleanDictionary`），仅提取出落在白名单集合内的有效键值，非对象或损坏输入一律安全降级为 `Object.create(null)`；
+  在快照中暴露 `corrupted: boolean`，让上层视图或测试能够精准感知配置是否包含损坏数据。
+
+### 11.2 单次原子自愈批处理生成规范 (buildRepairOps)
+
+当需要重新生成规范化配置时，控制器必须提供纯派生方法生成单次原子修复批处理（Flattening Pattern）：
+1. **规范写入有效项**：仅针对已验证合法的配置项派发标准的 `{ op: 'set', path: [field, key], value: true }`；
+2. **彻底清洗脏键**：对比底层原始对象中的键集合，凡不在合法集合中或值为假值的项，逐一派发 `{ op: 'unset', path: [field, key] }` 拔除；
+3. **彻底清除废弃字段**：在同一批 operations 末尾，对所有已声明废弃的历史字段派发 `unset`；
+4. **单次提交**：全量修复操作聚合为单一数组，仅调用一次 `form.mutate(repairOps)`，单次事务落盘。
+
+### 11.3 挂载零副作用准则与操作即自愈 (Lazy Healing on Mutation)
+
+- **坚决禁止挂载自发写入**：
+  控制器构造函数（`constructor`）或组件挂载（`useEffect`）中**严禁自发调用 `scope.mutate` 触发后台写入**。
+  - React 严格模式或热重载会在微秒内多次挂载组件，自发写入会连续消耗宿主 `SettingsService` 的 `revision` 版本锁，引发乐观锁并发冲突（`State Tearing`）；
+  - 挂载阶段必须保持为纯观察者，只在内存中呈现清洗后的干净快照，界面零报错、零白屏。
+- **操作即自愈（Lazy Healing on Mutation）**：
+  在用户触发任何一次显式操作（如开关切换、恢复默认、语言变更）时，控制器在组装该次动作的 `_buildOps` 中顺手融合修复操作，一次 RPC 完成用户操作与底层脏配置的规范化重写与重生；
+- **显式自愈通道**：
+  提供独立的公开方法（如 `repairConfig()`），仅在明确需要单步自愈时由外部动作显式调用。
+
+---
+
 ## 相关 DSH 源码
 
 ```text

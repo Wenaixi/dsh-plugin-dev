@@ -246,3 +246,68 @@ export interface StateStorageAdapter {
 - **生产适配器**：`createDiskStorage(profileDir)` 代理物理磁盘文件的安全原子读写与异常兜底；
 - **测试适配器**：导出 `createMemoryStorage()` 纯内存适配器，在内存字典中克隆往返，**物理磁盘 0 次触碰**；
 - **引导期隔离原则**：一次性引导迁移（如旧路径向 profile 补丁导入）属于启动编排职责，坚决不硬塞进运行时状态引擎，保持运行时模块的纯粹与轻盈。
+
+---
+
+## 十、会话状态跃迁原子事务与防重试撕裂（Session Transition Atomicity）
+
+在很多涉及多会话模式切换、动态配置通知或增量状态更新的插件中，开发者常常把**变动检测**与**已发射标记回写**拆散在调用方（如 `TurnCoordinator` 或 `agent/pre-step` 拦截器）中。
+
+### 1. 典型坏味道与重试撕裂隐患
+调用方逻辑通常如下：
+```ts
+// 坏味道：调用方承担状态机内部时序
+const session = state.getSession(sessionId)
+if (session.effectiveMode !== session.lastEmittedMode) {
+  const noticeMsg = buildNotice(session.effectiveMode, session.lastEmittedMode)
+  // 显式回调状态机回写标记
+  state.markSessionEmitted(sessionId, session.effectiveMode)
+  // 原地替换或追加通知消息
+}
+```
+**隐患分析**：
+1. **时序泄漏与缺乏 Locality**：状态机内部的字段比对（`effectiveMode !== lastEmittedMode`）与回写时机外泄，外部调用者必须深刻知晓状态机底层字段名；
+2. **重试流水线撕裂**：在宿主触发同轮次管道重试、或发生异常重新入站时，若前置步骤抛出异常，发射标记已提前或未及时回写，容易引发重复追加通知消息，导致单通知幂等不变量被打破。
+
+### 2. 深模块重构方案：原子跃迁消费接口
+将比对、发射标记更新与上下文提取完整收拢在状态机深模块事务方法中：
+```ts
+export interface SessionTransitionResult {
+  changed: boolean
+  effectiveMode: string | null
+  previousMode: string | null
+}
+
+// 状态机深接口：原子问询并完成消费
+consumeSessionTransition(sessionId?: string): SessionTransitionResult {
+  const session = this.getSession(sessionId)
+  const previous = session.lastEmittedMode
+  const effective = session.effectiveMode
+  if (effective !== previous) {
+    // 事务自闭环：原子更新发射标记并持久化
+    session.lastEmittedMode = effective
+    this.persistSessions()
+    return { changed: true, effectiveMode: effective, previousMode: previous }
+  }
+  return { changed: false, effectiveMode: effective, previousMode: previous }
+}
+```
+
+### 3. 架构收益
+- **调用方极简**：调用方仅需 `const tr = state.consumeSessionTransition(sessionId); if (tr.changed) { ... }`，“问一次即完成消费”；
+- **绝对幂等性**：后续同轮次重试或下一轮未变动时调用，原子返回 `changed: false`，彻底杜绝状态撕裂与多余通知注入。
+
+---
+
+## 十一、统一持久化通道接缝与消灭旁路直接写盘（Single Config Sink Seam）
+
+当插件同时支持官方 Settings 服务补丁通道（首选）与本地文件回退通道（headless / CLI / 纯净环境）时，极易产生**双轨写盘与接缝击穿漏洞**。
+
+### 1. 典型架构摩擦
+在配置解析模块中，既导出了上层通用的路径工具和类型，又直接导出了底层裸写盘函数（如 `writeConfigFileDirectly`）。其他业务子模块（如命令行分发器、状态重置器）在调用时，容易直接调用裸写盘函数绕过官方 Settings 补丁通道。
+结果：在拥有官方 Settings 服务的运行时环境下，配置被直接写进了磁盘文件，而宿主 Profile 补丁全然不知，造成严重的**多环境数据撕裂**。
+
+### 2. 解决方案：Single Sink Seam 范式
+1. **统一抽象 Sink 接缝**：定义统一的配置通道接口 `PluginConfigSink`（具备 `readConfig`、`writeConfig`、`reset` 等标准正交方法）；
+2. **物理磁盘 I/O 独占收归 FileSink**：所有底层的物理文件读取、字段级合并（merge）与崩溃安全原子写盘逻辑，**完全且独占**内聚在 `createFileSink` 内部；
+3. **配置定义模块彻底纯化**：将配置定义模块纯化为 100% 无副作用的纯类型、纯常量与路径计算模块；若为了向后兼容必须保留旧函数签名，内部坚决改为委托给 `createFileSink()` 处理，彻底封死旁路直接写盘后门。

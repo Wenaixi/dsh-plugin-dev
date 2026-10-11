@@ -95,11 +95,15 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - **客户端插件显式服务依赖声明铁律 (No Implicit Client Context)**：双面插件客户端导出严禁仅暴露裸 `apply(ctx)`，必须同时导出 `export const inject = ['slots', 'locale', ...]` 与 `export default { apply, inject }`。Cordis 微内核在全新隔离实例冷启动时在服务未就绪前立即执行 `apply`，未声明依赖会导致 `ctx.slots` / `ctx.locale` 为 undefined 并抛未捕获 TypeError，使条目的 Fiber 无法初始化（`fiber === undefined`），被宿主 Bootloader 判定为 `failed`（`web boot: 1 entry did not activate`）；在日常 profile 中该缺陷会被其他插件提前唤醒服务的行为隐蔽掩盖（假阳性）。详见 [client-bundle-loading-and-artifact-trace.md](references/client-bundle-loading-and-artifact-trace.md) §五、[dual-face-ui.md](references/dual-face-ui.md)。
 - **隔离实例本地源码联调直连铁律 (Direct Source Junction Rule)**：在隔离 profile 中调试本地未发布的源码时，严禁运行 `pnpm install` 或 `dsh plugin add <本地目录>`。pnpm 依赖解析器会将包深层锁定在 `.pnpm/<name>@<hash>/node_modules/<name>` 虚拟存储池中；导致开发者在本地修改源码并重新构建后，宿主静态服务继续分发虚拟池中的历史快照副本，产生“源码改了、编译过了、控制台零报错，但宿主永远运行旧代码”的严重假象；必须在 profile 的 `package.json` 配置 `dependencies` 与 `bundles` 后，跳过 pnpm install，直接手工建立直通开发工作区根目录的目录联接（Windows `mklink /J`，类 Unix `ln -s`），并通过 `(Get-Item node_modules/<pkg>).Target` 强校验联接目标绝不含 `.pnpm`。详见 [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §一。
 - **特权能力多级物理守卫铁律 (Multi-Tier Tool Guard Rule)**：插件向宿主引入代码执行、敏感数据写入或外部特权 API 时，严禁仅依靠系统提示词软约束，必须在 `agent/created` 中构建双道物理防线：先调用 `tools.restrict({ deny: targets })` 从系统提示词工具目录物理移除（第一道防线，消灭调用意图），再挂载 `tools.guard((exec) => ...)` 执行期动态守卫（第二道防线，阻断模型盲调并返回可读拒绝理由）；且必须具备全局 Master 总控短路（总控关闭全系统无条件拦截）与按预设作用域过滤机制，并通过 `settings/document-updated` 响应式联动。详见 [tools.md](references/tools.md) §九。
+- **Web 界面热安装与发布冷却期静默降级**：用户在运行中实例界面点击「+ 添加插件」输入裸包名时，因 pnpm 默认开启 24 小时发布冷却期（`minimumReleaseAge: 1440`），不满 24 小时的新版本被排除，静默降级安装已过冷却期的旧版（产生“明明发了修复但实测依然复现旧 bug”的严重误诊）；安装指引必须强制带精确版本号（自动登记 `minimumReleaseAgeExclude` 豁免名单），测试环境配置 `minimumReleaseAge: 0`。详见 [install-resolution-traps.md](references/install-resolution-traps.md) §九。
+- **多插件环境纯脚本升级构建脚本隔离 (`--ignore-scripts`)**：复杂 profile 中常混装其他含原生 C++ 绑定的第三方插件；更新纯 JS/TS 插件时 pnpm 默认会检查并重跑工作区所有依赖的生命周期构建脚本，在缺少编译环境的主机上报 `ERR_PNPM_EXECUTOR_LIFECYCLE_SCRIPT_FAILED` 连带阻断更新；纯脚本插件安装/升级必须追加 `--ignore-scripts` 物理隔离，且插件自身严禁滥用 `postinstall` 钩子。详见 [install-resolution-traps.md](references/install-resolution-traps.md) §十。
 
 ## 场景路由
 
 | 需求或症状 | 先读 |
 | --- | --- |
+| Web 界面热安装刚发布的补丁包依然复现旧 Bug、pnpm 发布冷却期静默降级 | [install-resolution-traps.md](references/install-resolution-traps.md) §九 |
+| 多插件 Profile 升级纯 JS 插件报不相干的原生依赖构建失败、ERR_PNPM_EXECUTOR_LIFECYCLE_SCRIPT_FAILED | [install-resolution-traps.md](references/install-resolution-traps.md) §十 |
 | 点击插件卡片展开详情界面瞬间崩溃卡死、CPU 100%、useSyncExternalStore 未缓存死循环 | [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md) §九 |
 | 配置面板提示当前宿主未提供本插件的配置通道、状态永久 unavailable、Schema.transform 闭包丢失 | [config.md](references/config.md) §十 |
 | 覆写宿主全局服务工厂导致旧会话永久持有闭包、Symbol+WeakRef 深度可逆还原 | [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §一 |

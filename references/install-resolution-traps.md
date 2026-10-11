@@ -361,7 +361,127 @@ pnpm 的内容寻址存储（Content-Addressable Store）与锁文件机制在�
 
 ---
 
-## 九、官方依据
+## 九、Web 界面运行中热安装裸包名遭遇 pnpm 发布冷却期静默降级回退 (Runtime Web Hot-Install Cooling Degradation)
+
+### 9.1 致命故障现象：补丁发布后用户热安装依然复现旧 Bug
+
+在 DSH 插件迭代中，开发者最常遇到一种令人极度困惑的反馈循环：
+- 开发者刚在 npm 发布了包含紧急缺陷修复的新版本（例如修复了某个导致前端死循环卡死或配置通道不可用的严重问题）；
+- 用户在正在常驻运行的 DSH 实例中，打开 Web 管理界面，点击右上角「+ 添加插件」，输入包名 `<scope>/<pkg>`（未指定版本号）执行热安装；
+- 界面提示安装成功，但用户进入该插件操作时，**旧版本的致命 Bug 依然 100% 复现**！
+- 开发者陷入自我怀疑，误以为新发布的修复没有生效，甚至盲目去推翻已经正确验证过的代码。
+
+---
+
+### 9.2 底层运行机理深度剖析 (The Silent Downgrade Trap)
+
+该故障的真实根因是 **DSH Web 界面热安装逻辑与 pnpm 供应链发布冷却期（`minimumReleaseAge`）的静默交互冲突**：
+
+```text
+[用户操作]
+Web 界面点击「+ 添加插件」输入裸包名 <scope>/<pkg>
+   │
+   ▼
+[宿主插件管理器]
+后台调用 pnpm add <scope>/<pkg> (未带精确版本后缀)
+   │
+   ▼
+[包管理器解析层]
+pnpm 默认开启 minimumReleaseAge (通常为 1440 分钟 / 24 小时)
+   │
+   ├─► 最新版本 (发布不满 24 小时) ──► 【静默排除出候选池！】
+   │
+   └─► 回退选择满足发布时长的最近成熟版本 (如 3 天前发布的旧版)
+   │
+   ▼
+[结果]
+package.json 写入 "^<old-version>"，node_modules 实际下载并装载了旧代码！
+```
+
+#### 1. 裸包名解析与候选池剔除
+当用户通过界面输入未带版本号的包名时，DSH 宿主后台执行的是裸 `pnpm add <scope>/<pkg>`。
+pnpm 的依赖选择算法并不是简单地取 `latest` 标签，而是先对候选版本列表应用供应链安全规则。新发布的补丁包（由于发布时长不足 24 小时）被**无声无息地直接从匹配集合中过滤剔除**。
+
+#### 2. 无声的降级回退
+版本选择器不会报错退出，而是顺着版本历史链一路向后跌落，最终选中了一个发布已超过 24 小时、满足冷却期的历史旧版本！
+界面上显示安装成功，但磁盘上 node_modules 里的物理文件实际是未修复的旧产物，从而导致旧缺陷如幽灵般继续作祟。
+
+---
+
+### 9.3 判据与诊断动作
+
+遇到「刚发了新版但用户实装后依旧复现」时，**严禁猜测代码写错**，直接执行两步物理取证：
+
+1. **核验 profile 的 package.json 依赖声明**：
+   ```bash
+   cat ~/.dsh/profiles/<name>/package.json
+   ```
+   看 `dependencies` 中该包对应的版本前缀是否为旧版本号（例如刚刚发布了 v1.2.3，但此处却变成了 `^1.2.0`）。
+2. **核验 node_modules 中实际落盘的物理文件**：
+   ```bash
+   cat ~/.dsh/profiles/<name>/node_modules/<scope>/<pkg>/package.json
+   ```
+   读取磁盘上实际运行文件的版本号，一旦发现与线上最新发布版本不一致，即铁证坐实遭遇了发布冷却期降级。
+
+---
+
+### 9.4 开发者防护与通用避坑纪律
+
+1. **用户说明文档与指引强制声明带版本号安装**：
+   在所有插件的说明文档（`README.md`）、发版公告与更新指引中，凡涉及安装或升级指令，**一律禁止使用裸包名**，强制书写精确版本：
+   ```bash
+   dsh plugin add <scope>/<pkg>@<最新精确版本>
+   # 或在界面添加插件输入框中输入：
+   <scope>/<pkg>@<最新精确版本>
+   ```
+   **原理**：带精确版本号的请求会被 pnpm 自动登记进工作区的 `minimumReleaseAgeExclude` 豁免清单（写入 `pnpm-workspace.yaml`），直接放行安装，完全免疫冷却期拦截。
+2. **测试与开发 profile 主动关闭冷却期**：
+   所有用于自研插件联调或真机验收的 profile，其 `pnpm-workspace.yaml` 必须显式声明 `minimumReleaseAge: 0`，确保新发布的包能够立即可见、即时安装。
+
+---
+
+## 十、多插件 Profile 依赖生命周期脚本雪崩与 `--ignore-scripts` 升级隔离准则 (Lifecycle Script Avalanche in Multi-Plugin Profiles)
+
+### 10.1 典型症状：升级纯 JS 插件报不相干的原生模块构建失败
+
+在用户的日常 profile（往往安装了十几个不同插件）中，通过命令行或脚本更新某个纯 TypeScript/JavaScript 开发的轻量插件时，pnpm 突然报错中断：
+
+```text
+Error: ERR_PNPM_EXECUTOR_LIFECYCLE_SCRIPT_FAILED
+  × adding a new package
+  ╰─▶ <other-native-dep>@x.y.z install: `node ./build.js ...` exited with exit code: 1
+```
+
+**误诊倾向**：开发者误以为是自己插件的构建产物损坏、或是自己的包引入了非法依赖，甚至怀疑是目标环境的 Node 版本不匹配。
+
+---
+
+### 10.2 根因剖析：工作区全局构建生命周期的链式触发
+
+1. **依赖环境异构性**：复杂 profile 中通常混装了其他具有底层系统级监控、音频处理或原生桥接能力的第三方插件，这些插件深层依赖了需要 C++ 编译（如 `node-gyp`、`cmake-js`）的原生模块；
+2. **生命周期脚本的次生灾害**：当在 profile 根目录执行 `pnpm add <pkg>` 更新目标插件时，pnpm 默认会对工作区依赖图中所有具有生命周期脚本（`install`、`postinstall`）的包进行联动检查与编译重试；
+3. **编译工具链缺失拦截**：若目标主机（特别是 Windows 普通桌面用户机器）没有安装完整的 Visual Studio C++ 编译工具链，那些早已安装好但恰巧带有构建脚本的无关依赖就会在编译阶段直接崩溃退出码 1；
+4. **事务性回滚**：pnpm 检测到任何一个依赖的生命周期脚本失败，会立刻中断并回滚整个操作，导致目标纯 JS 插件的正常更新被连带扼杀！
+
+---
+
+### 10.3 规范处置与工程纪律
+
+对于纯 TypeScript/JavaScript 实现的插件（不含任何 C++ 扩展、不依赖本地二进制编译）：
+
+#### 1. 命令行升级与脚本操作强制追加 `--ignore-scripts`
+在编写升级指导、管理脚本或自动化验收流程时，对于纯 JS 插件的依赖安装，一律附加 `--ignore-scripts`：
+```bash
+pnpm add <scope>/<pkg>@<version> --ignore-scripts
+```
+**收益**：完全跳过工作区内所有包的原生构建生命周期脚本，秒级完成纯脚本依赖的更新与替换，物理隔离其他插件引发的构建雪崩。
+
+#### 2. 插件包自身严禁滥用 postinstall 钩子
+作为插件作者，包内部严禁在 `package.json` 中声明非必需的 `postinstall` 脚本；所有初始化、环境探测与自愈逻辑全部推迟至插件入口的 `apply(ctx)` 运行时动态进行，保持依赖包本身在任何宿主机器上都是 100% 绿色、零构建污染的纯净产物。
+
+---
+
+## 十一、官方依据
 
 - pnpm `minimumReleaseAge` 设置项与默认值：<https://pnpm.io/settings/dependency-resolution>
 - pnpm 供应链安全说明（冷却期的设计动机）：<https://pnpm.io/supply-chain-security>
@@ -369,7 +489,7 @@ pnpm 的内容寻址存储（Content-Addressable Store）与锁文件机制在�
 
 ---
 
-## 相关 DSH 源码
+## 十二、相关 DSH 源码
 
 上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。

@@ -202,6 +202,82 @@ for (const callback of callbacks) {
 
 ---
 
+## 九、特权工具与外部服务的多级物理守卫模式 (Multi-Tier Tool Guard Pattern)
+
+当插件向宿主注册特权工具（如代码执行、外部生产 API 调用、特权网桥或 MCP 接入）时，既要支持用户全局一键关闭，又要支持在特定安全预设中按需隔离。仅靠提示词软约束无法防范模型幻觉或跨会话污染，必须构建**双道物理防线与双重短路机制**：
+
+### 9.1 双道物理防线架构
+
+在 `agent/created` 全局事件监听器中，对新建的智能体实例上下文 `agentCtx` 施加双重保护：
+
+1. **第一道防线：静态目录物理剥离 (`tools.restrict`)**：
+   - 目标：从模型提示词中彻底移除工具描述；
+   - 动作：调用 `agentCtx.tools.restrict({ deny: PRIVILEGED_TOOLS })`；
+   - 效果：模型在构建 Prompt 时收到的工具列表（Tool Definition List）中完全看不到这些特权工具，从源头消灭模型的调用意图。
+2. **第二道防线：运行期执行拦截抛错 (`tools.guard`)**：
+   - 目标：防范历史长上下文残留记忆或模型幻觉盲调；
+   - 动作：挂载单调运行期守卫 `agentCtx.tools.guard((exec) => ...)`；
+   - 效果：一旦检测到受限工具名称，同步返回明确的中文拒绝理由（如「特权工具已在设置中关闭」或「该工具仅在专属预设下可用」），直接中断执行管线并安全交付阻断结果，杜绝穿透可能。
+
+### 9.2 双重短路逻辑 (Master Switch vs Preset Scope)
+
+拦截守卫必须区分「全局主控关闭」与「按预设作用域隔离」两种状态：
+
+```ts
+function installToolGuard(ctx: Context, options: {
+  getEnabled: () => boolean
+  getScopeMode: () => 'preset' | 'global'
+  getAgentPresets: () => any
+  getTools: () => any
+}): () => void {
+  return (ctx as any).on('agent/created', (payload: any) => {
+    const isActive = options.getEnabled()
+    const isIsolated = options.getScopeMode() === 'preset'
+    // 若总控开启且为全局模式，全量放行
+    if (isActive && !isIsolated) return
+
+    const targetAgent = payload?.agent ?? payload
+    const agentCtx = targetAgent?.ctx
+    if (!agentCtx) return
+    const toolsService = options.getTools()
+    if (toolsService === undefined) return
+
+    try {
+      const presetId = options.getAgentPresets()?.composedPreset?.(agentCtx)
+      // 判定是否拦截：主控关闭则无条件全量拦截；主控开启时仅拦截非专属预设会话
+      const shouldBlock = !isActive || presetId !== 'dedicated-preset'
+      if (shouldBlock) {
+        const known: Set<string> | undefined = agentCtx.tools?.view?.()?.restrictableNames
+        const denyTargets = known ? PRIVILEGED_TOOLS.filter((t) => known.has(t)) : PRIVILEGED_TOOLS
+        
+        // 防线 1：静态目录剥离
+        if (denyTargets.length > 0 && typeof agentCtx.tools?.restrict === 'function') {
+          agentCtx.tools.restrict({ deny: denyTargets })
+        }
+        // 防线 2：运行期动态守卫
+        if (typeof agentCtx.tools?.guard === 'function') {
+          agentCtx.tools.guard((exec: { name: string }) => {
+            if (PRIVILEGED_TOOLS.includes(exec.name)) {
+              return !isActive
+                ? '特权工具已在设置中全局关闭'
+                : '该特权工具仅在专属智能体预设下可用'
+            }
+          })
+        }
+      }
+    } catch (e) {
+      ctx.logger.debug?.('[plugin] tools guard failed: ' + String(e))
+    }
+  }, { global: true })
+}
+```
+
+### 9.3 响应式配置联动与生命周期可逆性
+- 守卫状态必须通过闭包动态函数（如 `options.getEnabled`）读取，结合宿主 `settings/document-updated` 事件广播，配置变更免重启即时生效；
+- 安装器必须遵循对称具名安装器规范（Symmetric Named Installer），返回标准清理函数，卸载时注销事件监听与运行期守卫，零资源泄漏。
+
+---
+
 ## 相关 DSH 源码
 
 上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。

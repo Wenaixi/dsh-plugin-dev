@@ -112,13 +112,118 @@ Get-Item '<profile>/node_modules/<pkg>' | Select LinkType, Target
 **可失败检验**：这类断言应动态计算真实值再比对，而不是写死期望字符串——
 写死等于把每次变更都变成一次门禁修改，漏改就静默失效。
 
-## 四、启动遮罩「Failed to load plugins」的三分法
+## 四、启动遮罩「Failed to load plugins」的四分法
 
 `Failed to load plugins` 遮罩 + `N entry did not activate` 只点名了插件，没点名原因。定位顺序：
 
-1. **注册 id**：请求 combo URL 读开头 id，与包名比对；
+1. **注册 id**：请求 combo URL 读开头 id，与包名比对（不一致报 `loaded without registering`）；
 2. **组合进图**：`window.__DSH_BOOT__.entries` 里找包名（不在 = Loader 没激活 `dsh.client` 行）；
-3. **产物字节**：实例 node_modules 下的 client.js 与最新构建逐字节比对。
+3. **产物字节**：实例 node_modules 下的 client.js 与最新构建逐字节比对（排查 pnpm 静态快照副本未更新）；
+4. **服务注入时序**：检查客户端导出是否缺少 `inject: ['slots', 'locale', ...]` 显式声明（在冷启动纯净实例中抛未捕获 TypeError 导致 `fiber === undefined`）。
+
+---
+
+## 五、冷启动依赖注入时序与「1 entry did not activate」根因诊断 (The Cold-Boot Client Dependency Injection Trap)
+
+### 5.1 现象与假阳性陷阱
+
+在日常 profile（装有数十个官方和社区插件）中，插件的客户端面板运行完全正常、无任何报错；但在新建的**干净/隔离实例**冷启动时，页面卡死在启动遮罩，提示：
+
+```text
+HARNESS
+Failed to load plugins
+<包名>
+web boot: 1 entry did not activate
+<包名>: failed
+```
+
+服务端控制台没有任何报错，Network 中请求 combo URL 也是 200 OK，且静态代码已完整传输。
+
+### 5.2 核心机理：宿主 Bootloader 的 fiber 判定
+
+查阅 DSH Web 主框架（`dsh-web-app`）中的启动加载器源码：
+
+```js
+async function JS(e) {
+  const { ctx: n, manifest: o, onEntryState: s } = e;
+  // ...
+  await e.modules.entries.start(a, o);
+  for (const f of a.entries()) {
+    f.fiber === void 0 && s?.(f.options.name, "failed");
+  }
+  await a.await();
+  eM(n, e.modules);
+}
+
+function eM(e, n) {
+  const o = [];
+  for (const s of e.loader.entries()) {
+    const a = s.options.name;
+    if (s.fiber === void 0) {
+      const f = n.importError(a);
+      o.push(f === void 0 ? `${a}: failed` : `${a}: import failed: ${f.message}`);
+      continue;
+    }
+    const u = A7[s.fiber.state];
+    if (u !== "active") {
+      if (u === "pending") {
+        const f = Object.keys(s.fiber.inject).filter(h => e.get(h) === void 0);
+        o.push(`${a}: pending (waiting for service${f.length === 1 ? "" : "s"}: ${f.join(", ") || "unknown"})`);
+      } else {
+        o.push(`${a}: ${u}`);
+      }
+    }
+  }
+  if (o.length > 0) throw new Error(`web boot: ${String(o.length)} entr${o.length === 1 ? "y" : "ies"} did not activate\n${o.join("\n")}`);
+}
+```
+
+**状态判定铁律**：
+- 启动器遍历加载器条目，一旦某个插件的 `f.fiber === undefined`，直接在 UI 将其置为 `"failed"`！
+- `fiber === undefined` 意味着该插件的客户端模块在被加载器调用初始化（实例化 Fiber）时，执行内部的 factory 或调用 `apply(ctx)` 抛出了**同步未捕获异常**！
+
+### 5.3 为什么会抛异常：Cordis 客户端依赖注入时序
+
+客户端模块的执行是基于 Cordis 微内核的：
+1. 若客户端插件入口（`src/client.entry.ts`）仅仅导出了 `export function apply(ctx)`，而**未显式导出 `inject` 数组**：
+   - Cordis 认为该插件不依赖任何外部服务；
+   - 在客户端启动的极早期（bootstrap 阶段刚结束），Cordis 立即无等待调用插件的 `apply(ctx)`；
+   - 此时宿主前端的 `ctx.slots` 或 `ctx.locale` 尚未被提供者挂载（为 `undefined`）；
+   - 插件内执行 `ctx.slots.inject(...)` 或 `ctx.locale.register(...)` 立即抛出 `TypeError: Cannot read properties of undefined (reading 'inject')`；
+   - 该异常导致 entry 的 fiber 初始化崩溃，插件瞬间被标记为 `failed`。
+2. **为什么日常 profile 不报错**：
+   - 日常 profile 中装有其他几十个插件（例如各类官方 UI 插件），其他插件显式声明了 `inject: ['slots', 'locale']`，在更早的时序唤醒并装载了相关服务；
+   - 当有缺陷的插件被调用时，相关服务碰巧已经存在，掩盖了缺少声明的致命漏洞！
+   - 这属于典型的**“隐式依赖被邻居满足”假阳性**，只有在仅装基础插件的隔离新实例冷启动时才会被暴击。
+
+### 5.4 修复与规范标准
+
+客户端源码（`src/client.entry.ts`）的末尾必须严格声明并同时导出命名与默认注入数组：
+
+```ts
+export function apply(ctx: any): void {
+  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'plugin: dictionaries')
+  ctx.effect(() => ctx.slots.inject('plugins.row.config', () => ...), 'plugin: config slot')
+}
+
+// 必须显式声明客户端必需的前端服务依赖
+export const inject = ['slots', 'locale']
+export default { apply, PanelController, inject }
+```
+
+> **注意**：`package.json` 的 `dsh.client.inject` 仅作为分发层元数据索引，宿主前端 Cordis 运行期真正依据的是模块导出对象上的 `inject` 属性。二者必须严格同步。
+
+### 5.5 排查与诊断三步法
+
+1. **HTTP 探测 Combo URL**：
+   ```bash
+   # 确认静态分发是否 200，内容长度是否正常
+   curl -i "http://127.0.0.1:<port>/plugins/??<pkg>/client.js&rev=<rev>"
+   ```
+2. **审查 Boot 状态信封**：
+   在浏览器控制台读取 `window.__DSH_BOOT__.entries.find(e => e.id === '<pkg>')`，检查其声明的 `inject` 列表以及在哪个 `batches` 批次中分发；
+3. **隔离实例冷启动回归**：
+   任何客户端代码修改，必须在纯净隔离新实例（仅包含 base + web-app + 本插件）上冷启动验证，绝不在日常 profile 绿了就声称交付。
 
 ## 相关 DSH 源码
 

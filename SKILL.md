@@ -92,6 +92,9 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - **构建钩子与输出流管道隔离**：自动化校验 `npm pack --json` 时，必须防范 `prepare`/`prepack` 钩子向 stdout 打印构建日志导致的标准输出污染；采用结构锚点切片提取（`raw.slice(start, end)`）防御，杜绝门禁 JSON 解析假崩溃。详见 [packaging.md](references/packaging.md) §八。
 - **React 18 快照引用稳定性与事件驱动失效**：控制器向 `useSyncExternalStore` 暴露的 `getSnapshot()` 必须返回不可变缓存对象（`_cachedSnapshot`）。若状态未变时每次调用返回新建对象字面量，`Object.is(old, new)` 恒为 false，React 18 会误判外部存储在渲染期间发生改变而无限递归更新，导致主线程 100% 冻结卡死（`Maximum update depth exceeded`）；快照缓存必须采用**事件驱动失效 (Event-Driven Invalidation)**，仅在底层数据源事件广播、作用域重绑或交互状态变动时清空缓存；且 `updateScope(nextScope)` 必须包含 `if (this.scope !== nextScope)` 恒等守卫，严禁在组件渲染周期内无条件调用 `_notify()` 向外部订阅者派发同步更新信号。详见 [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md) §九。
 - **Schemastery 跨端表单序列化与 Schema.transform 禁忌**：严禁在向前端暴露的 volatile 字段上使用 `Schema.transform`。宿主向浏览器同步配置表单 Schema 时使用 `schema.toJSON()` 进行 JSON 传输；`Schema.transform` 内部的 JavaScript 回调函数无法被 JSON 序列化，导致浏览器客户端反序列化（`rehydrate`）后调用 `validate(schema, draft)` 校验时触发 `TypeError: callback is not a function`，使 `ConfigFormController.prototype.decode(view)` 判定校验失败并返回 `undefined`，状态永远停留在 `loading` / `unavailable`，导致前端降级显示“当前宿主未提供本插件的配置通道，开关暂不可用”；易变字段声明保持 `Schema.any().default(...).volatile()`，清洗逻辑下沉至双侧纯函数。详见 [config.md](references/config.md) §十。
+- **客户端插件显式服务依赖声明铁律 (No Implicit Client Context)**：双面插件客户端导出严禁仅暴露裸 `apply(ctx)`，必须同时导出 `export const inject = ['slots', 'locale', ...]` 与 `export default { apply, inject }`。Cordis 微内核在全新隔离实例冷启动时在服务未就绪前立即执行 `apply`，未声明依赖会导致 `ctx.slots` / `ctx.locale` 为 undefined 并抛未捕获 TypeError，使条目的 Fiber 无法初始化（`fiber === undefined`），被宿主 Bootloader 判定为 `failed`（`web boot: 1 entry did not activate`）；在日常 profile 中该缺陷会被其他插件提前唤醒服务的行为隐蔽掩盖（假阳性）。详见 [client-bundle-loading-and-artifact-trace.md](references/client-bundle-loading-and-artifact-trace.md) §五、[dual-face-ui.md](references/dual-face-ui.md)。
+- **隔离实例本地源码联调直连铁律 (Direct Source Junction Rule)**：在隔离 profile 中调试本地未发布的源码时，严禁运行 `pnpm install` 或 `dsh plugin add <本地目录>`。pnpm 依赖解析器会将包深层锁定在 `.pnpm/<name>@<hash>/node_modules/<name>` 虚拟存储池中；导致开发者在本地修改源码并重新构建后，宿主静态服务继续分发虚拟池中的历史快照副本，产生“源码改了、编译过了、控制台零报错，但宿主永远运行旧代码”的严重假象；必须在 profile 的 `package.json` 配置 `dependencies` 与 `bundles` 后，跳过 pnpm install，直接手工建立直通开发工作区根目录的目录联接（Windows `mklink /J`，类 Unix `ln -s`），并通过 `(Get-Item node_modules/<pkg>).Target` 强校验联接目标绝不含 `.pnpm`。详见 [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §一。
+- **特权能力多级物理守卫铁律 (Multi-Tier Tool Guard Rule)**：插件向宿主引入代码执行、敏感数据写入或外部特权 API 时，严禁仅依靠系统提示词软约束，必须在 `agent/created` 中构建双道物理防线：先调用 `tools.restrict({ deny: targets })` 从系统提示词工具目录物理移除（第一道防线，消灭调用意图），再挂载 `tools.guard((exec) => ...)` 执行期动态守卫（第二道防线，阻断模型盲调并返回可读拒绝理由）；且必须具备全局 Master 总控短路（总控关闭全系统无条件拦截）与按预设作用域过滤机制，并通过 `settings/document-updated` 响应式联动。详见 [tools.md](references/tools.md) §九。
 
 ## 场景路由
 
@@ -208,6 +211,11 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 | 呈现维度（如语言）切换造成高频无谓读盘、未解耦物理变动 | [provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) §七 |
 | 集合/字典型字段惰性迁移时，单项操作抹除旧表其余历史数据 | [config-field-lifecycle.md](references/config-field-lifecycle.md) §3.2.1 |
 | 本地 pnpm pack 重装调试时报 Already up to date、产物不更新 | [install-resolution-traps.md](references/install-resolution-traps.md) §8.4 |
+| 纯净隔离新实例冷启动卡死在启动遮罩、报 web boot: 1 entry did not activate / failed | [client-bundle-loading-and-artifact-trace.md](references/client-bundle-loading-and-artifact-trace.md) §五、[dual-face-ui.md](references/dual-face-ui.md) |
+| 本地插件改了源码重新构建后新实例依然运行旧代码、pnpm 虚拟存储池快照陷阱 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §一 |
+| 现代高质感插件设置面板设计规范（状态展板、卡片分段单选、主控芯片、即时搜索与批量控制） | [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §十二 |
+| 特权工具/敏感外部能力双道物理守卫、全局总控短路与专属预设按需隔离 | [tools.md](references/tools.md) §九 |
+| 技能/功能开关多轴心智负担简化为一元化单开关、持久层 3-ops 原子批处理与向后兼容契约 | [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §十三 |
 
 已有专题参考仍按 [references/README.md](references/README.md) 索引；若通用参考与目标版本源码冲突，以源码和运行时为准。
 
@@ -297,3 +305,7 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - 交互浮层为了避免失去焦点而手写全局 DOM 变量与命令式突变，未将切片与视口定位提炼为纯算法深模块，导致测试必须依赖重型浏览器。
 - 在高频变动状态（如 `draft`）的输入框组件中混杂多个正交特性，导致捕获期全局事件监听器频繁解绑重绑引发事件颠簸。
 - 在面向用户的说明文档（`README`）中滥用 `（vX.Y.Z 新增）` 历史标签或写死单测通过数量，破坏文档长青性并引入散弹式维护债务。
+- 客户端插件仅导出 `apply` 却遗漏 `inject: ['slots', 'locale']`，导致在纯净隔离新实例冷启动时因前端服务未就绪抛未捕获 TypeError 被宿主标记为 `failed`（`web boot: 1 entry did not activate`）。
+- 在隔离新实例调试本地插件时直接运行 `pnpm install` 或 `dsh plugin add`，导致依赖被深锁入 `.pnpm` 虚拟快照池，引发“源码修改重构建后宿主继续分发旧代码”的严重假象。
+- 插件设置面板直接堆叠简陋的原生单选框与粗糙表格，条目繁多时缺少即时搜索过滤与原子批量控制工具条。
+- 特权工具仅依赖系统提示词口头约束，未在 `agent/created` 中构建“静态目录物理剥离 (`tools.restrict`) + 运行期动态拦截 (`tools.guard`)”双道物理防线。

@@ -62,21 +62,41 @@ dsh plugin --profile <实例名> add <本地插件目录>
 
 装完立刻检查 package.json 的 profile bundles 是否含该包——**dependencies 只管装进来，bundles 才决定是否作为补丁层参与组合**。只在前者里的插件完全不生效，且零报错。
 
-### 本地源码联调：手工建目录联接，不要跑 `pnpm install`
+### 本地源码联调：手工建直通目录联接，坚决避免 `pnpm install`（The pnpm Store Snapshot Trap）
 
-隔离实例里装本地未发布的源码时，`dsh plugin add <目录>` 会走 pnpm，产出的 `node_modules` 布局对宿主不友好。
-宿主有自己的依赖解析器，pnpm 装出的状态文件可能让它在自己的解析阶段就失败，
-症状是**整棵插件树一起 import 失败**（日志里几十个插件同时报错），而不是只坏你这一个。
+在隔离实例里调试本地未发布的源码时，若执行 `dsh plugin add <本地目录>` 或在 profile 目录下运行 `pnpm add <本地目录>` / `pnpm install`，会掉入极其隐蔽的 **pnpm 存储池快照陷阱**：
 
-可靠做法：
+#### 1. 陷阱机理：虚拟存储池与静态快照隔离
+- pnpm 的安装机制会将本地路径依赖解析并深层建立硬链接至 `.pnpm/<包名>@<哈希>/node_modules/<包名>` 虚拟存储池中；
+- 隔离实例 `node_modules/<包名>` 最终链接到的是这个 `.pnpm` 实体副本，而不是你的工作区开发根目录；
+- 当开发者在源码中修改逻辑并重新执行 `npm run build` 后，最新的 `lib/` 产物落盘在工作区，但 `.pnpm` 虚拟池内的文件**从未被更新**；
+- 宿主加载器在静态分发时读取该副本计算 `rev`（基于 mtime/size），由于副本文件未动，`rev` 恒定不变，浏览器永远命中山寨长缓存；
+- 表现为：**源码改了、编译过了、控制台无报错，但宿主和界面永远运行旧代码**！排查成本极高，极易被误判为宿主核心有 bug 或代码逻辑失效。
 
-1. 写好 `package.json`、`cordis.yml`、`cordis.patch.yml` 三个文件，`dependencies` 里把插件指向本地目录；
-2. **跳过 `pnpm install`**，手工创建一条指向仓库根的目录联接（Windows 用 junction，类 Unix 用符号链接），
-   目录名必须与包名一致（scoped 包形如 `node_modules/@scope/name`）；
-3. `node_modules` 里只放这一条，不要混装其它条目。
+#### 2. 标准直通解法：手工建立工作区直通联接
+坚决**跳过 `pnpm install`**，直接手工建立物理直通开发工作区根目录的目录联接：
 
-联接必须**指向仓库根**。指向 pnpm store 里的实体副本时，宿主读到的是安装时的产物快照——源码改了也不生效，
-而且表现与「代码写错了」几乎一样，排查成本极高。改完源码若界面没变，第一件事就是回读这条联接的最终目标。
+1. **配置文件就绪**：
+   - `package.json` 中的 `dependencies` 配置 `"<包名>": "file:<开发工程绝对路径>"`；
+   - `dsh.profile.bundles` 数组中追加该包名，确保作为补丁层参与宿主组合。
+2. **手工创建目录联接**：
+   - 确保创建父目录（例如 scoped 包需要 `mkdir -p node_modules/@scope`）；
+   - Windows 系统使用 Junction 目录联接：
+     ```powershell
+     cmd /c mklink /J "<profile路径>\node_modules\@scope\<包名>" "<开发工程绝对路径>"
+     ```
+   - 类 Unix 系统使用绝对路径符号链接：
+     ```bash
+     ln -s "<开发工程绝对路径>" "<profile路径>/node_modules/@scope/<包名>"
+     ```
+3. **双向核验联接真源**：
+   - 验证联接必须直通开发工作区根目录，绝不允许包含 `.pnpm` 字符串：
+     ```powershell
+     # Windows 校验目标
+     (Get-Item "<profile路径>\node_modules\@scope\<包名>").Target
+     # 预期输出：D:\path\to\your\workspace
+     ```
+   - 改动源码后仅需在工作区运行 `npm run build`，产物立刻在宿主端就地生效；重启宿主后浏览器强刷即可加载最新逻辑。
 
 ---
 
@@ -224,6 +244,7 @@ if (manifestOnly && bundles === lastBundles) return;
 | 检查项 | 判定动作 |
 | --- | --- |
 | 实例是隔离的 | 插件清单只有基础插件加你的插件，零报错 |
+| 本地源码直连工作区 | 目录联接 Target 强校验直通仓库根目录，且不包含 `.pnpm` 虚拟副本 |
 | 配置来源单一且可追溯 | 复用了哪份配置、哪些条目是追加的，有分界注释 |
 | 凭据引用存在 | 配置里的每个环境变量引用都能在全局凭据中找到 |
 | 模型由用户选定 | 已询问，且已说明建议选便宜模型的理由 |

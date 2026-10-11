@@ -474,6 +474,73 @@ function submit(form, t, names, op, setPending, setFailures, opsOverride) {
 
 ---
 
+## 十二、现代高质感插件设置面板设计规范与组件范式 (High-End Settings Panel Patterns)
+
+当双面插件挂载于宿主行配置页（`plugins.row.config`）时，界面易陷入“粗糙原生控件堆砌、无视觉呼吸感、条目拥挤”的反模式。应遵循专业前端设计准则（Frontend Design Standards），采用自适应宿主主题（暗色/亮色）的高级设计系统与微交互范式：
+
+### 12.1 头部状态微型展板 (Hero Status Banner)
+- **视觉特征**：放置于面板最顶部，采用宿主背景层级（`var(--dsw-alias-bg-layer-2)`）与微弱边框；
+- **呼吸指示点**：左侧放置插件专属品牌/强调色呼吸指示点（如 10px 圆点，配 `box-shadow: 0 0 10px rgba(accent, 0.6)`），赋予界面生命感；
+- **动态胶囊徽标组 (Status Badges)**：右侧水平平铺当前运行模式、主控服务状态与子项启用计数徽标，让用户一屏纵览插件的全局运行健康度。
+
+### 12.2 卡片式分段选择器 (Segmented Mode Cards)
+- **拒绝原生单选框堆砌**：模式切换放弃简陋的纯文本 `<input type="radio">` 列表，重构为双列/多列卡片式分段选择器；
+- **高对比度选中反馈**：
+  - 未选中态：低对比度细边框（`0.5px solid var(--dsw-alias-border-l2)`）与二级背景；
+  - 选中态：强调色加粗边框（`1.5px solid var(--dsw-accent)`）+ 5% 强调色微光背景（`rgba(accent, 0.05)`）+ 醒目胶囊徽标（如「推荐」或「默认」）；
+- **无障碍兼容**：卡片内部包裹原生 radio 并同步受控状态，确保键盘可达性与标准表单语义无缝契合。
+
+### 12.3 主控独立卡片与功能芯片 (Master Toggle with Feature Chips)
+- **顶层能力总控**：当插件提供特权工具、外部服务连接或全局中间件时，提供独立的 Master 容器；
+- **层级分明的排版**：
+  - 标题行左侧呈现主控功能名称与状态 Badge，右侧搭载原生受控 `UI.Switch`；
+  - 下方使用自适应网格（`grid-template-columns: repeat(auto-fit, minmax(180px, 1fr))`）平铺子能力芯片标牌（Feature Chips）；
+  - **停用态安全隐喻**：总控开关关闭时，芯片整体过渡为半透明淡化（`opacity: 0.45`），并在下方展示醒目的全局停用警示条（淡红背景 + 红色微边框），传递明确的安全阻断心理模型。
+
+### 12.4 实时搜索与批量控制工具条 (Live Search & Batch Controls)
+- **即时响应搜索框**：当插件提供十余项以上子条目/子技能时，标配带搜索图标的文本输入框。`onInput` 触发纯内存即时过滤（同时匹配名称、简介与分类），彻底消除长列表查找的心智负担；
+- **原子批量操作**：搜索栏右侧配置「全部启用」与「全部停用」按钮。批量操作必须由控制器平铺为单次原子批处理提交，严禁循环逐项调用导致版本号飞升。
+
+### 12.5 条目一元化单开关与类别徽标 (Unified Item Row)
+- **代码风等宽标题**：条目名称采用等宽字体（`font-family: monospace, font-weight: 600`）；
+- **语义化类别微徽标**：名称后紧随分类小徽标（如 CLI、AI、Storage），字号 10-11px，圆角 4px；
+- **一句话人话简介**：优先展示面向人类的通俗简介，无简介时回退为物理标识，严禁显示空白行；
+- **状态联动**：右侧展示单一受控 Switch 与状态文字（「已启用」/「已停用」）。关闭时整行平滑淡化（`opacity: 0.55`）。
+
+### 12.6 侧边色彩竖线引导块 (Contextual Callout)
+- 放弃粗糙的纯灰框，引导提示采用左侧 3px 强调色竖线的高级 Callout 样式，清晰呈现凭据配置、环境变量说明与进程重启注意事项。
+
+---
+
+## 十三、单开关一元化原子提交与向后兼容契约 (Unified Toggle with Backward-Compatible 3-Ops Batching)
+
+在插件功能演进中，若历史上设计了复杂的“多轴独立开关”（例如：模型端是否可用、人类端是否可用，由多个 independent hidden 字段控制），会导致用户心智负担剧增。重构为“一元化单一开关”（开即全开，关即全关）时，必须恪守以下三大向后兼容与版本安全契约：
+
+### 13.1 配置 Schema 声明向后兼容（废弃不是删除）
+- 宿主 `Config` Schema 中**必须完整保留历史字段的声明与 `markVolatile()` 标注**；
+- 若为了“简化”而在 Schema 中物理删除旧字段，会导致安装了旧版本的用户在升级后，其 profile 配置因包含未声明字段而被宿主 Loader 判定为 `invalid config` 抛错崩溃！
+- 详见 [config-field-lifecycle.md](config-field-lifecycle.md)。
+
+### 13.2 写入侧 3-ops 单次原子平铺翻转
+客户端控制器在将单一开关状态映射至底层持久化时，必须在单次原子事务内将所有相关字段一并规范化：
+```ts
+// 开启：原子从禁用列表与全部隐藏列表中剔除
+// 关闭：原子写入禁用列表，并清空历史隐藏列表（避免同一事实双重来源）
+const ok = await this.form.mutate(
+  [
+    { op: 'set', path: ['disabledItems'], value: [...disabled].sort() },
+    { op: 'set', path: ['modelHiddenItems'], value: [...modelHidden].sort() },
+    { op: 'set', path: ['userHiddenItems'], value: [...userHidden].sort() },
+  ],
+  state.revision,
+)
+```
+
+### 13.3 批量全开/全关操作原子提交
+无论列表有多少项，批量操作必须在内存中一次性计算出全量变动数组，平铺为单次 `form.mutate(3-ops, revision)` 提交，绝对禁止遍历循环派发多次 mutate 竞争宿主 revision 乐观锁。
+
+---
+
 ## 相关 DSH 源码
 
 ```text

@@ -77,11 +77,11 @@ error: profile "desktop" is managed exclusively by the Electron application
 
 | 操作 | CLI 可用性 | 说明 |
 | --- | --- | --- |
-| `--dump-config` / 组合树打印 | ❌ 被拒 | 属于"启动/组合"路径 |
-| `plugin --profile <desktop> list` | ✅ 可用 | 只读清单 |
-| `plugin --profile <desktop> add <pkg>` | ✅ 可用 | 真正安装并改 profile 清单 |
-| `plugin --profile <desktop> remove <pkg>` | ✅ 可用 | 真正卸载 |
-| 直接用 fs 改 profile 的 `package.json` / `cordis.patch.yml` | ✅ 可行 | 但要手动维护一致性 |
+| `--dump-config` / 组合树打印 | [错误] 被拒 | 属于"启动/组合"路径 |
+| `plugin --profile <desktop> list` | [正确] 可用 | 只读清单 |
+| `plugin --profile <desktop> add <pkg>` | [正确] 可用 | 真正安装并改 profile 清单 |
+| `plugin --profile <desktop> remove <pkg>` | [正确] 可用 | 真正卸载 |
+| 直接用 fs 改 profile 的 `package.json` / `cordis.patch.yml` | [正确] 可行 | 但要手动维护一致性 |
 
 **前提（仅对 plugin 子命令成立）**：桌面 profile 的插件操作需用**桌面版自带的** CLI（`<App>/resources/runtime/cli/bin/dsh.cmd`，`manageDesktopProfile=true`）；dump/boot 对 desktop 无论哪份 CLI 一律被拒。
 
@@ -102,9 +102,9 @@ npm 全局那份（%APPDATA%\\npm/dsh.cmd，即 npm 全局 bin，非 pnpm）  = 
 ### 参数形式的一个坑
 
 `text
-dsh web --port 8080            # ✅ 第一个位置参数即 profile 名（launcher 展开为 --profile web；web 是官方内置 profile，读者自己的 profile 用 <name>）
-dsh --profile web --port 8080   # ✅ 等价
-dsh web --profile web           # ❌ 展开后 --profile 出现两次 -> select a profile only once
+dsh web --port 8080            # [正确] 第一个位置参数即 profile 名（launcher 展开为 --profile web；web 是官方内置 profile，读者自己的 profile 用 <name>）
+dsh --profile web --port 8080   # [正确] 等价
+dsh web --profile web           # [错误] 展开后 --profile 出现两次 -> select a profile only once
 dsh --profile web web           # 等价 dsh web web：web 成为 app-args；与 --dump-config 等 launcher 形态互斥时报 config dumps take no app arguments（实测）
 `
 

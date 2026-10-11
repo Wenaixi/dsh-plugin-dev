@@ -11,7 +11,7 @@
 
 **常见的致命反模式**：
 ```ts
-// ❌ 浅层覆写反模式：卸载时仅还原顶层方法，遗漏已分发的活动实例
+// [错误] 浅层覆写反模式：卸载时仅还原顶层方法，遗漏已分发的活动实例
 ctx.inject(['someService'], (raw) => {
   const service = raw.someService
   const origSessionOf = service.sessionOf
@@ -38,7 +38,7 @@ ctx.inject(['someService'], (raw) => {
 为确保 100% 深度可逆且绝不引发 GC 泄漏，必须遵循「**全局 Symbol 防重入 + WeakRef 集合追踪 + 状态失活守卫 + 深度级联还原**」范式：
 
 ```ts
-// ✔ 标准实现：100% 深度可逆猴补
+// [正确] 标准实现：100% 深度可逆猴补
 const ORIG_TRACK = Symbol.for('dsh.plugin.origTrackMethod')
 
 ctx.inject(['someService'], (raw) => {
@@ -100,10 +100,10 @@ ctx.inject(['someService'], (raw) => {
 ### 2.1 规则 1：样式标签必须注册卸载 Disposer
 在浏览器端注入自定义 CSS 规则时，严禁裸调 `document.head.appendChild(style)`：
 ```ts
-// ❌ 错误：HMR 热重载或插件禁用后，旧样式在 <head> 中不断累积叠加
+// [错误] 错误：HMR 热重载或插件禁用后，旧样式在 <head> 中不断累积叠加
 document.head.appendChild(style)
 
-// ✔ 正确：声明式注册销毁回调
+// [正确] 正确：声明式注册销毁回调
 ctx.effect(() => {
   document.head.appendChild(style)
   return () => { style.remove() }
@@ -113,10 +113,10 @@ ctx.effect(() => {
 ### 2.2 规则 2：插槽注入返回值必须回收
 在 Cordis 客户端体系中，`ctx.slots.inject(...)` 注册了插槽的全局 Root 监听并返回一个 Disposer 函数。若裸调用而丢弃该返回值，热重载时宿主插槽容器内的回调数量将成倍膨胀。
 ```ts
-// ❌ 错误：丢弃 Disposer，导致重复注入与卸载时监听器泄露
+// [错误] 错误：丢弃 Disposer，导致重复注入与卸载时监听器泄露
 ctx.slots.inject('conversation.input.right', () => ctx.slots.register(...))
 
-// ✔ 正确：使用 ctx.effect 妥善收集并自动执行
+// [正确] 正确：使用 ctx.effect 妥善收集并自动执行
 ctx.effect(() => ctx.slots.inject('conversation.input.right', () => ctx.slots.register(...)), 'dsh-plugin: input slot')
 ```
 
@@ -232,8 +232,8 @@ export class OverlayController<T> {
 
 ### 5.1 痛点与文档债务
 开发者常在面向使用者的说明文档（如 `README.md`）正文中写死具体的小版本号或测试数字：
-- ❌ `### 6. 行内斜杠补全（v2.2.2 新增）`
-- ❌ `test/ # 纯函数单元测试集（48 项测试全绿）`
+- [错误] `### 6. 行内斜杠补全（v2.2.2 新增）`
+- [错误] `test/ # 纯函数单元测试集（48 项测试全绿）`
 
 **危害**：
 1. **散弹式修改（Shotgun Surgery）**：每次版本升级或单测扩充，都必须散弹式地修改多份双语文档；
@@ -243,3 +243,11 @@ export class OverlayController<T> {
 1. **README 面向最终用户**：展示长久自洽的功能介绍，坚决剔除任何历史版本标注（如 `（vX.Y.Z 新增）`），直接描述该特性做什么；
 2. **CHANGELOG 独占版本演进**：所有新增、修复、重构细节，严格且唯一地收敛于 `CHANGELOG.md` 与 Git Tag 注释中；
 3. **门禁脚本为单一真源**：文档仅指示执行命令（如 `node --test test/*.test.ts`），具体通过的用例数由自动化输出权威作证，文档不写死阈值。
+
+## 相关 DSH 源码
+
+```
+packages/core/src/context.ts            <- @deepseek-ai/dsh-core@0.4.3
+packages/core/src/lifecycle.ts          <- @deepseek-ai/dsh-core@0.4.3
+packages/client/src/overlay.ts          <- @deepseek-ai/dsh-client@0.4.3
+```

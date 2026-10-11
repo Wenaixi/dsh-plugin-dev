@@ -152,7 +152,7 @@ await form.mutate(ops)
 - 此时用户操作了条目 D（例如将 D 禁用）。
 - 若变异组装逻辑直觉地生成了如下操作批：
   ```javascript
-  // ❌ 灾难性代码：只写了当前被点击的单项 D，并全量 unset 了旧表！
+  // [错误] 灾难性代码：只写了当前被点击的单项 D，并全量 unset 了旧表！
   const ops = [
     { op: 'set', path: ['disabled', 'D'], value: true },
     { op: 'unset', path: ['modelDisabled'] },

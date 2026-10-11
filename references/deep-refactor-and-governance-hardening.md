@@ -13,7 +13,7 @@
 
 许多构建脚本的直觉写法往往是：
 ```javascript
-// ❌ 脆弱的时序：先写磁盘，后做校验
+// [错误] 脆弱的时序：先写磁盘，后做校验
 mkdirSync(dirname(target), { recursive: true });
 copyFileSync(source, target); // 或 compileTo(target)
 
@@ -34,7 +34,7 @@ if (drift.length > 0) {
 构建流水线必须严格遵循「纯内存前置校验 -> 零漂移安全写入 -> 最终产物落地核验」的原子时序：
 
 ```javascript
-// ✅ 标准原子时序：先验后写，杜绝污染
+// [正确] 标准原子时序：先验后写，杜绝污染
 
 // 1. 第一步：纯内存前置校验（源文件 vs 资产目录）
 const drift = await checkSourceConsistency();
@@ -68,7 +68,7 @@ console.log('[build] OK: 构建成功');
 
 常见的偷懒写法：
 ```typescript
-// ❌ 顶层无差别全部 import
+// [错误] 顶层无差别全部 import
 import {
   usedByThisFile,
   onlyForExternalUsersA,
@@ -95,12 +95,12 @@ export {
 ### 2.3 规避铁律：消费导入与委托导出物理解耦
 物理分离“本地消费使用的符号”与“对外公开重导出的符号”：
 ```typescript
-// ✅ 1. 顶层只 import 本文件运行时直接消费的符号
+// [正确] 1. 顶层只 import 本文件运行时直接消费的符号
 import {
   usedByThisFile
 } from './internal-utils.js';
 
-// ✅ 2. 外部公开符号纯粹使用 export ... from 委托重导出，不在本地引入局部绑定
+// [正确] 2. 外部公开符号纯粹使用 export ... from 委托重导出，不在本地引入局部绑定
 export {
   usedByThisFile,
   onlyForExternalUsersA,
@@ -176,3 +176,11 @@ git push origin v1.2.3 --force
 3. **是否破坏了短路求值或增加了传参负担？**（若带来额外的对象构造、入参膨胀或性能开销 -> 坚决不抽离）。
 
 > **黄金法则**：优秀的模块应当“接口小，实现深”。当一段逻辑高度私有且行数适中时，就地封装在所属模块的私有方法中，是远胜于浅层碎片的最佳工程选择。
+
+## 相关 DSH 源码
+
+```
+packages/core/src/plugin.ts             <- @deepseek-ai/dsh-core@0.4.3
+packages/core/src/registry.ts           <- @deepseek-ai/dsh-core@0.4.3
+packages/core/src/settings.ts           <- @deepseek-ai/dsh-core@0.4.3
+```

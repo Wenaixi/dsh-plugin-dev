@@ -32,7 +32,7 @@ notifyChange() {
 ## 二、反模式 1：在 `skills/change` 监听器里调 `control.invalidate()` —— 同步递归栈溢出
 
 ```js
-// ❌ 错误：监听器内反向 invalidate
+// [错误] 错误：监听器内反向 invalidate
 ctx.on('skills/change', () => {
   providerControl.invalidate();  // invalidateCache → notifyChange → 再次 emit → 再进监听器 → …
 });
@@ -47,7 +47,7 @@ ctx.on('skills/change', () => {
 ## 三、反模式 2：provider 实例没被捕获 —— invalidate() 空转（静默失效）
 
 ```ts
-// ❌ 错误：工厂返回值被丢弃，providerInstance 永远是 null
+// [错误] 错误：工厂返回值被丢弃，providerInstance 永远是 null
 let providerInstance: Provider | null = null
 ctx.skills.registerProvider((control) => new MyProvider(ctx, control, opts))  // 没赋回
 // 后面某外部函数调 invalidate() 时，if (providerInstance) 恒为 false → 空操作（示例名；官方 API 是 control.invalidate() / registry.invalidateCache()）
@@ -56,7 +56,7 @@ ctx.skills.registerProvider((control) => new MyProvider(ctx, control, opts))  //
 `registerProvider(create)` 的 `create(control)` 是**同步工厂**，返回值就是 provider。**需要在 provider 外部触发失效时，必须在工厂内把它存进闭包变量（provider 内部变更点直接持 control 即可）**：
 
 ```ts
-// ✅ 正确：捕获实例，UI 变更点直调
+// [正确] 正确：捕获实例，UI 变更点直调
 let providerInstance: MyProvider | null = null
 ctx.skills.registerProvider((control) => {
   providerInstance = new MyProvider(ctx, control, opts)
@@ -97,7 +97,7 @@ Cordis 微内核规范严格规定：**`loader/volatile-update` 只在待更新�
 所有需要动态跟随宿主级配置的插件，必须在该事件监听器中触发自身 Provider 的缓存与编目失效：
 
 ```typescript
-// ✅ 正确：监听宿主全局补丁重载事件，收敛跨 Fiber 配置变更
+// [正确] 正确：监听宿主全局补丁重载事件，收敛跨 Fiber 配置变更
 ctx.on('app-boot/config-reload', () => {
   ctx.logger.debug('[plugin] host config reloaded, invalidating catalog cache')
   activeProvider?.invalidate() // 内部清空 hostLanguageCache 与目录快照
@@ -207,7 +207,7 @@ async listCandidates(provider: string, rank: number, options?: { language?: 'zh'
 - **热路径（快照命中）**：从内存 Map 命中条目，根据 `options` 传入的呈现维度（如 `language` 或 `scope`）进行投影：
   `return cached.document.toDefinition(providerName, language);`
 - **冷路径（快照未命中或名称漂移自愈）**：从磁盘重新读取解析出文档对象后，代码漏传了呈现参数：
-  `return doc.toDefinition(providerName); // ❌ 漏掉了 language 参数！`
+  `return doc.toDefinition(providerName); // [错误] 漏掉了 language 参数！`
 
 ### 8.2 破坏表征：冷热双重标准
 由于契约对象的转换方法通常在参数缺失时回退到默认语言或默认投影：
@@ -272,7 +272,7 @@ invalidate(): void {
     // ... 检查文件 mtime ...
     return false;
   } catch {
-    return true; // ❌ 吞没了所有错误，误将取消判定为「需要重读」
+    return true; // [错误] 吞没了所有错误，误将取消判定为「需要重读」
   }
   ```
 
@@ -299,7 +299,7 @@ for (const item of items) {
     const doc = await parseItemAsync(item, signal);
     results.set(item.name, doc);
   } catch (err: unknown) {
-    // ❌ 致命陷阱：无差别 catch 将取消异常误当成「条目损坏/业务解析失败」
+    // [错误] 致命陷阱：无差别 catch 将取消异常误当成「条目损坏/业务解析失败」
     logger.warn(`skip ${item.name}: parse failed — ${err}`);
     this.loadErrors.push({ name: item.name, error: String(err) });
     continue;
@@ -322,7 +322,7 @@ for (const item of items) {
 在单条目自愈按需重读（如 `get(candidate, options)`）中：
 ```typescript
 } catch (err: unknown) {
-  if ((err as DOMException)?.name === 'AbortError') throw err; // ❌ 隐藏漏洞
+  if ((err as DOMException)?.name === 'AbortError') throw err; // [错误] 隐藏漏洞
   if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') return undefined;
   logger.warn(`read failed: ${err}`);
   return undefined; // 吞没错误回退

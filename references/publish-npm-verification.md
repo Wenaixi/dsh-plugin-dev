@@ -241,7 +241,7 @@ spawnSync('git', ['push', 'origin', `v${version}`, '--force'], { encoding: 'utf8
 ---
 
 ### 3. 多语言说明文档白名单防 404 死链规范 (Multi-lingual Doc Packaging Rule)
-当插件在根目录提供国际化多语言跳转链接（如 `[English](./README.md) | [中文](./README.zh.md)`）时：
+当插件在根目录提供国际化多语言跳转链接（如 `[English](./README.md) | [中文](./README.<lang>.md)`）时：
 - **致命陷阱**：若仅在 `package.json.files` 中声明了 `README.md`，打包发布的 npm tarball 将不会包含 `README.zh.md`！用户在 npm 官网浏览包首页点击语言切换时，直接跳转至 404 页面！
 - **防御铁律**：主文档中只要声明了相对路径跳转的任何语言副档（如 `README.zh.md`、`README.en.md`），必须将其显式登记至 `package.json.files` 白名单中；并在 `scripts/check.js` 或 `scripts/validate-bundle.js` 的 `files[]` 校验中同步核查，确保打包物完备。
 

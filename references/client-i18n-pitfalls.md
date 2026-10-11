@@ -45,12 +45,12 @@ exports.inject = ["slots", "locale"];   // 显式声明，时序更稳
 ## 四、铁律 3：构建期 Node 计算，产物只内嵌字面量
 
 ```js
-// ❌ 错误：把 Node API 写进模板字符串（浏览器端执行会 ReferenceError）
+// [错误] 错误：把 Node API 写进模板字符串（浏览器端执行会 ReferenceError）
 const content = `const SKILL_META = (function () {
   const dirs = readdirSync(...);   // 浏览器没有 readdirSync
 })()`;
 
-// ✅ 正确：脚本顶层（Node 端）算好，模板里 ${JSON.stringify(result)} 内嵌字面量
+// [正确] 正确：脚本顶层（Node 端）算好，模板里 ${JSON.stringify(result)} 内嵌字面量
 const SKILL_META_BUILD = extractSkillMeta();   // readdirSync/readFileSync 只在这个作用域
 const content = `const SKILL_META = ${JSON.stringify(SKILL_META_BUILD)};`;
 ```
@@ -80,7 +80,7 @@ const content = `const SKILL_META = ${JSON.stringify(SKILL_META_BUILD)};`;
 当一个 volatile 配置字段具有三态语义（例如 `undefined` = 动态跟随宿主当前设置、`'zh'` / `'en'` = 用户显式锁定）时，客户端读取函数存在极易踩中的**缺项折叠反模式**：
 
 ```javascript
-// ❌ 灾难：直接把未声明/缺项折叠成了兜底值 'zh'
+// [错误] 灾难：直接把未声明/缺项折叠成了兜底值 'zh'
 function readLanguage(value) {
   return value && value.language === 'en' ? 'en' : 'zh';
 }
@@ -94,7 +94,7 @@ function readLanguage(value) {
 
 **正确姿势**：读取函数必须显式保留 `undefined`，只有这样三态派生与未配置提示才可能生效：
 ```javascript
-// ✓ 正确：三态干净透传，缺项严格返回 undefined
+// [正确] 正确：三态干净透传，缺项严格返回 undefined
 function readLanguage(value) {
   var raw = value && value.language;
   return raw === 'zh' || raw === 'en' ? raw : undefined;

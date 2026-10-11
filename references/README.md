@@ -35,6 +35,7 @@
 - [shared-contract-capability-boundaries.md](./shared-contract-capability-boundaries.md)：当「同一个数据要按调用方给出不同表现」的需求撞上一个改不动的上游时，先沿链路收敛——枚举全部消费方、追到投影函数的字段白名单、抄缓存键的构成维度、核对作用域参数能否区分调用方。四条全过才有受支持路径；不过就是上游数据模型不支持。不可行时的三条覆写路径（接受同源 / 并列注册 / 运行时改写上游对象）各自的代价、失效形态与门禁写法，含「为省条目而改可见性标志会砍掉主功能」这一常见否决项。
 - [config-resilience-and-atomic-self-healing.md](./config-resilience-and-atomic-self-healing.md)：配置韧性、多阶损坏提取与崩溃安全自愈架构——物理崩溃安全原子写盘（Temp + Atomic Rename）、双阶启发式抢救提取流水线（语法修补与字段级模式深度提取）、**YAML 补丁与组合层 (Bundle Patch) 的物理损坏提取与行级状态机抢救**、**截断写入引发的「Null 毒丸」伪正常解析防御**、**运行时内存配置深度体检与宿主持久层 (Settings) 自愈闭环**、**配置重生成时的反引号嵌套与转义陷阱**、**双面客户端 (Client UI) 防崩与防白屏契约**、现场留样备份轮转与破坏注入测试设计范式。
 - [deep-refactor-and-governance-hardening.md](./deep-refactor-and-governance-hardening.md)：深度重构、构建流水线原子时序与工程治理严密化指南——构建时序先验后写（Validate-Before-Write，杜绝脏产物落盘污染）、TypeScript 编译器死代码零容忍与导入重导出分离架构（解除 noUnusedLocals 约束）、发版 Tag 指针漂移陷阱与标准纠偏四步序列、以及插件私有复杂度的 YAGNI 裁决与浅模块过度抽象警惕。
+- [deep-lifecycle-overlay-and-coordinator-patterns.md](./deep-lifecycle-overlay-and-coordinator-patterns.md)：深度可逆生命周期、交互浮层深模块化与 Coordinator 架构规范——宿主服务深度安全猴补（原型拦截、实例还原与 100% 深度可逆清理）、非 React 交互浮层解耦与独立渲染引擎封装、复杂输入外壳正交拆解（Coordinator 统一调度键盘手势、浮层与宿主桥接）、以及面向最终用户的文档长青治理法则（严禁在正文写死小版本号与单测数字，CHANGELOG 与自动化门禁独占版本演进）。
 
 通用专题与具体版本资料冲突时，以目标运行时和源码为准。**每篇专题末尾都有「相关 DSH 源码」清单**，列出上游仓库相对路径与版本号，版本升级后必须重新读源码核对。
 

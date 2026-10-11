@@ -496,7 +496,7 @@ P.Button({ variant: "outline", size: "sm", onClick: reset }, "恢复默认")
 
 常见的防御性注入写法：
 ```javascript
-// ❌ 常见写法：在开发期 HMR 时新样式无法热生效
+// [错误] 常见写法：在开发期 HMR 时新样式无法热生效
 if (typeof document !== 'undefined' && !document.querySelector('style[data-plugin-css=' + JSON.stringify(CSS_ID) + ']')) {
   var tag = document.createElement('style');
   tag.dataset.plugin = PACKAGE_NAME;
@@ -512,7 +512,7 @@ if (typeof document !== 'undefined' && !document.querySelector('style[data-plugi
 采用“存在则更新 `textContent`，不存在才新建追加”的纯正幂等范式：
 
 ```javascript
-// ✅ 正确范式：兼顾 DOM 单例回收与开发期 HMR 即时热生效
+// [正确] 正确范式：兼顾 DOM 单例回收与开发期 HMR 即时热生效
 if (typeof document !== 'undefined') {
   var tag = document.querySelector('style[data-plugin-css=' + JSON.stringify(CSS_ID) + ']');
   if (!tag) {

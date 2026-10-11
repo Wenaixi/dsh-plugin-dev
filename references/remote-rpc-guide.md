@@ -36,15 +36,15 @@
 DSH 的 Typert 协议对远程暴露的方法签名有严格约束，由网关的 SRC 回退模式在**派生描述符时**用函数源码解析参数列表执行（解构/默认值/rest/重名参数抛 `gateway/signature-invalid`，不是注册期静态 AST 拒绝）：
 
 1. **【禁止参数解构】**：必须使用单一名命对象参数。
-   - ❌ 错误：`async readFile({ path, encoding })`
-   - ✅ 正确：`async readFile(payload: { path: string, encoding: string })`
+   - [错误] 错误：`async readFile({ path, encoding })`
+   - [正确] 正确：`async readFile(payload: { path: string, encoding: string })`
 2. **【禁止参数默认值】**：不得在函数签名中指定默认值。
-   - ❌ 错误：`async listFiles(limit = 20)`
-   - ✅ 正确：在函数体内部处理缺省值 `const effectiveLimit = limit ?? 20;`
+   - [错误] 错误：`async listFiles(limit = 20)`
+   - [正确] 正确：在函数体内部处理缺省值 `const effectiveLimit = limit ?? 20;`
 3. **【禁止剩余参数 (Rest Parameters)】**：不得使用不定长参数。
-   - ❌ 错误：`async executeCommand(...args)`
+   - [错误] 错误：`async executeCommand(...args)`
 4. **【协作式取消信号尾参规则】**：若方法支持客户端中断，最后一个参数必须是 `signal?: AbortSignal`。
-   - ✅ 正确：`async longTask(payload: TaskPayload, signal?: AbortSignal)`
+   - [正确] 正确：`async longTask(payload: TaskPayload, signal?: AbortSignal)`
 
 ---
 

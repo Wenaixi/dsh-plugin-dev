@@ -92,3 +92,11 @@ function checkJavaScriptSyntax(filePath) {
    ```
 3. **识别 EPERM 边界，严禁重试**：
    沙箱拒绝（`[sandbox: file access denied]` 或 `EPERM`）是操作系统的策略断言，不是瞬时偶发错误。遇到此类拒绝应当立即重构调用方式，绝不进行原地重试。
+
+## 相关 DSH 源码
+
+```
+packages/sandbox/src/process.ts         <- @deepseek-ai/dsh-sandbox@0.4.3
+packages/sandbox/src/pipes.ts           <- @deepseek-ai/dsh-sandbox@0.4.3
+packages/ptc-runtime-node/src/runner.ts <- @deepseek-ai/dsh-ptc-runtime-node@0.4.3
+```

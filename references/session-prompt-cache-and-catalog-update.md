@@ -122,3 +122,11 @@ DSH 官方在每轮对话发起前，通过瀑布流事件对全量动态条目�
 ### 5. 会话显式意图守卫（Explicit Intent Guard）
 - 当用户在某个具体会话内通过命令显式指定了工作模式时，给该会话打上 `explicitlySet = true` 意图保护标记；
 - 当外部全局配置发生热变更（经 `loader/volatile-update` 广播）时，状态管理器**只同步那些从未显式设置过的跟随型会话**，严禁覆盖用户已明确指定的会话模式。
+
+## 相关 DSH 源码
+
+```
+packages/agent/src/session.ts           <- @deepseek-ai/dsh-agent@0.4.3
+packages/agent/src/prompt.ts            <- @deepseek-ai/dsh-agent@0.4.3
+packages/agent/src/pipeline.ts          <- @deepseek-ai/dsh-agent@0.4.3
+```

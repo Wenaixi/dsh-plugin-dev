@@ -287,14 +287,14 @@ if (fs.existsSync(iconPath)) {
 ### 1. 陷阱场景：prepare 钩子输出混入标准输出流
 在自动化门禁流水线中，通常使用 `npm pack --dry-run --json` 检查待发布 tarball 的文件完整性、发布白名单与解包体积。
 然而，当 `package.json` 的 `scripts` 配置了 `prepare` 或 `prepack` 钩子（例如 `"prepare": "pnpm build"`）时，`npm pack` 会在打包前隐式触发该构建钩子。
-构建工具（如 `tsdown`, `tsc`, `vite`, `esbuild` 等）在执行期间会向控制台标准输出（`stdout`）打印进度与构建耗时日志（例如 `ℹ tsdown v...`, `✔ Build complete in 50ms`）。
+构建工具（如 `tsdown`, `tsc`, `vite`, `esbuild` 等）在执行期间会向控制台标准输出（`stdout`）打印进度与构建耗时日志（例如 `[信息] tsdown v...`, `[正确] Build complete in 50ms`）。
 
 ### 2. 致命破坏
 这些构建日志会直接追加在 JSON 字符串前面输出，使得整个进程输出流不再是以纯 `[` 或 `{` 开头的合法 JSON 文本。如果门禁脚本直接执行：
 ```ts
 // 错误写法：直接解析整体输出流
 const result = JSON.parse(execSync('npm pack --dry-run --json', { encoding: 'utf8' }));
-// 崩溃报错：SyntaxError: Unexpected token 'ℹ', ... is not valid JSON
+// 崩溃报错：SyntaxError: Unexpected token '[信息]', ... is not valid JSON
 ```
 这会导致门禁脚本发生假阳性崩溃。
 

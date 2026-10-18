@@ -522,3 +522,70 @@ async function publishCatalog(runtime: Runtime) {
    ```
 
 **总结**：全链路贯穿 `AbortSignal` 并严密保护异常判断，能够彻底确保系统在处理高并发、长遍历及协作式取消时表现出极强的健壮性与防抖抗性。
+
+---
+
+## 十六、多运行模式状态机的单一关闭契约与物理文件同态消除 (Single-off Contract in Multi-Mode State Machines)
+
+### 1. 架构场景与设计摩擦
+在许多提供多档位调控（例如 `lite` / `full` / `ultra`）的 DSH 插件中，通常同时提供一个关闭档位 `off`，并使用磁盘 flag 文件（如 `.active` 或 `.session-mode`）持久化当前运行标志。
+在处理状态转换时，开发者极易陷入**关闭态双轨表示**的陷阱：
+- 部分函数认为 `null` 代表关闭（调用 `storage.clear()` 删除 flag 文件）；
+- 另一部分函数（如全局配置重载、volatile 变更同步）认为 `'off'` 是合法字符串，直接赋值 `current = 'off'`。
+
+### 2. 状态撕裂与物理文件残留陷阱
+当宿主或用户通过全局配置将模式切换为 `off` 时：
+```typescript
+// 典型反模式：全局同步未做关闭态归一化
+syncGlobalModeToSessions(newDefaultMode: string): void {
+  const normalized = normalizeMode(newDefaultMode); // 返回 'off'
+  if (!normalized) return;
+  current = normalized; // 错误！内存状态被赋予了字符串 'off'
+  this.syncToFile();    // 触发写盘
+}
+
+syncToFile(): void {
+  // 判定失灵：current 为 'off' 而非 null，导致进入了 write 分支！
+  if (current === null) storage.clear();
+  else storage.write(current); // 磁盘写入了 "off"，flag 文件未被删除！
+}
+```
+
+**严重后果**：
+1. **物理文件残留**：磁盘上的 flag 文件依然物理存在，内容变成了 `"off"`；
+2. **跨进程误判激活**：其他独立进程或子模块（如启动判定探针）按照通用惯例做存在性检查 `existsSync(flagPath)` 时，误判为插件依然处于激活状态；
+3. **内存与磁盘同态破坏**：内存中已经不再注入逻辑，但磁盘 flag 依然报告存活，造成不可逆的假阳性状态撕裂。
+
+### 3. 标准深模块解法：单一关闭契约 (Single-off Contract)
+在状态机深模块边界处，必须确立严格的**法定单一关闭表示**——在系统内部，“关闭态”只认一种真值，即 `null`。
+
+```typescript
+// 1. 模式归一化纯函数必须输出单一关闭表示
+export function normalizeMode(mode: string): RuntimeMode | null {
+  if (typeof mode !== 'string') return null;
+  const n = mode.trim().toLowerCase();
+  // 'off' 在语义上即为 null，进入状态机边界必须归一
+  return n === 'off' ? null : (VALID_MODES.includes(n) ? n : null);
+}
+
+// 2. 状态跃迁与同步函数入口必须强制施加单一关闭守卫
+syncGlobalModeToSessions(newDefaultMode: string): void {
+  const normalized = normalizeMode(newDefaultMode);
+  // 无论传入 'off' 还是 null，一律严格归一为 null
+  current = normalized === 'off' ? null : normalized;
+  
+  // 触发删除磁盘物理文件，维持绝对镜像同态
+  this.syncToFile();
+
+  // 同步所有跟随型会话为 null
+  for (const session of sessions.values()) {
+    if (!session.explicitlySet) {
+      session.effectiveMode = current;
+    }
+  }
+}
+```
+
+### 4. 架构收益
+- **杜绝歧义**：内存中只有 `null`（关闭）和有效模式字符串（开启），消除三态/四态混乱；
+- **镜像同态**：`current === null` 严格 1:1 映射到底层物理文件的删除（`storage.clear()`），彻底消除磁盘文件假阳性残留。

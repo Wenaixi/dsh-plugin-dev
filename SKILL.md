@@ -103,11 +103,21 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - **宿主微内核对等依赖生命周期区间铁律 (Host Peer Semver Range Syntax)**：DSH 微内核在加载 Profile 时会对插件 `peerDependencies` 执行严格版本校验。严禁将对等依赖过度收窄至某一特定小版本或 RC（如 `^0.2.1-rc.2`），否则相近的相邻版本宿主（如 `0.2.0-rc.2`）会在启动时物理禁用该插件行（报 `Plugin ... is incompatible with dsh ...`）；必须采用跨越生命周期的标准区间语法（如 `>=0.2.0-rc.2 <0.3.0-0`），兼顾向前对齐与平滑兼容。详见 [ci-release-workflow.md](references/ci-release-workflow.md) §五。
 - **隔离实例官方模板自动派生铁律 (Shipped Profile Auto-Initialization)**：在临时 `DSH_HOME` 下初始化官方自带模板（`web`、`desktop`、`tui`）时，直接运行 `dsh <shipped> --dump-config` 即可自发完成标准初始化；严禁向官方内建模板追加 `--from-default-profile` 参数（宿主直接报错 `profile "..." is shipped and cannot be a custom profile target`）；`--from-default-profile` 仅允许在目标是自定义命名的 profile 时使用。详见 [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §7.1。
 - **自动化隔离验收动态端口与代理豁免铁律 (Ephemeral Port & Loopback Proxy Bypass)**：端到端验收脚本严禁硬编码端口（如 3099/3088，极易因前次残留或系统服务占用报 `listen EADDRINUSE` 崩溃），必须使用 Node `net.createServer().listen(0)` 向操作系统动态申请保底空闲端口；在 Windows 环境下动态导入绝对路径必须经 `pathToFileURL` 转换为 `file://` 协议（杜绝 `ERR_UNSUPPORTED_ESM_URL_SCHEME`）；且探针测试时必须注入 `NO_PROXY=127.0.0.1,localhost`，防范外部代理劫持本地回环端口导致握手超时。详见 [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §7.2、§7.3。
+- **`engines.dsh` 版本门禁与静默跳过防线**：第三方插件版本兼容性优先按 `engines.dsh` 判断；未满足 `peerDependencies` 时宿主不会崩溃而是静默从 Profile 的 `bundles` 栈中剔除该插件并引发级联 patch 丢失（`patch: entry not found`）。插件必须显式声明 `engines.dsh`（如 `">=0.2.0-rc.2 <0.3.0-0"`）并理性配置 `peerDependencies` 覆盖当前与下一代候选版本。详见 [host-semantic-gates.md](references/host-semantic-gates.md) §2.10。
+- **单包工程工作区纯净律**：单包 DSH 插件根目录严禁创建或提交无有效 `packages:` 声明的 `pnpm-workspace.yaml`，否则触发 GitHub Actions `actions/setup-node@v4` 执行 `pnpm store path` 时报 `ERROR packages field missing or empty` 恶性中断构建。详见 [ci-release-workflow.md](references/ci-release-workflow.md) §三.3。
+- **纯净平铺原子批处理 (Pure Flattening Pattern)**：主版本放弃旧版兼容时，坚决从 Schema、运行时与控制器中拔除废弃字段；单项切换严格发射 1 条 op（禁止追加旧表 unsets），批量操作严格发射 N 条 op，将 RPC payload 与 revision 乐观锁冲突降至物理极小值。详见 [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §十四。
+- **模板补丁空数组覆盖律**：从官方模板派生 Profile（`--from-default-profile`）生成的 `cordis.patch.yml` 初始内容为 `[]`，严禁盲目向后追加条目（引发 `YAMLException: end of the stream or a document separator is expected`），必须整体覆写为合法的单顶级序列。详见 [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §一。
+- **零端口无感装配检验**：在启动 GUI 或消耗 Token 之前，优先调用 `dsh --profile <name> --dump-config`，1 秒内完成语法、Schema 校验、volatile 解包与组合树真值回读，0 端口占用、0 Token 消耗。详见 [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §一。
 
 ## 场景路由
 
 | 需求或症状 | 先读 |
 | --- | --- |
+| 宿主成功启动或 dump 正常，但插件功能完全没加载、patch 报 entry not found、bundle 被静默跳过 | [host-semantic-gates.md](references/host-semantic-gates.md) §2.10 |
+| GitHub Actions 在 setup-node 阶段报错 ERROR packages field missing or empty、CI 未装依赖即中断 | [ci-release-workflow.md](references/ci-release-workflow.md) §三.3 |
+| 单开关操作每次发送 3 条 ops、批量操作 payload 膨胀、旧表 unset 拖垮并发性能与 revision 锁 | [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §十四 |
+| 从官方模板新建 Profile 引导时报 YAMLException: end of the stream or a document separator is expected | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §一 |
+| 隔离实例验收不想启动 Web 占端口或消耗大模型额度、零端口毫秒级底层装配回读 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §一 |
 | Schemastery 3.18.5+ volatile 字段单测报 Expected values to be strictly equal: + { [Symbol]: [Function], get: [Function] } - 'val' | [config.md](references/config.md) §十一 |
 | 本地测试全绿但 GitHub Actions CI 容器单测报 Cannot find package '@deepseek-ai/dsh-scope' 或 ERR_MODULE_NOT_FOUND | [ci-release-workflow.md](references/ci-release-workflow.md) §四 |
 | DSH 宿主启动日志提示 disabling profile plugin row: Plugin ... is incompatible with dsh ... 插件行被禁用 | [ci-release-workflow.md](references/ci-release-workflow.md) §五 |

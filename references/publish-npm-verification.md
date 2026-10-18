@@ -256,3 +256,68 @@ spawnSync('git', ['push', 'origin', `v${version}`, '--force'], { encoding: 'utf8
   git -c http.proxy=http://127.0.0.1:<port> -c https.proxy=http://127.0.0.1:<port> push origin v<version> --force
   ```
   既能实现秒级顺畅发版，又保持开发环境配置纯洁。
+
+---
+
+## 八、npm 官方 Registry 发布包物理不可变性与“幽灵版本”发布陷阱 (Package Immutability & Ghost Release Trap)
+
+### 8.1 致命故障现象与排查误区
+
+在 DSH 插件迭代发版时，开发者极易遭遇以下死循环：
+1. 开发者将版本 `v1.2.0` 推送并成功发布到 npm；
+2. 随后在测试环境或真实宿主中运行，发现 `package.json` 中的 `peerDependencies`、`engines.dsh` 或构建产物有微小疏漏，导致宿主抛出兼容性警告或加载异常；
+3. 开发者在本地快速修改了代码，为了“不污染版本号”或“保持发布整洁”，在本地删除了旧 Tag `v1.2.0`，在最新 Commit 上重新打上 `v1.2.0`，并通过 `git push -f origin v1.2.0` 强推远端；
+4. GitHub Actions CI 流水线被触发，编译、门禁和测试全部显示绿色（Success）；
+5. 用户在真实 DSH 宿主中执行安装或更新；
+6. **灾难结果**：错误依然 100% 复现！宿主报错信息中依然要求旧的依赖版本，开发者百思不得其解，甚至误判宿主内核有缓存漏洞。
+
+---
+
+### 8.2 底层运行机理深度剖析 (The Ghost Release Mechanism)
+
+该故障的核心根因是 **npm 官方注册表的物理不可变性（Package Immutability）** 与 **自动化流水线幂等跳过机制** 产生的暗态冲突：
+
+```text
+[开发者操作]
+修改源码/配置 -> 本地重打 Tag v1.2.0 -> git push -f 强推 Tag
+      │
+      ▼
+[GitHub Actions CI 流水线]
+检出最新 commit -> 重新执行 build 与 verify（全绿）
+      │
+      ▼
+[Publish 步骤的幂等性守卫]
+执行：if npm view @scope/pkg versions | grep "1.2.0"; then
+        echo "Version 1.2.0 already published, skipping"
+        exit 0
+      fi
+      │
+      ├─►【短路分支】：npm 官方源上已存在 1.2.0 ──► 静默跳过 npm publish！
+      │
+      ▼
+[结果与现场状态]
+- GitHub 上的 Tag v1.2.0 指向了最新 Commit（表象！）；
+- GitHub Release 显示最新文档（表象！）；
+- CI 流水线显示通过（表象！）；
+- npm 官方源里的 1.2.0 tarball 永远是第一次发布的那份包含错误元数据的旧包！
+- 真实用户从 npm 下载的永远是旧的“幽灵产物”！
+```
+
+1. **npm 官方 Registry 物理不可变铁律**：
+   npm 官方仓库强制实施单向版本归档（WORM，Write Once Read Many）安全策略。一个包的特定版本一旦成功发布，**其物理 tarball 与元数据就是永久锁死的**，npm 服务器直接以 `E403 Forbidden: You cannot publish over the previously published versions` 拦截任何同版本的重新上传。
+2. **CI 流程的静默防冲突设计**：
+   健全的发布流水线（如 `.github/workflows/publish.yml`）为了防范重复推送 Tag 导致流水线红灯，通常内置了版本存在性检查。当发现目标版本已在线上存在时，直接静默退出（exit 0），营造出“发布成功”的假象。
+
+---
+
+### 8.3 规范处置与工程防雷铁律
+
+1. **铁律：只要包已上架 npm，任何修复必须递增 SemVer 版本号**：
+   绝对禁止依赖 `git push -f <tag>` 试图“更新已上线的 npm 包”。只要前序版本已在 npm 官方源生成，哪怕只修改了一个字符的 `peerDependencies`，**也必须通过递增补丁版本号（如 `1.2.0 -> 1.2.1`）生成全新的物理 tarball**。
+2. **发布后必须直接向全球根源回读已发布元数据**：
+   发版成功的唯一可信判据是向全球官方根源回读已发布的物理元数据：
+   ```bash
+   npm view @scope/pkg@<新版本号> peerDependencies --registry=https://registry.npmjs.org --json
+   npm view @scope/pkg@<新版本号> engines --registry=https://registry.npmjs.org --json
+   ```
+   只有从 npm 官方注册表物理回读出符合预期的依赖与引擎声明，才能证明线上分发物真正携带了最新修复。

@@ -210,6 +210,12 @@ if (manifestOnly && bundles === lastBundles) return;
 - **致命误诊**：测试人员以为安装的是最新修复版，实测发现旧 bug 依然存在，误判为“代码未修复”；
 - **验收铁律**：热安装完成后，**第一件事永远是读磁盘真值**（`cat <profile>/node_modules/<pkg>/package.json`），比对物理版本是否等于预期发布版本；文档与界面指引中强制要求用户带精确版本号（如 `<pkg>@X.Y.Z`）安装，自动获得 `minimumReleaseAgeExclude` 豁免。
 
+#### 5. DSH Web 一次性 Launch Token 鉴权与 Session Cookie 握手机制 (Ephemeral Launch Token & 401 Bypass)
+在隔离实例启动 Web 服务进行自动化验收或脚本探针检测时：
+- **机制剖析**：`dsh web` 启动时在内存中生成一次性随机 `launchToken`，并在控制台打印携带该令牌的完整 URL（`dsh web: http://127.0.0.1:<port>/?token=<token>`）。宿主连接安全闸门（`dsh-client-connection` 模块的 `authorizeIndex`）对所有未携带合法签名 Cookie 的原始 HTTP 请求直接响应 `401 Unauthorized`（`dsh web authentication required; reopen the URL printed by dsh web.`）；
+- **握手流程**：浏览器或 HTTP 客户端首次带着 `?token=<launchToken>` 请求根路径时，宿主比对成功并签发基于 HMAC-SHA256 的带签名 HttpOnly 跨站隔离 Cookie（`dsh-auth-<authorityHash>=v1.<payload>.<signature>`），并以 `303 See Other` 状态码重定向至目录相对路径 `./`。随后携带该 Cookie 的所有资源请求（包括 `window.__DSH_BOOT__` 和客户端插件 JS）才能正常返回 200；
+- **自动化脚本验收铁律**：自动化测试工具（CDP / Playwright / 自动化脚本）严禁直接裸请求 `http://127.0.0.1:<port>/`。必须优先从宿主启动输出中捕获完整的 `?token=...` URL 先完成一次 303 握手（例如 HTTP 探针必须携带能够自动处理重定向与 Cookie 保持的 Session 对象），建立受信任的 WebSession，否则所有接口和静态产物请求均被 401 拦截并误判为服务坏死。
+
 ---
 
 ## 四、浏览器逐项验证
@@ -240,6 +246,10 @@ if (manifestOnly && bundles === lastBundles) return;
 | 坑 | 表现 | 解法 |
 | --- | --- | --- |
 | 遮罩吞点击 | 元素可读、强制点击也点了，但事件处理从未执行；读操作全对、写操作全无效 | 用 DOM 原生的元素点击触发，命中元素自身绕过遮罩；或先关掉引导层与弹窗 |
+| 全屏引导遮罩吞点击 | 纯净隔离实例首次启动时全屏弹出「预览版说明」Modal 遮罩，DOM 元素可读但所有点击被遮罩吸收 | 页面 `wait_for_load()` 后先调用 CDP 无障碍树（`Accessibility.getFullAXTree`）检索 `role: "button", name: "继续"` 节点，通过 `DOM.getBoxModel` 计算物理包围盒中心坐标派发真实光标点击（`click_at_xy`）彻底关闭遮罩 |
+| 会话生命周期插槽挂载分界 | 在 `dataPhase: "hero"`（空白起始态，尚未分配会话）下，会话级输入插槽（如 `conversation.input.right`）静默不渲染，误判为插件挂载失败 | DSH `InputBar` 严密受控于 `sessionId === void 0 ? null : renderSlot(...)`。测试会话级输入插槽前，必须先发送一条本地零 Token 指令（如输入 `/help` 并回车）驱动宿主分配本地会话使页面跃升进入 `dataPhase: "active"`，插槽即刻激活挂载 |
+| 控制台传递代码中文代理字符崩溃 | Windows 控制台向 Python/Node 自动化脚本管道传参时，中文字符串编码不一致抛出 `UnicodeEncodeError: surrogates not allowed` | 自动化脚本自身一律采用纯 7-bit ASCII 编写（中文字符串使用 `\uXXXX` 标准 Unicode 转义），浏览器提取的结果直接写入本地 UTF-8 临时 JSON 文件，外部执行器再从文件读取，彻底免疫管道编码截断 |
+| Web 未握手 401 假死 | 自动化脚本或探针直接请求 `http://127.0.0.1:<port>/` 报 401 Unauthorized 误以为服务坏死 | 宿主安全门禁强制要求一次性 Launch Token 握手。脚本必须从后台输出捕获完整 `?token=...` 链接，通过支持重定向与 Cookie 持久化的 Client（`-WebSession`）先执行一次 303 握手沉淀 Session Cookie |
 | 导航等待超时 | 等待文档就绪的判定永不触发 | 长连接会让它永不触发；改用更弱的等待条件或明确的元素等待 |
 | 浏览器沙箱崩溃 | 启动失败 | 指定本机浏览器可执行文件并关闭沙箱相关开关 |
 | 控制台中文乱码 | 断言全乱码 | 把输出流按 UTF-8 处理 |

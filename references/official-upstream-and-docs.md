@@ -174,13 +174,13 @@ DSH 迭代频繁，出现与本库描述不符的行为时，按此顺序处理�
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
-apps/cli  <-  @deepseek-ai/dsh@0.2.0-rc.2
-packages/core/agent  <-  @deepseek-ai/dsh-agent@0.2.0-rc.2
-packages/core/agent-loop  <-  @deepseek-ai/dsh-agent-loop@0.2.0-rc.2
-packages/credentials/credentials  <-  @deepseek-ai/dsh-credentials@0.2.0-rc.2
-packages/llm/llm  <-  @deepseek-ai/dsh-llm@0.2.0-rc.2
-packages/core/session  <-  @deepseek-ai/dsh-session@0.2.0-rc.2
-packages/core/system-prompt  <-  @deepseek-ai/dsh-system-prompt@0.2.0-rc.2
-packages/core/tools  <-  @deepseek-ai/dsh-tools@0.2.0-rc.2
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
+apps/cli  <-  @deepseek-ai/dsh@0.2.1-rc.2
+packages/core/agent  <-  @deepseek-ai/dsh-agent@0.2.1-rc.2
+packages/core/agent-loop  <-  @deepseek-ai/dsh-agent-loop@0.2.1-rc.2
+packages/credentials/credentials  <-  @deepseek-ai/dsh-credentials@0.2.1-rc.2
+packages/llm/llm  <-  @deepseek-ai/dsh-llm@0.2.1-rc.2
+packages/core/session  <-  @deepseek-ai/dsh-session@0.2.1-rc.2
+packages/core/system-prompt  <-  @deepseek-ai/dsh-system-prompt@0.2.1-rc.2
+packages/core/tools  <-  @deepseek-ai/dsh-tools@0.2.1-rc.2
 ```

@@ -114,7 +114,7 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - **Windows PowerShell 原生无 BOM 写入铁律**：在 Windows PowerShell 编写自动化脚本生成或重写 `package.json`、`cordis.patch.yml` 等文件时，严禁使用 `Out-File -Encoding utf8`（会静默注入 3 字节 UTF-8 BOM `\uFEFF`）；Node.js 原生 `JSON.parse` 严格遵循 RFC 8259 规范，遇 BOM 直接抛出 `SyntaxError: Unexpected token '﻿'` 致命崩溃中断宿主引导；必须使用 `[System.IO.File]::WriteAllText($path, $content, [System.Text.UTF8Encoding]::new($false))` 纯净无 BOM 写入。详见 [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §配置文件生成。
 - **DSH Web 一次性 Launch Token 鉴权与 Session Cookie 握手**：`dsh web` 启动时生成一次性随机内存 `launchToken`，并对所有未携带合法签名 Cookie 的原始请求返回 `401 Unauthorized`；自动化测试探针与浏览器脚本严禁直连裸端口，必须捕获启动输出中的 `?token=...` 链接，通过 `303 See Other` 完成鉴权握手并持久化 `dsh-auth-*` Session Cookie，杜绝误判服务坏死。详见 [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §3.5。
 - **会话生命周期插槽挂载分界 (Blank Hero vs Active Session)**：DSH 输入条容器对会话级输入插槽施加 `sessionId === void 0 ? null : renderSlot(...)` 严格门禁；在未创建会话的 `dataPhase: "hero"` 空白起始页上插槽静默不渲染；自动化测试输入增强特性前，必须先发送本地零 Token 指令（如 `/help`）激发宿主分配本地会话使页面跃升进入 `dataPhase: "active"`，方可验证插槽挂载。详见 [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §4.4。
-- **npm 全球读副本扩散时延与连续发布容错**：连续快速发版时，npm 主写集群返回 `✅ Published package` 后，全球 CDN 读副本（`registry.npmjs.org`）存在 1 至 5 分钟的元数据同步扩散时延；自动化验签脚本必须携带防缓存时间戳（`?nocache=`）并设置至少 3 分钟的重试窗口，严禁因暂态 404 冲动重复发布引发 `E409 Staged` 锁死。详见 [publish-npm-verification.md](references/publish-npm-verification.md) §6.3。
+- **npm 全球读副本扩散时延与连续发布容错**：连续快速发版时，npm 主写集群返回 `[发布成功] Published package` 后，全球 CDN 读副本（`registry.npmjs.org`）存在 1 至 5 分钟的元数据同步扩散时延；自动化验签脚本必须携带防缓存时间戳（`?nocache=`）并设置至少 3 分钟的重试窗口，严禁因暂态 404 冲动重复发布引发 `E409 Staged` 锁死。详见 [publish-npm-verification.md](references/publish-npm-verification.md) §6.3。
 - **命令原子芯片化下的触发放宽通用性**：DSH 0.2.1+ 将认领命令升级为原子内联芯片（`CommandChipNode`），但底层 `detectTrigger` 依然对 `guard.tier === 'claimed'` 硬跳过所有斜杠；无论命令呈现为纯文本还是芯片，行内斜杠判定并在参数区将守卫降级为 `plain` 是恢复后续技能补全的唯一通用接缝。详见 [slash-commands-and-input-triggers.md](references/slash-commands-and-input-triggers.md) §三之三。
 - **上游废弃诊断包彻底解耦与孤儿清障**：上游版本演进中若彻底下架某项运行时机制（如 DSH 0.2.1 彻底移除 `dsh-invariants` 与 `./invariant` 导出），插件必须执行源码删除、构建 entry 剔除、`package.json.exports/peerDependencies` 拔除以及物理编译目录清理（`rm -rf lib/types`）四步彻底清障，杜绝因残留废弃 peer 依赖或孤儿声明导致兼容性拦截或打包污染。详见 [install-resolution-traps.md](references/install-resolution-traps.md) §十二。
 
@@ -122,6 +122,11 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 
 | 需求或症状 | 先读 |
 | --- | --- |
+| 需要多智能体团队协作开发、隐式根名册管理、点对点非自旋通信与共享任务 DAG 调度 | [agent-teams-architecture.md](references/agent-teams-architecture.md) |
+| 需要启用计划模式进行方案探索、只读执行纪律、用户审批闸门与 /plan off 退出通道 | [plan-mode-and-user-review-gate.md](references/plan-mode-and-user-review-gate.md) |
+| 需要多轮自主长程目标驱动、跨轮延续驱动器 goal-round-driver 与三轮持久阻塞判据 | [goal-driven-system.md](references/goal-driven-system.md) |
+| 升级适配 Session V4 格式、团队通信收件箱映射、Prompt Cache 保全与 SQLite 检索 | [session-format-v4-and-migration.md](references/session-format-v4-and-migration.md) |
+| 需要持续伪终端 PTY 会话常驻、ObservedStateGate 写前强观察门禁与 Win32 ACL 沙箱 | [persistent-shells-and-observation-policy.md](references/persistent-shells-and-observation-policy.md) |
 | 启动报 SyntaxError: Unexpected token '﻿'、package.json 无法解析、Windows UTF-8 BOM 陷阱 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §配置文件生成 |
 | 自动化探针请求 Web 报 401 Unauthorized、launchToken 与 Cookie 握手机制 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §3.5 |
 | 会话输入框插槽在空白首页找不到 DOM 节点、事件未触发、Hero 起始态与 Active 阶段门禁 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §4.4 |
@@ -358,3 +363,9 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - 大版本已决定不兼容旧版，却仍在前端控制器中保留 `legacyCarry` 继承逻辑与旧字段 `unset` 追加，导致单次操作发出 3 条 ops、膨胀 RPC 并加剧 `revision` 乐观锁冲突。
 - 向官方模板生成的 `cordis.patch.yml` 末尾盲目追加条目，与原有的空数组 `[]` 产生顶层 YAML 语法冲突（`YAMLException`）导致宿主引导失败。
 - 隔离实例验收一上来就启动完整 Web 服务占用端口或消耗大模型额度，不知道使用 `dsh --profile <name> --dump-config` 进行零端口、零 Token 的底层装配毫秒级快速检验。
+- 在未先通过 read 或 glob 进行权威物理观察前直接调用 write 或 edit，触发 FS_UNOBSERVED_WRITE_DENIAL 策略拦截并导致写盘失败。
+- 遇到单次错误或外部依赖未就绪便轻率调用 update_goal 标记 blocked，违背「同一阻断条件必须在连续 3 轮以上尝试多种路径无法突破方可标记」的铁律。
+- 修改共享任务看板时不传递或伪造 expected_revision，破坏 CAS 乐观锁并发保护，引发版本漂移与多成员任务状态相互践踏覆盖。
+- 在计划模式（Plan Mode）处于激活态且未获用户审批前，违背探索期只读纪律，擅自调用写盘或具有破坏副作用的终端命令。
+- 仅凭 list_agents 中成员状态处于 inactive 就盲目断言其负责的任务已完成，忽略了该状态仅代表当前轮次空闲、任务是否完工必须以共享看板 completed 与产物核验为真值。
+- 遇到 FS_STALE_VERSION 文件版本冲突时直接粗暴重试重写，未先调用 read 回读最新盘面内容并执行增量变动重基（rebase）。

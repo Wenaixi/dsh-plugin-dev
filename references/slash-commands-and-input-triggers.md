@@ -166,7 +166,7 @@ for (let i = caret - 1; i >= 0; i--) {
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
 packages/client/shortcuts  <-  @deepseek-ai/dsh-client-shortcuts@0.2.1-rc.2
 packages/client/ui-commands  <-  @deepseek-ai/dsh-client-ui-commands@0.2.1-rc.2
 packages/client/ui-input-trigger  <-  @deepseek-ai/dsh-client-ui-input-trigger@0.2.1-rc.2

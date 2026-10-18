@@ -133,7 +133,7 @@ git push origin vX.Y.Z --force                   # 5. 强制覆盖远端 tag 触
 ### 6.3 连续多版本发布与读副本扩散时延 (Read-Replica Propagation Lag)
 
 #### 1. 现象与误诊
-当连续发布多个版本（例如刚发了 `X.Y.0` 紧接着因修复环境依赖又发布了 `X.Y.1`）时，CI 流水线虽然明确输出了 `✅ Published package @scope/pkg@X.Y.1 → https://registry.npmjs.org/`，但随后在本地通过 `npm view @scope/pkg dist-tags.latest` 或直接请求 tarball 时，可能连续 1 至 3 分钟依然返回上一版本 `X.Y.0` 或返回 `E404`。开发者极易误诊为“发布未成功入库”而冲动再次执行 publish。
+当连续发布多个版本（例如刚发了 `X.Y.0` 紧接着因修复环境依赖又发布了 `X.Y.1`）时，CI 流水线虽然明确输出了 `[发布成功] Published package @scope/pkg@X.Y.1 → https://registry.npmjs.org/`，但随后在本地通过 `npm view @scope/pkg dist-tags.latest` 或直接请求 tarball 时，可能连续 1 至 3 分钟依然返回上一版本 `X.Y.0` 或返回 `E404`。开发者极易误诊为“发布未成功入库”而冲动再次执行 publish。
 
 #### 2. 分布式架构根因
 npm 官方 Registry 采用多地域分布式读写分离架构：
@@ -142,7 +142,7 @@ npm 官方 Registry 采用多地域分布式读写分离架构：
 
 #### 3. 权威验证与防缓存轮询规范
 自动化验收与人工复核时，必须遵循三条铁律：
-1. **以主写日志为准**：CI 或发布终端只要返回 `✅ Published package ...`，即视为发布事务完成，严禁重复发布同版本；
+1. **以主写日志为准**：CI 或发布终端只要返回 `[发布成功] Published package ...`，即视为发布事务完成，严禁重复发布同版本；
 2. **防缓存直连探测**：使用带时间戳的防缓存 HTTP 请求直接探测 npm 根元数据：
    ```powershell
    # PowerShell 穿透缓存轮询
@@ -204,9 +204,9 @@ tar -xzf downloaded.tgz
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-apps/cli  <-  @deepseek-ai/dsh@0.2.0-rc.2
-packages/boot/config-editor  <-  @deepseek-ai/dsh-config-editor@0.2.0-rc.2
-packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@0.2.0-rc.2
+apps/cli  <-  @deepseek-ai/dsh@0.2.1-rc.2
+packages/boot/config-editor  <-  @deepseek-ai/dsh-config-editor@0.2.1-rc.2
+packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@0.2.1-rc.2
 ```
 
 ---

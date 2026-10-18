@@ -70,10 +70,10 @@
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-packages/runtime-diagnostics/invariants  <-  @deepseek-ai/dsh-invariants@0.2.0-rc.2
-packages/feedback/message-feedback  <-  @deepseek-ai/dsh-message-feedback@0.2.0-rc.2
-packages/guard/repeat-tool-reminder  <-  @deepseek-ai/dsh-repeat-tool-reminder@0.2.0-rc.2
-packages/schedule/schedule  <-  @deepseek-ai/dsh-schedule@0.2.0-rc.2
-packages/core/session  <-  @deepseek-ai/dsh-session@0.2.0-rc.2
-packages/context/time-context  <-  @deepseek-ai/dsh-time-context@0.2.0-rc.2
+packages/runtime-diagnostics/invariants  <-  @deepseek-ai/dsh-invariants@0.2.1-rc.2
+packages/feedback/message-feedback  <-  @deepseek-ai/dsh-message-feedback@0.2.1-rc.2
+packages/guard/repeat-tool-reminder  <-  @deepseek-ai/dsh-repeat-tool-reminder@0.2.1-rc.2
+packages/schedule/schedule  <-  @deepseek-ai/dsh-schedule@0.2.1-rc.2
+packages/core/session  <-  @deepseek-ai/dsh-session@0.2.1-rc.2
+packages/context/time-context  <-  @deepseek-ai/dsh-time-context@0.2.1-rc.2
 ```

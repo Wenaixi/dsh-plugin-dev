@@ -29,8 +29,8 @@
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-vendor/loader  <-  @deepseek-ai/cordis-plugin-loader@1.0.5
-packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.0-rc.2
-packages/bundle/base  <-  @deepseek-ai/dsh-base@0.2.0-rc.2
-packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@0.2.0-rc.2
+vendor/loader  <-  @deepseek-ai/cordis-plugin-loader@1.0.6
+packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.1-rc.2
+packages/bundle/base  <-  @deepseek-ai/dsh-base@0.2.1-rc.2
+packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@0.2.1-rc.2
 ```

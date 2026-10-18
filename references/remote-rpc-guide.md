@@ -204,6 +204,6 @@ export function apply(ctx) {
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-packages/api/gateway  <-  @deepseek-ai/dsh-api-gateway@0.2.0-rc.2
-packages/typert/protocol  <-  @deepseek-ai/dsh-typert-protocol@0.2.0-rc.2
+packages/api/gateway  <-  @deepseek-ai/dsh-api-gateway@0.2.1-rc.2
+packages/typert/protocol  <-  @deepseek-ai/dsh-typert-protocol@0.2.1-rc.2
 ```

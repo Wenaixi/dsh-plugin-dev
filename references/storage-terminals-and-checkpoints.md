@@ -108,20 +108,27 @@ export function apply(ctx) {
 
 ---
 
+
+### 3.4 SQLite 本地检索与长程会话增量检查点
+
+在 DSH v0.2.1 中，会话持久化与检索机制迎来了升级：
+- **SQLite 高性能检索** (`@deepseek-ai/dsh-session-query-sqlite`)：自动在本地建立增量全文与元数据索引，支持在超大规模历史会话中毫秒级检索；
+- **周期性快照检查点** (`@deepseek-ai/dsh-session-checkpoint-policy`)：对长程事件流建立快照基准线，冷启动重放时仅需重放最近检查点后的增量记录，大幅降低加载时延。
+
 ## 相关 DSH 源码
 
 上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-packages/jobs/jobs  <-  @deepseek-ai/dsh-jobs@0.2.0-rc.2
-packages/jobs/jobs-local  <-  @deepseek-ai/dsh-jobs-local@0.2.0-rc.2
-packages/schedule/schedule  <-  @deepseek-ai/dsh-schedule@0.2.0-rc.2
-packages/session/session-checkpoint-policy  <-  @deepseek-ai/dsh-session-checkpoint-policy@0.2.0-rc.2
-packages/storage/storage  <-  @deepseek-ai/dsh-storage@0.2.0-rc.2
-packages/storage/storage-domain  <-  @deepseek-ai/dsh-storage-domain@0.2.0-rc.2
-packages/storage/storage-json  <-  @deepseek-ai/dsh-storage-json@0.2.0-rc.2
-packages/terminal/terminal  <-  @deepseek-ai/dsh-terminal@0.2.0-rc.2
-packages/terminal/terminal-bash  <-  @deepseek-ai/dsh-terminal-bash@0.2.0-rc.2
-packages/jobs/tool-jobs  <-  @deepseek-ai/dsh-tool-jobs@0.2.0-rc.2
+packages/jobs/jobs  <-  @deepseek-ai/dsh-jobs@0.2.1-rc.2
+packages/jobs/jobs-local  <-  @deepseek-ai/dsh-jobs-local@0.2.1-rc.2
+packages/schedule/schedule  <-  @deepseek-ai/dsh-schedule@0.2.1-rc.2
+packages/session/session-checkpoint-policy  <-  @deepseek-ai/dsh-session-checkpoint-policy@0.2.1-rc.2
+packages/storage/storage  <-  @deepseek-ai/dsh-storage@0.2.1-rc.2
+packages/storage/storage-domain  <-  @deepseek-ai/dsh-storage-domain@0.2.1-rc.2
+packages/storage/storage-json  <-  @deepseek-ai/dsh-storage-json@0.2.1-rc.2
+packages/terminal/terminal  <-  @deepseek-ai/dsh-terminal@0.2.1-rc.2
+packages/terminal/terminal-bash  <-  @deepseek-ai/dsh-terminal-bash@0.2.1-rc.2
+packages/jobs/tool-jobs  <-  @deepseek-ai/dsh-tool-jobs@0.2.1-rc.2
 ```

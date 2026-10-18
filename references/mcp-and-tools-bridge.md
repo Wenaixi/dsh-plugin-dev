@@ -124,6 +124,14 @@ export function apply(ctx) {
 
 ---
 
+
+### 4.3 v0.2.1 持续终端与团队协同工具桥接
+
+在 DSH v0.2.1 中，工具系统新增了长连接持续伪终端与团队协同工具的注册机制：
+- **持续终端工具** (`tool-pwsh-persistent` / `tool-bash-persistent`)：通过 PTY seam 与调用方会话建立唯一映射，保持长驻变量与进程；
+- **调用超时与熔断策略** (`dsh-tool-call-timeout-policy`)：统一规范工具调用的正整数毫秒预算，超时平滑转入后台作业而不是粗暴终止；
+- **团队工具桥接** (`dsh-experimental-tool-agent-team`)：为 Team Lead 动态暴露 `spawn_teammate`，为全体成员暴露 `send_message`、`wait_agent` 与 `team_task_*` 看板工具。
+
 ## 相关 DSH 源码
 
 上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
@@ -131,5 +139,5 @@ export function apply(ctx) {
 
 ```text
 vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
-packages/mcp/mcp-client  <-  @deepseek-ai/dsh-mcp-client@0.2.0-rc.2
+packages/mcp/mcp-client  <-  @deepseek-ai/dsh-mcp-client@0.2.1-rc.2
 ```

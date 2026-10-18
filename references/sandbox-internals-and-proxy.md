@@ -75,7 +75,7 @@ Linux 平台采用**探测制链**：`PLATFORM_CHAINS.linux = ["bwrap", "landloc
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-packages/compaction/compaction-image-offload  <-  @deepseek-ai/dsh-compaction-image-offload@0.2.0-rc.2
-packages/util/http-proxy  <-  @deepseek-ai/dsh-http-proxy@0.2.0-rc.2
-packages/sandbox/sandbox-windows-acl  <-  @deepseek-ai/dsh-sandbox-windows-acl@0.2.0-rc.2
+packages/compaction/compaction-image-offload  <-  @deepseek-ai/dsh-compaction-image-offload@0.2.1-rc.2
+packages/util/http-proxy  <-  @deepseek-ai/dsh-http-proxy@0.2.1-rc.2
+packages/sandbox/sandbox-windows-acl  <-  @deepseek-ai/dsh-sandbox-windows-acl@0.2.1-rc.2
 ```

@@ -318,6 +318,6 @@ CI 通常校验 `tag == package.json.version`，不一致直接失败。发版�
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
-packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.0-rc.2
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
+packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.1-rc.2
 ```

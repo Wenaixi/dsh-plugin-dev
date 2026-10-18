@@ -734,3 +734,14 @@ packages/dsh-client-ui-primitives/src/index.ts <- @deepseek-ai/dsh-client-ui-pri
 1. 第一步必须执行真实构建（npm run build）；
 2. 构建失败立即退出熔断：一旦构建或类型检查返回非零，整个流水线必须立即宣告失败并阻断退出，绝不允许执行后续仅读取旧产物的测试步骤，彻底戳破假绿泡沫！
 3. 断言验证产物行为，但必须前置证明源码无漂移。
+
+## 相关 DSH 源码
+
+上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
+本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
+
+```text
+packages/settings/settings    <-  @deepseek-ai/dsh-settings@0.2.1-rc.2
+packages/boot/app-boot        <-  @deepseek-ai/dsh-app-boot@0.2.1-rc.2
+packages/common/atomic-write  <-  @deepseek-ai/dsh-atomic-write@0.2.1-rc.2
+```

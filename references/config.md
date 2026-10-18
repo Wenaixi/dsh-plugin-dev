@@ -796,15 +796,15 @@ export function unwrapLazy<T>(raw: unknown, defaultValue: T): T {
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
-vendor/loader  <-  @deepseek-ai/cordis-plugin-loader@1.0.5
-apps/cli  <-  @deepseek-ai/dsh@0.2.0-rc.2
-packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.0-rc.2
-packages/bundle/base  <-  @deepseek-ai/dsh-base@0.2.0-rc.2
-packages/boot/config-editor  <-  @deepseek-ai/dsh-config-editor@0.2.0-rc.2
-packages/experimental/voice-input-bundle  <-  @deepseek-ai/dsh-experimental-voice-input-bundle@0.2.0-rc.2
-packages/mcp/mcp-client  <-  @deepseek-ai/dsh-mcp-client@0.2.0-rc.2
-packages/settings/settings  <-  @deepseek-ai/dsh-settings@0.2.0-rc.2
-packages/bundle/web-app  <-  @deepseek-ai/dsh-web-app@0.2.0-rc.2
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
+vendor/loader  <-  @deepseek-ai/cordis-plugin-loader@1.0.6
+apps/cli  <-  @deepseek-ai/dsh@0.2.1-rc.2
+packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.1-rc.2
+packages/bundle/base  <-  @deepseek-ai/dsh-base@0.2.1-rc.2
+packages/boot/config-editor  <-  @deepseek-ai/dsh-config-editor@0.2.1-rc.2
+packages/experimental/voice-input-bundle  <-  @deepseek-ai/dsh-experimental-voice-input-bundle@0.2.1-rc.2
+packages/mcp/mcp-client  <-  @deepseek-ai/dsh-mcp-client@0.2.1-rc.2
+packages/settings/settings  <-  @deepseek-ai/dsh-settings@0.2.1-rc.2
+packages/bundle/web-app  <-  @deepseek-ai/dsh-web-app@0.2.1-rc.2
 schema 库             <-  schemastery（lib/index.mjs 的 validateVolatileSchema / toJSON / resolve）
 ```

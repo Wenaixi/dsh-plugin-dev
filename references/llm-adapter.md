@@ -281,13 +281,13 @@ interface TokenUsage {
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
-packages/llm/llm  <-  @deepseek-ai/dsh-llm@0.2.0-rc.2
-packages/llm/llm-deepseek-account  <-  @deepseek-ai/dsh-llm-deepseek-account@0.2.0-rc.2
-packages/llm/llm-deepseek-api-key  <-  @deepseek-ai/dsh-llm-deepseek-api-key@0.2.0-rc.2
-packages/llm/llm-pi-ai  <-  @deepseek-ai/dsh-llm-pi-ai@0.2.0-rc.2
-packages/llm/llm-retry  <-  @deepseek-ai/dsh-llm-retry@0.2.0-rc.2
-packages/session/session-title-first-prompt-llm  <-  @deepseek-ai/dsh-session-title-first-prompt-llm@0.2.0-rc.2
-packages/session/session-title-llm  <-  @deepseek-ai/dsh-session-title-llm@0.2.0-rc.2
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
+packages/llm/llm  <-  @deepseek-ai/dsh-llm@0.2.1-rc.2
+packages/llm/llm-deepseek-account  <-  @deepseek-ai/dsh-llm-deepseek-account@0.2.1-rc.2
+packages/llm/llm-deepseek-api-key  <-  @deepseek-ai/dsh-llm-deepseek-api-key@0.2.1-rc.2
+packages/llm/llm-pi-ai  <-  @deepseek-ai/dsh-llm-pi-ai@0.2.1-rc.2
+packages/llm/llm-retry  <-  @deepseek-ai/dsh-llm-retry@0.2.1-rc.2
+packages/session/session-title-first-prompt-llm  <-  @deepseek-ai/dsh-session-title-first-prompt-llm@0.2.1-rc.2
+packages/session/session-title-llm  <-  @deepseek-ai/dsh-session-title-llm@0.2.1-rc.2
 vendor/schemastery  <-  @deepseek-ai/schemastery@3.18.4
 ```

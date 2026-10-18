@@ -49,7 +49,7 @@ pnpm 全局根各平台形态不同，且带版本目录，必须以实际输出
 | macOS | `~/Library/pnpm/global/<大版本>/` |
 | Linux | `<XDG data home>/pnpm/global/<大版本>/` |
 
-**isolated 布局的目录名转义**：pnpm 把包名压成扁平目录名，`@scope/name@版本` 变成 `@scope+name@版本`，并可能追加 peer 依赖哈希后缀。例如 `@deepseek-ai/dsh-agent@0.2.0-rc.2` 在 profile 里是 `<profile>/node_modules/.pnpm/@deepseek-ai+dsh-agent@<版本>_<peer哈希>/node_modules/@deepseek-ai/dsh-agent/`。**不要把转义后的名字当包名**，读它的 `package.json` 取真实 `name`。
+**isolated 布局的目录名转义**：pnpm 把包名压成扁平目录名，`@scope/name@版本` 变成 `@scope+name@版本`，并可能追加 peer 依赖哈希后缀。例如 `@deepseek-ai/dsh-agent@0.2.1-rc.2` 在 profile 里是 `<profile>/node_modules/.pnpm/@deepseek-ai+dsh-agent@<版本>_<peer哈希>/node_modules/@deepseek-ai/dsh-agent/`。**不要把转义后的名字当包名**，读它的 `package.json` 取真实 `name`。
 
 **阅读入口，从便宜到贵**：
 
@@ -218,7 +218,7 @@ DSH 的用户数据根是跨平台统一的——源码里只有 `homedir()/.dsh
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-apps/cli  <-  @deepseek-ai/dsh@0.2.0-rc.2
-packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.0-rc.2
-packages/util/home-paths  <-  @deepseek-ai/dsh-home-paths@0.2.0-rc.2
+apps/cli  <-  @deepseek-ai/dsh@0.2.1-rc.2
+packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.1-rc.2
+packages/util/home-paths  <-  @deepseek-ai/dsh-home-paths@0.2.1-rc.2
 ```

@@ -329,15 +329,15 @@ function apply(ctx) {
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
-packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.0-rc.2
-packages/client/ui-agent-preset  <-  @deepseek-ai/dsh-client-ui-agent-preset@0.2.0-rc.2
-packages/client/ui-plugin-manager  <-  @deepseek-ai/dsh-client-ui-plugin-manager@0.2.0-rc.2
-packages/client/ui-primitives  <-  @deepseek-ai/dsh-client-ui-primitives@0.2.0-rc.2
-packages/client/ui-settings-agent-loop  <-  @deepseek-ai/dsh-client-ui-settings-agent-loop@0.2.0-rc.2
-packages/client/ui-settings-general  <-  @deepseek-ai/dsh-client-ui-settings-general@0.2.0-rc.2
-packages/client/ui-settings-models  <-  @deepseek-ai/dsh-client-ui-settings-models@0.2.0-rc.2
-packages/client/ui-settings-plugins  <-  @deepseek-ai/dsh-client-ui-settings-plugins@0.2.0-rc.2
-packages/llm/plugin-package-inventory-deepseek  <-  @deepseek-ai/dsh-plugin-package-inventory-deepseek@0.2.0-rc.2
-packages/settings/settings  <-  @deepseek-ai/dsh-settings@0.2.0-rc.2
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
+packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.1-rc.2
+packages/client/ui-agent-preset  <-  @deepseek-ai/dsh-client-ui-agent-preset@0.2.1-rc.2
+packages/client/ui-plugin-manager  <-  @deepseek-ai/dsh-client-ui-plugin-manager@0.2.1-rc.2
+packages/client/ui-primitives  <-  @deepseek-ai/dsh-client-ui-primitives@0.2.1-rc.2
+packages/client/ui-settings-agent-loop  <-  @deepseek-ai/dsh-client-ui-settings-agent-loop@0.2.1-rc.2
+packages/client/ui-settings-general  <-  @deepseek-ai/dsh-client-ui-settings-general@0.2.1-rc.2
+packages/client/ui-settings-models  <-  @deepseek-ai/dsh-client-ui-settings-models@0.2.1-rc.2
+packages/client/ui-settings-plugins  <-  @deepseek-ai/dsh-client-ui-settings-plugins@0.2.1-rc.2
+packages/llm/plugin-package-inventory-deepseek  <-  @deepseek-ai/dsh-plugin-package-inventory-deepseek@0.2.1-rc.2
+packages/settings/settings  <-  @deepseek-ai/dsh-settings@0.2.1-rc.2
 ```

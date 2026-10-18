@@ -242,10 +242,10 @@ Cardinality 选错会导致重复渲染或完全不渲染；调试实时插槽�
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
-apps/cli  <-  @deepseek-ai/dsh@0.2.0-rc.2
-packages/client/modules  <-  @deepseek-ai/dsh-client-modules@0.2.0-rc.2
-packages/client/ui-settings  <-  @deepseek-ai/dsh-client-ui-settings@0.2.0-rc.2
-packages/subprocess/subprocess  <-  @deepseek-ai/dsh-subprocess@0.2.0-rc.2
-packages/subprocess/subprocess-local  <-  @deepseek-ai/dsh-subprocess-local@0.2.0-rc.2
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
+apps/cli  <-  @deepseek-ai/dsh@0.2.1-rc.2
+packages/client/modules  <-  @deepseek-ai/dsh-client-modules@0.2.1-rc.2
+packages/client/ui-settings  <-  @deepseek-ai/dsh-client-ui-settings@0.2.1-rc.2
+packages/subprocess/subprocess  <-  @deepseek-ai/dsh-subprocess@0.2.1-rc.2
+packages/subprocess/subprocess-local  <-  @deepseek-ai/dsh-subprocess-local@0.2.1-rc.2
 ```

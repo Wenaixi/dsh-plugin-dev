@@ -37,7 +37,7 @@
 - `dirty` 为假、`invalid` 为真、或 `saving` 中，**自动禁用 Save 按钮**；
 - 卸载（unmount）时自动调用 `onDiscard`——「离开即丢弃草稿」不用你写。
 
-源码位置（0.2.0-rc.2）：`packages/client/ui-primitives/src/settings-form/SettingsForm.tsx`。`SettingsFormShell` 类型在同目录 `form-model.ts`。
+源码位置（0.2.1-rc.2）：`packages/client/ui-primitives/src/settings-form/SettingsForm.tsx`。`SettingsFormShell` 类型在同目录 `form-model.ts`。
 
 **文案键别自创**：unavailable / readOnly / saveFailed / save / saving 的对仗句式官方插件（settings-shell、settings-subagent）已固定，直接抄它们的字典措辞，不要发明自己的变体。
 
@@ -570,13 +570,13 @@ const ok = await this.form.mutate(
 ## 相关 DSH 源码
 
 ```text
-packages/client/ui-primitives  <-  @deepseek-ai/dsh-client-ui-primitives@0.2.0-rc.2
+packages/client/ui-primitives  <-  @deepseek-ai/dsh-client-ui-primitives@0.2.1-rc.2
   src/settings-form/SettingsForm.tsx / form-model.ts / fields.tsx
-packages/client/ui-settings   <-  @deepseek-ai/dsh-client-ui-settings@0.2.0-rc.2
+packages/client/ui-settings   <-  @deepseek-ai/dsh-client-ui-settings@0.2.1-rc.2
   lib/types/client/config-form*.d.ts（ConfigForm / ConfigFormSnapshot）
-packages/client/ui-renderer  <-  @deepseek-ai/dsh-client-ui-renderer@0.2.0-rc.2
+packages/client/ui-renderer  <-  @deepseek-ai/dsh-client-ui-renderer@0.2.1-rc.2
   lib/client.js（bindInjectSources：hooks 键转 use<Name>、bindSnapshotSelector：选择器签名）
-packages/client/ui-slots    <-  @deepseek-ai/dsh-client-ui-slots@0.2.0-rc.2
+packages/client/ui-slots    <-  @deepseek-ai/dsh-client-ui-slots@0.2.1-rc.2
   lib/index.js（standardHookPropName：use<Name> 命名规则）
 packages/client/ui-settings-subagent  <-  官方 bool/枚举控制器范本（subagent-model-selection-card-controller）
 packages/client/ui-settings-shell     <-  官方 SettingsFormModel 用法范本

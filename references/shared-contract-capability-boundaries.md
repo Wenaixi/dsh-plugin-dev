@@ -123,13 +123,13 @@
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-packages/skill/skill               <-  @deepseek-ai/dsh-skill@0.2.0-rc.2（注册表：投影函数与缓存键）
-packages/skill/tool-skill         <-  @deepseek-ai/dsh-tool-skill@0.2.0-rc.2（模型侧目录消费者）
-packages/api/session-controller   <-  @deepseek-ai/dsh-api-session-controller@0.2.0-rc.2（人类侧目录服务）
-packages/api/remotes              <-  @deepseek-ai/dsh-api-remotes@0.2.0-rc.2（结果 schema 白名单）
-packages/api/gateway              <-  @deepseek-ai/dsh-api-gateway@0.2.0-rc.2（命名空间挂载与命名空间服务）
-packages/client/ui-skill          <-  @deepseek-ai/dsh-client-ui-skill@0.2.0-rc.2（斜杠菜单消费者）
-packages/client/ui-input-trigger  <-  @deepseek-ai/dsh-client-ui-input-trigger@0.2.0-rc.2（触发源注册表与分组渲染）
+packages/skill/skill               <-  @deepseek-ai/dsh-skill@0.2.1-rc.2（注册表：投影函数与缓存键）
+packages/skill/tool-skill         <-  @deepseek-ai/dsh-tool-skill@0.2.1-rc.2（模型侧目录消费者）
+packages/api/session-controller   <-  @deepseek-ai/dsh-api-session-controller@0.2.1-rc.2（人类侧目录服务）
+packages/api/remotes              <-  @deepseek-ai/dsh-api-remotes@0.2.1-rc.2（结果 schema 白名单）
+packages/api/gateway              <-  @deepseek-ai/dsh-api-gateway@0.2.1-rc.2（命名空间挂载与命名空间服务）
+packages/client/ui-skill          <-  @deepseek-ai/dsh-client-ui-skill@0.2.1-rc.2（斜杠菜单消费者）
+packages/client/ui-input-trigger  <-  @deepseek-ai/dsh-client-ui-input-trigger@0.2.1-rc.2（触发源注册表与分组渲染）
 ```
 
 配套阅读：

@@ -124,15 +124,15 @@
 - **宿主源码闸门**：`dsh-app-boot` 中的 `evaluatePluginCompatibility(manifest, exemptions, runtimeVersion)`，遍历插件所有以 `@deepseek-ai/dsh` 开头的 `peerDependencies`，逐项执行：
   `semver.satisfies(runtimeVersion, requirement, { includePrerelease: true })`
 - **致命判定陷阱**：
-  若插件在 `peerDependencies` 中写死单一的预发布版本（如 `"@deepseek-ai/dsh-client-locale": "0.2.0-rc.2"`），当宿主升级到相邻小版本（如 `0.2.1-rc.2`）时，SemVer 预发布规则判定不满足，宿主立即收集该 peer 依赖；若未获得豁免，直接抛出 `ManagementFailure("incompatible-version")`。
+  若插件在 `peerDependencies` 中写死单一的预发布版本（如 `"@deepseek-ai/dsh-client-locale": "0.2.1-rc.2"`），当宿主升级到相邻小版本（如 `0.2.1-rc.2`）时，SemVer 预发布规则判定不满足，宿主立即收集该 peer 依赖；若未获得豁免，直接抛出 `ManagementFailure("incompatible-version")`。
 - **真机表现**：
   1. 界面呈现：Web 端与桌面端插件管理页将插件卡片直接标红并显示为“异常”状态，提示：
      `{plugin} 与 DSH {version} 不兼容（要求 {requirements}），运行它可能导致崩溃或数据丢失。请卸载后重新安装与当前 DSH 兼容的版本。`
   2. CLI 装配表现：在 `loadProfileDirectory` 阶段跳过该 bundle（`dsh: skipping profile bundle "<pkg>"`），导致后续 `cordis.patch.yml` 补丁因找不到挂载目标报错 `patch: entry "<plugin-id>" not found`。
 - **为何静态门禁测不到**：本地开发环境测试与 `tsc` 编译只针对本地 node_modules 下的代码，无法感知外部用户机器上宿主运行时的具体微小版本号，静态断言 100% 全绿但真机直接被阻断激活。
 - **真机判据与工程规范**：
-  1. 官方一等公民引擎声明：在 `package.json` 中显式声明 `"engines": { "node": ">=20", "dsh": ">=0.2.0-rc.2" }`（DSH >=0.2.1 优先按 `engines.dsh` 裁决）；
-  2. `peerDependencies` 必须采用半开区间（如 `">=0.2.0-rc.2"`），严禁锁定单点预发布版本；
+  1. 官方一等公民引擎声明：在 `package.json` 中显式声明 `"engines": { "node": ">=20", "dsh": ">=0.2.1-rc.2" }`（DSH >=0.2.1 优先按 `engines.dsh` 裁决）；
+  2. `peerDependencies` 必须采用半开区间（如 `">=0.2.1-rc.2"`），严禁锁定单点预发布版本；
   3. 破坏实验验证：人为将 peer 依赖改写为不满足宿主的范围，断言真机准确抛出 `incompatible-version`，证明闸门判定真实有效。
 
 ---
@@ -207,9 +207,9 @@
 ## 相关 DSH 源码
 
 ```text
-packages/settings/settings       <-  @deepseek-ai/dsh-settings@0.2.0-rc.2（写入闸门）
-packages/client/modules         <-  @deepseek-ai/dsh-client-modules@0.2.0-rc.2（产物缓存与修订号）
-packages/boot/plugin-manager    <-  @deepseek-ai/dsh-plugin-manager@0.2.0-rc.2（应用状态与热替换）
+packages/settings/settings       <-  @deepseek-ai/dsh-settings@0.2.1-rc.2（写入闸门）
+packages/client/modules         <-  @deepseek-ai/dsh-client-modules@0.2.1-rc.2（产物缓存与修订号）
+packages/boot/plugin-manager    <-  @deepseek-ai/dsh-plugin-manager@0.2.1-rc.2（应用状态与热替换）
 ```
 
 配套阅读：

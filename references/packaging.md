@@ -328,15 +328,15 @@ const packManifest = JSON.parse(raw.slice(jsonStart, jsonEnd));
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
-apps/cli  <-  @deepseek-ai/dsh@0.2.0-rc.2
-packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.0-rc.2
-packages/bundle/base  <-  @deepseek-ai/dsh-base@0.2.0-rc.2
-packages/client/hmr  <-  @deepseek-ai/dsh-client-hmr@0.2.0-rc.2
-packages/boot/cmdline  <-  @deepseek-ai/dsh-cmdline@0.2.0-rc.2
-packages/boot/hmr  <-  @deepseek-ai/dsh-hmr@0.2.0-rc.2
-packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@0.2.0-rc.2
-packages/session/session-projection  <-  @deepseek-ai/dsh-session-projection@0.2.0-rc.2
-packages/terminal/terminal-bash  <-  @deepseek-ai/dsh-terminal-bash@0.2.0-rc.2
-packages/workspace/workspace  <-  @deepseek-ai/dsh-workspace@0.2.0-rc.2
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
+apps/cli  <-  @deepseek-ai/dsh@0.2.1-rc.2
+packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.1-rc.2
+packages/bundle/base  <-  @deepseek-ai/dsh-base@0.2.1-rc.2
+packages/client/hmr  <-  @deepseek-ai/dsh-client-hmr@0.2.1-rc.2
+packages/boot/cmdline  <-  @deepseek-ai/dsh-cmdline@0.2.1-rc.2
+packages/boot/hmr  <-  @deepseek-ai/dsh-hmr@0.2.1-rc.2
+packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@0.2.1-rc.2
+packages/session/session-projection  <-  @deepseek-ai/dsh-session-projection@0.2.1-rc.2
+packages/terminal/terminal-bash  <-  @deepseek-ai/dsh-terminal-bash@0.2.1-rc.2
+packages/workspace/workspace  <-  @deepseek-ai/dsh-workspace@0.2.1-rc.2
 ```

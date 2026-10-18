@@ -15,7 +15,7 @@
 4. 非负整数配置字段用 schemastery 的 `z.natural()`，没有 `z.number().integer()`（见 [config.md](./config.md) §7.8）。
 
 - [source-verification-and-caches.md](./source-verification-and-caches.md)：源码至上的三层来源（本机安装先 pnpm 后 npm、命中即停且未混淆不必解包 / 桌面版解包 / 上游仓库）、`lib/types/*.d.ts` 优先于读实现的阅读入口、pnpm isolated 目录名转义、跨平台定位、缓存目录约定与冲突裁决顺序。
-- [isolated-instance-acceptance.md](./isolated-instance-acceptance.md)：隔离新实例的创建与配置复用、四种安装形态、浏览器逐项验证、模型选择与 debug 循环；本地源码联调必须手工建指向仓库根的目录联接，不跑 `pnpm install`。
+- [isolated-instance-acceptance.md](./isolated-instance-acceptance.md)：隔离新实例的创建与配置复用、四种安装形态、浏览器逐项验证、模型选择与 debug 循环；本地源码联调必须手工建指向仓库根的目录联接，不跑 `pnpm install`；**Windows PowerShell UTF-8 BOM 诱发 Node.js JSON.parse 崩溃陷阱与原生无 BOM 写入规范**；**DSH Web 一次性 Launch Token 鉴权与 Session Cookie 303 握手机制（401 穿透指南）**；**纯净实例首次启动全屏「预览版说明」引导遮罩与 CDP AX Tree 坐标穿透避让**；**会话生命周期插槽挂载分界（Blank Hero vs Active Session 阶段门禁）**。
 - [reproduction-experiment-design.md](./reproduction-experiment-design.md)：复现实验设计——症状与状态分别取证、冷热态前置条件、对照组（只变一个变量）、断言锚点选择（不按类型取第一个、不用文本匹配）、环境不稳定与产品缺陷的区分、产物遗留物与文档口径漂移，以及把单次事故沉淀成可迁移规则的四段式。
 - [dependency-injection.md](./dependency-injection.md)：显式依赖、服务契约和缺失依赖。
 - [lifecycle.md](./lifecycle.md)：可逆副作用、异步取消和卸载竞态。

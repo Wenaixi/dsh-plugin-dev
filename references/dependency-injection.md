@@ -18,17 +18,14 @@
 
 ## 读「未 inject 服务」的两条路：属性读 vs ctx.get
 
-插件有时要读一个不在 `inject` 声明里的可选服务（例如 headless/CLI 组合装配不上、不能因它而 PENDING 的
-`settings` 服务）。两条路语义完全不同，选错就是「运行时永远 undefined、行为静默回退」：
+插件有时要读一个不在 `inject` 声明里的可选服务（例如 headless/CLI 组合装配不上、不能因它而 PENDING 的 `settings` 服务）。两条路语义完全不同，选错就是「运行时永远 undefined、行为静默回退」：
 
 | 写法 | 真实语义 | 什么时候有效 |
 | --- | --- | --- |
 | `ctx.settings`（属性读） | 走 cordis get trap 的 isolate 隔离查找，**兄弟 fiber / 未注入服务会抛 `cannot get property "settings" without inject`** | 只在「当前 fiber 自己 provide 过」或属性在该 fiber 可见范围内有效 |
 | `ctx.get('settings', false)` | Service.get 直接查 store（`_getImpl`），不要求 inject、不抛错，缺失返回 undefined | 任意服务，含兄弟 fiber 提供的；`strict=false` 连「提供方 fiber 未激活」也放行 |
 
-实战教训（双面插件、宿主侧）：启动期把 `ctx.settings` 属性读缓存进闭包，之后每次求值都用它——
-在真实宿主上该属性读被 get trap 隔离抛错、try/catch 吞成 undefined，于是「读宿主其他命名空间做初始对齐」
-的功能**恒回退默认值且零报错**，只有隔离验收的运行时回读能暴露。
+实战教训（双面插件、宿主侧）：启动期把 `ctx.settings` 属性读缓存进闭包，之后每次求值都用它——在真实宿主上该属性读被 get trap 隔离抛错、try/catch 吞成 undefined，于是「读宿主其他命名空间做初始对齐」的功能**恒回退默认值且零报错**，只有隔离验收的运行时回读能暴露。
 
 正确写法（宿主侧读可选服务）：
 
@@ -51,8 +48,7 @@ function readOptional<T>(ctx: Context, name: string): T | undefined {
 }
 ```
 
-判据：跨 fiber 读服务、且该服务是「可选能力」时，一律 `ctx.get(name, false)`；属性读只用于你自己 provide 的
-对象或同 fiber 可见面。
+判据：跨 fiber 读服务、且该服务是「可选能力」时，一律 `ctx.get(name, false)`；属性读只用于你自己 provide 的对象或同 fiber 可见面。
 
 ## 常见失效
 
@@ -73,6 +69,6 @@ function readOptional<T>(ctx: Context, name: string): T | undefined {
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
-vendor/loader  <-  @deepseek-ai/cordis-plugin-loader@1.0.5
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
+vendor/loader  <-  @deepseek-ai/cordis-plugin-loader@1.0.6
 ```

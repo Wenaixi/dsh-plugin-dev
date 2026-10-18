@@ -335,3 +335,8 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - 在隔离新实例调试本地插件时直接运行 `pnpm install` 或 `dsh plugin add`，导致依赖被深锁入 `.pnpm` 虚拟快照池，引发“源码修改重构建后宿主继续分发旧代码”的严重假象。
 - 插件设置面板直接堆叠简陋的原生单选框与粗糙表格，条目繁多时缺少即时搜索过滤与原子批量控制工具条。
 - 特权工具仅依赖系统提示词口头约束，未在 `agent/created` 中构建“静态目录物理剥离 (`tools.restrict`) + 运行期动态拦截 (`tools.guard`)”双道物理防线。
+- `peerDependencies` 仅锁定单一窄幅 rc 版本，导致在稍低宿主上被静默从 Profile 的 `bundles` 栈中剔除并引发 `patch: entry not found` 级联失效；未声明 `engines.dsh` 错失官方一等公民门禁。
+- 在单包插件根目录遗留空的 `pnpm-workspace.yaml`，导致 GitHub Actions 缓存探测执行 `pnpm store path` 时抛 `ERROR packages field missing or empty` 阻断 CI。
+- 大版本已决定不兼容旧版，却仍在前端控制器中保留 `legacyCarry` 继承逻辑与旧字段 `unset` 追加，导致单次操作发出 3 条 ops、膨胀 RPC 并加剧 `revision` 乐观锁冲突。
+- 向官方模板生成的 `cordis.patch.yml` 末尾盲目追加条目，与原有的空数组 `[]` 产生顶层 YAML 语法冲突（`YAMLException`）导致宿主引导失败。
+- 隔离实例验收一上来就启动完整 Web 服务占用端口或消耗大模型额度，不知道使用 `dsh --profile <name> --dump-config` 进行零端口、零 Token 的底层装配毫秒级快速检验。

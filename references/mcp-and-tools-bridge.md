@@ -8,7 +8,7 @@
 官方核心包 `@deepseek-ai/dsh-mcp-client` 扮演了**协议转换桥梁**的角色：
 1. 它作为一个独立的插件实例运行，在初始化时与指定的外部 MCP Server 建立连接；
 2. 自动拉取 MCP 服务暴露的工具 Schema，并动态注册到 DSH 统一的 `ctx.tools` 工具运行时中；
-3. 会话和模型在调用工具时，调用请求透明地经由 DSH 工具执行流水线（13 个调度器环节 + 3 个非调度器环节，见 tools.md），再由客户端桥转发至真实的 MCP Server。
+3. 会话和模型在调用工具时，调用请求透明地经由 DSH 工具执行流水线（调度器环节与安全守卫），再由客户端桥转发至真实的 MCP Server。
 
 ```
 ┌─────────────────────────┐
@@ -16,7 +16,7 @@
 └────────────┬────────────┘
              │ 调用 mcp__context7__query_docs
 ┌────────────▼────────────┐
-│   DSH ctx.tools 运行时  │ (经过工具执行流水线：审批、单调 guard 校验)
+│   DSH ctx.tools 运行时  │ (经过工具执行流水线：审批、单调 guard 校验、超时守卫)
 └────────────┬────────────┘
              │
 ┌────────────▼────────────┐
@@ -88,35 +88,69 @@ mcp__<serverName>__<rawToolName>
 
 | 配置字段 | 类型 | 必填 | 官方语义与生产防坑建议 |
 | :--- | :--- | :--- | :--- |
-| `serverName` | string | 是 | 服务的命名空间标识，用于构成工具名前缀。**在同一注册作用域内唯一**（不同 Agent 作用域可复用同名；必须匹配 `^[A-Za-z0-9_-]{1,32}$`）——全局实例与同一 Agent 内重复同名互相排斥（`mcp-client.serverName` 持久保留字）。 |
+| `serverName` | string | 是 | 服务的命名空间标识，用于构成工具名前缀。在同一注册作用域内唯一（不同 Agent 作用域可复用同名；必须匹配 `^[A-Za-z0-9_-]{1,32}$`）。 |
 | `transport` | string | 是 | 通信传输协议，判别联合仅两种：`streamable-http`（现代 HTTP 串流）或 `stdio`（本地子进程管道）。不存在 `sse` 传输。 |
 | `url` | string | 条件 | 当 transport 为 `streamable-http` 时必填。建议配合 `!!js process.env.VAR` 从环境变量中安全注入。 |
 | `command` | string | 条件 | 当 transport 为 stdio 时必填，指定子进程可执行程序（如 `node`、`python`）。 |
 | `args` | string[] | 否 | stdio 子进程的启动参数数组。**严格零 Shell 解释**，不得拼接字符串。 |
 | `toolCallTimeoutMs` | number | 否 | 单次工具调用最大超时毫秒数，默认 `60000` (60秒)。防外部服务假死挂起。 |
-| `failOnStartupError` | boolean | 否 | 默认 `false`：初始连接/工具同步失败时记录错误并跳过该服务器的工具加载，插件与宿主继续运行；若为 `true`，初始失败使该插件实例激活失败（`apply` 抛错），不涉及"阻止宿主崩溃"。 |
+| `failOnStartupError` | boolean | 否 | 默认 `false`：初始连接/工具同步失败时记录错误并跳过该服务器的工具加载，插件与宿主继续运行；若为 `true`，初始失败使该插件实例激活失败。 |
 
 ---
 
-## 五、MCP 工具与单调安全守卫 (Guard) 协同
+## 五、工具执行安全守卫与超时策略协同
 
+### 1. 单调安全守卫 (Guard) 拦截高危工具
 通过 MCP 引入的外部工具同样完全受 DSH 单调守卫体系管控。插件可通过 `ctx.tools.guard` 对 MCP 工具进行细粒度权限拦截：
 
 ```js
 export function apply(ctx) {
   ctx.tools.guard((exec) => {
-    // 匹配特定 MCP 服务下的高危工具
-    // guard 阶段 exec 携带 name / callId / rootCallId / agent / parent / signal / schema（arguments 在守卫判定前已物化并 deepFreeze，可直接用于匹配）
     if (exec.name.startsWith('mcp__database__') && exec.name.endsWith('drop_table')) {
-      return '安全策略阻断：禁止通过 MCP 执行删库操作';
+      return '安全策略阻断：禁止通过 MCP 执行删库操作'
     }
-  });
+  })
 }
 ```
 
+### 2. 工具调用协作式超时策略 (dsh-tool-call-timeout-policy)
+官方核心包 `@deepseek-ai/dsh-tool-call-timeout-policy` 作为 `tools/execute` 的环绕中间件运行：
+- **超时判定与截止时间**：工具可在其 Schema 中声明 `timeoutMs`。超时策略中间件在执行前武装该截止时间，绑定于 `exec.signal`；
+- **结构化结果映射**：一旦超时触发胜出，策略将把结算状态映射为结构化的 `TOOL_TIMEOUT` 错误并直接返回给大模型，避免因外部服务无响应导致 Agent 循环无限挂起；
+- **协作式取消契约**：该策略无法硬杀底层尚未完成的工作流，底层工具必须主动监听并响应 `exec.signal` 的中止信号；若工具无视取消，下游仍会保持等待直到其自行结算。
+
 ---
 
-## 六、其他约束与已知边界
+## 六、持续伪终端 (PTY) 工具接入
+
+普通命令行工具（如 `bash` 或 `pwsh`）执行一次性命令并等待进程退出。但面对常驻服务（开发服务器、长期编译、交互式 REPL）时，必须借助持续 PTY 机制。
+
+### 1. 核心原语与生命周期
+借助 `ctx.terminals`（所属包 `@deepseek-ai/dsh-terminal` + `@deepseek-ai/dsh-terminal-bash`），工具可将长寿命终端暴露给模型：
+- **`spawn(owner, { type, name?, cwd? }, signal)`**：创建长寿命伪终端会话，返回包含会话快照的实体对象；
+- **`read(owner, id, { offset?, count? })`**：非阻塞、同步返回最近 scrollback 的快照窗口，offset 为非负相对偏移；
+- **`startSend(owner, id, { text, submit, signal? })`**：向 PTY 发送输入。同一时刻同一会话只允许一个活动的 send，并发调用抛出 `SEND_ACTIVE` 错误；
+- **`signal(owner, id, signal)`**：向终端进程组投递 POSIX 真实信号（如 `SIGINT`、`SIGTERM`），实现优雅收敛；
+- **`kill(owner, id, reason?)`**：销毁终端会话并回收底层系统句柄。
+
+---
+
+## 七、团队协同工具桥接 (Agent Teams Tools Bridge)
+
+在多智能体协同场景中，官方包 `@deepseek-ai/dsh-experimental-tool-agent-team` 将底层 `ctx.agentTeams` 封装为一套完整的模型侧团队交互工具：
+
+| 工具名称 | 核心入参 | 职责与官方行为规范 |
+| --- | --- | --- |
+| `spawn_teammate` | `{ name, preset, role?, writeScopes? }` | 生成指定命名与角色的队友。支持划分物理写入作用域 (`write_scopes`)，避免并发写冲突。 |
+| `send_message` | `{ targetAgentId, content, metadata? }` | 向指定队友投递点对点信件，写入持久化收件箱；若目标处于冷态，系统将自动唤醒。 |
+| `list_agents` | `{ scope?: 'children' | 'descendants' }` | 列出当前团队所有队友的运行状态（`running`、`inactive` 等）与层级拓扑。 |
+| `wait_agent` | `{ agentId, timeoutMs? }` | 异步等待指定队友完成阶段性任务，安全收集其输出并解除阻塞。 |
+| `interrupt_agent` | `{ agentId }` | 对正在执行失控任务的队友投递紧急中断信号。 |
+| `team_task_*` | `create` / `list` / `get` / `update` | 协作维护团队共享任务 DAG 看板。更新时强制校验 `expected_revision` CAS 版本号。 |
+
+---
+
+## 八、其他约束与已知边界
 
 - **工具公开名规范化**：公开名超过 64 字符或含非 `[A-Za-z0-9_-]` 字符时，做确定性规范化（非法字符替换为 `_`、超长截断），并追加 12 位十六进制 SHA-256 哈希（对 `serverName\0rawName` 取摘要），保证不同 MCP 身份不会塌缩成同名。
 - **reconnect 指数退避**：默认为 `enabled: true`、`initialDelayMs: 500`、`maxDelayMs: 30000`、`maxAttempts: 10`；连续失败达到上限后注销已注册工具，需重载插件或重启宿主。
@@ -124,20 +158,16 @@ export function apply(ctx) {
 
 ---
 
-
-### 4.3 v0.2.1 持续终端与团队协同工具桥接
-
-在 DSH v0.2.1 中，工具系统新增了长连接持续伪终端与团队协同工具的注册机制：
-- **持续终端工具** (`tool-pwsh-persistent` / `tool-bash-persistent`)：通过 PTY seam 与调用方会话建立唯一映射，保持长驻变量与进程；
-- **调用超时与熔断策略** (`dsh-tool-call-timeout-policy`)：统一规范工具调用的正整数毫秒预算，超时平滑转入后台作业而不是粗暴终止；
-- **团队工具桥接** (`dsh-experimental-tool-agent-team`)：为 Team Lead 动态暴露 `spawn_teammate`，为全体成员暴露 `send_message`、`wait_agent` 与 `team_task_*` 看板工具。
-
 ## 相关 DSH 源码
 
 上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
 packages/mcp/mcp-client  <-  @deepseek-ai/dsh-mcp-client@0.2.1-rc.2
+packages/guard/timeout-policy  <-  @deepseek-ai/dsh-tool-call-timeout-policy@0.2.1-rc.2
+packages/terminal/terminal  <-  @deepseek-ai/dsh-terminal@0.2.1-rc.2
+packages/terminal/terminal-bash  <-  @deepseek-ai/dsh-terminal-bash@0.2.1-rc.2
+packages/experimental/tool-agent-team  <-  @deepseek-ai/dsh-experimental-tool-agent-team@0.2.1-rc.2
 ```

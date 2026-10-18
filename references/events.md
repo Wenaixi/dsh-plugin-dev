@@ -10,8 +10,8 @@ DSH 构建于 Cordis 事件总线之上。Cordis 提供五种严格区分同步/
 
 | 模式名称 | 源码调度算法与返回值 | 适用场景与核心语义 |
 | --- | --- | --- |
-| `emit` | 同步顺序通知，返回 `void`，不等待 Promise | 纯状态广播与无返回值通知（如 `skills/change`、`agent/disposed`） |
-| `waterfall` | **同步环绕中间件 (Around-Middleware)**<br>监听器接收 `(...args, next)`，外层先调，内部调 `next()` 驱动下游，返回最终值 | 拦截器、请求管道、动态上下文过滤与参数/结果整体替换。**绝非简单顺序传值链**！不调 `next()` 即短路。 |
+| `emit` | 同步顺序通知，返回 `void`，不等待 Promise | 纯状态广播与无返回值通知（如 `skills/change`、`plan/change`、`goal/changed`、`agent/disposed`） |
+| `waterfall` | **同步环绕中间件 (Around-Middleware)**<br>监听器接收 `(...args, next)`，外层先调，内部调 `next()` 驱动下游，返回最终值 | 拦截器、请求管道、动态上下文过滤、文件变更意图门禁（`fs/write-intent`）。**绝非简单顺序传值链**！不调 `next()` 即短路。 |
 | `parallel` | `Promise.allSettled` 并发等待**全部 settle**<br>返回 `Promise<void>`（**绝非结果数组**） | 异步资源关闭与并发收敛通知（如 `workspace/session-stop`）。若有失败项，全部 settle 后汇总抛出 `AggregateError`。 |
 | `serial` | 串行依次 `await`，直到遇到首个 bail 值即短路返回<br>返回 `Promisify<ReturnType>`（**绝非结果数组**） | 异步短路链、优先处理者决策链（首个非 null/非 false/非 undefined 的 bail 值胜出）。 |
 | `bail` | 同步按序调用，遇到首个 bail 值即同步短路返回<br>返回 `ReturnType` | 同步优先级匹配、首个命中即停的决策链。 |
@@ -48,9 +48,18 @@ export function isBailed(value: any) {
 | --- | --- | --- |
 | `workspace/session-activity` | **waterfall** | `({ sessionId }, next)`：Workspace 归档会话前询问活跃状态。四大活动族（`turn`、`subagent`、`job`、`schedule`）通过 `next()` 合并入数组。若数组非空，Workspace 立即拒绝归档。 |
 | `workspace/session-stop` | **parallel** | 会话归档或强制停止时并发派发。各子系统以用户自身的停止方式取消当前活跃活动（如丢弃排队收件箱，记录 inbox splice）。宿主捕获 `AggregateError` 后逐条 `logger.warn`，归档不被中止，不向调用方抛出。 |
-| `plan/mode` | **双重机制** | 持久化层为仅记日志的 SessionEvent `plan/mode`（整值替换）；运行时通过 `ctx.sessionProjections`（SessionProjectionRegistry）注册的 `plan` 单元推导 `{ active, pending }` 视图。注：`plan/mode` 事件本身不进模型 transcript，但带消息后缀的 `/plan <text>` 会经 `agent.steer()` 成为一条用户消息进入历史（不带附件的 `/plan` / `/plan off` 留在历史之外）。 |
+| `plan/mode` | **双重机制** | 持久化层为仅记日志的 SessionEvent `plan/mode`（整值替换）；运行时通过 `ctx.sessionProjections`（SessionProjectionRegistry）注册的 `plan` 单元推导 `{ active, pending }` 视图。带消息后缀的 `/plan <text>` 会经 `agent.steer()` 成为一条用户消息进入历史。 |
+| `plan/change` | **emit** | 计划模式状态发生变动时在运行时广播（如计划开启、提交审核、用户反馈或退出），载荷为 `{ agentId, active, pending, plan? }`。UI 层和协同组件据此同步刷新规划面板。 |
+| `goal/change` | **持久化驱动** | 目标状态全量快照变更事件。每次调用 `ctx.goals` 变更目标状态时，先向会话日志仅追加一条携带完整后置快照的 `goal/change` SessionEvent。 |
+| `goal/changed` | **emit** | 目标数据发生变化时的运行时广播，载荷为当前目标快照 `GoalView`（包含 `id`, `revision`, `phase`, `objective`, `blockedReason` 等）。 |
+| `goal/activation-changed` | **emit** | 目标进程内激活态切换广播，载荷为 `{ goalId, activation: 'armed' | 'disarmed' }`。进程冷启动或 `agent/created` 时自动进入 `disarmed` 态。 |
+| `agent-team/message` | **serial / emit** | 团队内点对点消息投递与通知事件（所属包 `@deepseek-ai/dsh-experimental-agent-team`）。载荷包含发信方、目标队友 ID、消息正文与元数据，驱动队友收件箱接收信件并唤醒冷藏队友。 |
+| `fs/observe` | **emit** | 工具层执行合法文件读取（如 `read`）成功后派发，用于建立或刷新观察网关的内存指纹记录。载荷包含调用者所有者 `owner`、标准化路径与复合版本指纹。 |
+| `fs/observed` | **emit** | 文件观察记录成功写入网关弱引用表后的确认通知，载荷为已登记的最新文件元数据。 |
+| `fs/write-intent` | **waterfall** | 写入意向环绕中间件。在 `write` 工具执行物理落盘前触发，观察策略网关拦截并校验目标文件此前是否已被合法读取、当前物理版本是否匹配。未读抛出 `FS_NOT_OBSERVED`，版本漂移抛出 `FS_STALE_VERSION`。 |
+| `fs/edit-intent` | **waterfall** | 编辑意向环绕中间件。在 `edit` 工具替换文本前拦截，严格校验目标文件的复合版本指纹与观察记录。 |
 | `skills/change` | **emit** | 技能注册表发生变动（增删改）时的全局失效广播，不带 diff。消费方收到后应重新调用 `ctx.skills.list()`。 |
-| `agent/created` | **serial** | 活动 Agent 实例创建时广播（真实生命周期事件；当前核验版本未发现 `ready` 事件；使用前请按目标版本复核）。 |
+| `agent/created` | **serial** | 活动 Agent 实例创建时广播，携带 `{ agent }` 句柄。常用于初始化会话级内存缓存（如重置目标的 `disarmed` 态）。 |
 | `agent/disposed` | **emit** | Agent 实例销毁时广播（宿主防御性隔离，监听器抛错仅记日志）。 |
 
 ---
@@ -60,7 +69,7 @@ export function isBailed(value: any) {
 在 DSH 会话存储层中，日志通常以仅追加（Append-Only）的 `SessionEvent` 形式持久化。事件目录、存储格式与生成方式属于版本实现，数量和类型以目标版本的持久化目录或运行时定义为准。
 
 ### 1. 表面事件 (SurfaceEventType，严格 5 大类)
-在当前核验的事件模型中，以下几类事件被视为模型可见表面节点；具体集合以目标版本类型定义为准：
+在当前核验的事件模型中，以下 5 类事件被视为模型可见表面节点：
 1. `system/message`：系统消息；
 2. `developer/message`：开发者指令；
 3. `user/message`：用户输入；
@@ -68,18 +77,21 @@ export function isBailed(value: any) {
 5. `tool/result`：工具执行结果。
 
 ### 2. `surfaceOp` 操作语义
-只有上述 5 类表面事件允许携带 `surfaceOp`，其余 54 个事件在类型定义中强制 `surfaceOp?: never`：
+只有上述 5 类表面事件允许携带 `surfaceOp`，其余所有会话事件在类型定义中强制 `surfaceOp?: never`：
 - `'append'`：向当前模型上下文表面末尾追加节点；
 - `{ op: 'replace', startSeq: SessionSeq, endSeq: SessionSeq }`：用于会话压缩（Compaction）与历史修剪，声明被替换的表面事件序号范围，被遮蔽节点不再进入模型上下文。
 
 ### 3. `ignorable` 向前兼容性契约
 - **缺席 = 必需 (Required)**！
-- 当反序列化器读取会话日志时，如果遇到不在已知 59 个类型集合中的事件：
+- 当反序列化器读取会话日志时，如果遇到不在已知类型集合中的未知事件：
   - 若该事件**未携带** `ignorable: true`，反序列化器**必须抛出异常并拒绝重建会话 (fail-fast)**，防止因静默丢失关键事件造成状态推导错误；
   - 若该事件标记了 `ignorable: true`，则视为安全的向前兼容扩展，仅作为日志存储保留，跳过表面重建。
 
-### 4. 事件结构变更的核验
-若目标版本提供事件目录指纹或生成校验，应把它当作实现侧的变更检测机制；字段、可选性、顺序和指纹算法必须直接查看生成器或类型实现，不能从本节推断固定算法。
+### 4. 关键持久化机制事件清单
+- **`goal/change`**：版本号为 1 的目标快照持久化事件。携带完整的目标定义与版本号，会话回放时通过折叠（Fold）直接重构出最新 `GoalView`；
+- **`plan/mode`**：整值替换日志事件，记录计划模式的开启、关闭与待审阅计划正文；
+- **`image/offload`**：多模态图像外部转储事件，记录被紧凑占位符替换的陈旧图片信息；
+- **`tool/call`**：顶级工具派发前检查点事件，分配唯一的不可变 `callSeq`。
 
 ---
 
@@ -118,8 +130,6 @@ ctx.on('some/hook', async (payload, next) => {
 })
 ```
 
-判据：这段插件的失败**是否应该让整个宿主跟着失败**？绝大多数情况答案是否，那就必须隔离。
-
 ---
 
 ## 五、事件监听代码实战
@@ -128,29 +138,28 @@ ctx.on('some/hook', async (payload, next) => {
 export const inject = ['tools']
 
 export function apply(ctx) {
-  // 1. 同步广播监听（注意：`ready` 事件不存在；真实生命周期事件是 `agent/created`）
-  const unbindReady = ctx.on('agent/created', ({ agent }) => {
-    ctx.logger('my-plugin').info('Agent 已创建: ' + agent.id)
+  // 1. 同步状态变更广播监听
+  ctx.on('goal/changed', (goalView) => {
+    ctx.logger('my-plugin').info(`目标状态更新: [${goalView.phase}] ${goalView.objective}`)
   })
 
-  // 2. waterfall 环绕中间件（拦截工具前置决策）
+  // 2. 计划模式变动广播监听
+  ctx.on('plan/change', ({ agentId, active, pending }) => {
+    ctx.logger('my-plugin').info(`Agent ${agentId} 计划模式状态: active=${active}, pending=${pending}`)
+  })
+
+  // 3. waterfall 环绕中间件（拦截工具前置决策）
   ctx.waterfall('tools/pre-execute', async (exec, next) => {
-    // 检查是否受保护
     if (exec.name === 'dangerous_tool') {
-      // 短路拦截，不再调用下游
-      return { kind: 'deny', reason: '此工具已被策略拦截' }
+      return { kind: 'deny', reason: '安全策略阻断：禁止执行受保护工具' }
     }
-    // 正常放行至下游监听器
     return next()
   })
 
-  // 3. 监听会话活动检测
-  ctx.waterfall('workspace/session-activity', (target, next) => {
-    const list = next() || []
-    if (hasPendingJob(target.sessionId)) {
-      list.push({ kind: 'job', items: [{ id: 'my-job-1' }] })
-    }
-    return list
+  // 4. 监听文件读写观察意向 (fs/write-intent)
+  ctx.waterfall('fs/write-intent', (intent, next) => {
+    ctx.logger('my-plugin').debug(`收到写入意向: ${intent.targetKey}`)
+    return next()
   })
 }
 ```
@@ -163,7 +172,12 @@ export function apply(ctx) {
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
-packages/core/session  <-  @deepseek-ai/dsh-session@0.2.0-rc.2
-packages/session/session-persistence  <-  @deepseek-ai/dsh-session-persistence@0.2.0-rc.2
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
+packages/core/session  <-  @deepseek-ai/dsh-session@0.2.1-rc.2
+packages/session/session-persistence  <-  @deepseek-ai/dsh-session-persistence@0.2.1-rc.2
+packages/goal/goal  <-  @deepseek-ai/dsh-goal@0.2.1-rc.2
+packages/plan/plan-mode  <-  @deepseek-ai/dsh-plan-mode@0.2.1-rc.2
+packages/fs/fs  <-  @deepseek-ai/dsh-fs@0.2.1-rc.2
+packages/fs/fs-observation-policy  <-  @deepseek-ai/dsh-fs-observation-policy@0.2.1-rc.2
+packages/experimental/agent-team  <-  @deepseek-ai/dsh-experimental-agent-team@0.2.1-rc.2
 ```

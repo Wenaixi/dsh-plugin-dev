@@ -98,10 +98,22 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - **Web 界面热安装与发布冷却期静默降级**：用户在运行中实例界面点击「+ 添加插件」输入裸包名时，因 pnpm 默认开启 24 小时发布冷却期（`minimumReleaseAge: 1440`），不满 24 小时的新版本被排除，静默降级安装已过冷却期的旧版（产生“明明发了修复但实测依然复现旧 bug”的严重误诊）；安装指引必须强制带精确版本号（自动登记 `minimumReleaseAgeExclude` 豁免名单），测试环境配置 `minimumReleaseAge: 0`。详见 [install-resolution-traps.md](references/install-resolution-traps.md) §九。
 - **多插件环境纯脚本升级构建脚本隔离 (`--ignore-scripts`)**：复杂 profile 中常混装其他含原生 C++ 绑定的第三方插件；更新纯 JS/TS 插件时 pnpm 默认会检查并重跑工作区所有依赖的生命周期构建脚本，在缺少编译环境的主机上报 `ERR_PNPM_EXECUTOR_LIFECYCLE_SCRIPT_FAILED` 连带阻断更新；纯脚本插件安装/升级必须追加 `--ignore-scripts` 物理隔离，且插件自身严禁滥用 `postinstall` 钩子。详见 [install-resolution-traps.md](references/install-resolution-traps.md) §十。
 
+- **Schemastery 易变字段访问器模式与递归解包铁律 (Volatile Accessor Pattern)**：在 Schemastery 3.18.5+ 中，标记为 `volatile` 的 Schema 字段经 `Config(raw)` 校验后返回的是带有 `[Symbol(cosmokit.volatile.write)]` 与 `get: [Function]` 的只读响应式访问器对象，而非原始标量；单测与业务逻辑严禁直接对解析结果做标量恒等断言（`assert.equal(resolved.field, 'literal')`），必须通过通用的 `unwrapLazy` 多级解包函数（兼顾函数闭包与对象访问器）提取真实值。详见 [config.md](references/config.md) §十一。
+- **CI 纯净容器编译与单测依赖显式声明铁律 (CI Peer Dependency Reflection Rule)**：上游底座包编译产物（如 `lib/index.js`）直接引用的同族依赖（如 `@deepseek-ai/dsh-scope`），在本地因父级或全局缓存往往能静默解析，但在 GitHub Actions 等开启 `legacy-peer-deps=true` 的纯净 CI 容器中不会被 `npm ci` 自动补全。脱机单测或编译期直接引用的包，必须显式在 `package.json.devDependencies` 中登记并锁定在 `package-lock.json` 中，杜绝「本地能跑、云端报 ERR_MODULE_NOT_FOUND」的跨端假象。详见 [ci-release-workflow.md](references/ci-release-workflow.md) §四。
+- **宿主微内核对等依赖生命周期区间铁律 (Host Peer Semver Range Syntax)**：DSH 微内核在加载 Profile 时会对插件 `peerDependencies` 执行严格版本校验。严禁将对等依赖过度收窄至某一特定小版本或 RC（如 `^0.2.1-rc.2`），否则相近的相邻版本宿主（如 `0.2.0-rc.2`）会在启动时物理禁用该插件行（报 `Plugin ... is incompatible with dsh ...`）；必须采用跨越生命周期的标准区间语法（如 `>=0.2.0-rc.2 <0.3.0-0`），兼顾向前对齐与平滑兼容。详见 [ci-release-workflow.md](references/ci-release-workflow.md) §五。
+- **隔离实例官方模板自动派生铁律 (Shipped Profile Auto-Initialization)**：在临时 `DSH_HOME` 下初始化官方自带模板（`web`、`desktop`、`tui`）时，直接运行 `dsh <shipped> --dump-config` 即可自发完成标准初始化；严禁向官方内建模板追加 `--from-default-profile` 参数（宿主直接报错 `profile "..." is shipped and cannot be a custom profile target`）；`--from-default-profile` 仅允许在目标是自定义命名的 profile 时使用。详见 [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §7.1。
+- **自动化隔离验收动态端口与代理豁免铁律 (Ephemeral Port & Loopback Proxy Bypass)**：端到端验收脚本严禁硬编码端口（如 3099/3088，极易因前次残留或系统服务占用报 `listen EADDRINUSE` 崩溃），必须使用 Node `net.createServer().listen(0)` 向操作系统动态申请保底空闲端口；在 Windows 环境下动态导入绝对路径必须经 `pathToFileURL` 转换为 `file://` 协议（杜绝 `ERR_UNSUPPORTED_ESM_URL_SCHEME`）；且探针测试时必须注入 `NO_PROXY=127.0.0.1,localhost`，防范外部代理劫持本地回环端口导致握手超时。详见 [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §7.2、§7.3。
+
 ## 场景路由
 
 | 需求或症状 | 先读 |
 | --- | --- |
+| Schemastery 3.18.5+ volatile 字段单测报 Expected values to be strictly equal: + { [Symbol]: [Function], get: [Function] } - 'val' | [config.md](references/config.md) §十一 |
+| 本地测试全绿但 GitHub Actions CI 容器单测报 Cannot find package '@deepseek-ai/dsh-scope' 或 ERR_MODULE_NOT_FOUND | [ci-release-workflow.md](references/ci-release-workflow.md) §四 |
+| DSH 宿主启动日志提示 disabling profile plugin row: Plugin ... is incompatible with dsh ... 插件行被禁用 | [ci-release-workflow.md](references/ci-release-workflow.md) §五 |
+| 临时 DSH_HOME 初始化 web profile 报错 profile "web" is shipped and cannot be a custom profile target | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §7.1 |
+| 自动化验收脚本启动 Web 实例报 listen EADDRINUSE: address already in use 端口冲突 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §7.2 |
+| Windows 下自动化脚本动态 import 报 ERR_UNSUPPORTED_ESM_URL_SCHEME 或本地探测连接超时被系统代理劫持 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §7.3 |
 | Web 界面热安装刚发布的补丁包依然复现旧 Bug、pnpm 发布冷却期静默降级 | [install-resolution-traps.md](references/install-resolution-traps.md) §九 |
 | 多插件 Profile 升级纯 JS 插件报不相干的原生依赖构建失败、ERR_PNPM_EXECUTOR_LIFECYCLE_SCRIPT_FAILED | [install-resolution-traps.md](references/install-resolution-traps.md) §十 |
 | 点击插件卡片展开详情界面瞬间崩溃卡死、CPU 100%、useSyncExternalStore 未缓存死循环 | [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md) §九 |

@@ -539,6 +539,32 @@ const ok = await this.form.mutate(
 ### 13.3 批量全开/全关操作原子提交
 无论列表有多少项，批量操作必须在内存中一次性计算出全量变动数组，平铺为单次 `form.mutate(3-ops, revision)` 提交，绝对禁止遍历循环派发多次 mutate 竞争宿主 revision 乐观锁。
 
+
+---
+
+## 十四、无历史兼容包袱的纯净原子批处理范式 (The Pure Flattening Pattern: Decoupling from Legacy Baggage)
+
+第十三节描述的是多轴复杂开关演进到一元化单开关时的**向后兼容过渡态（Backward-Compatible 3-Ops Batching）**。在该阶段，为了兼顾老用户的平滑迁移，客户端每次操作都会额外追加历史字段的 unset 操作（例如 1 条 set + 2 条旧表 unsets = 3 ops），并在内存中通过 `legacyCarry` 继承旧表项。
+
+然而，**当插件经过充分的版本过渡、或者明确决定升级主版本（Major Release）彻底不再兼容旧版时**，继续保留这种兼容层就会蜕变为高危技术债务。
+
+### 14.1 拖带历史兼容包袱的三重税负 (The Triple Tax)
+1. **RPC 负载冗余膨胀 200%**：单开关哪怕只改动一个项，每次点击也必须发射 3 条 operations，浪费网络与进程间通信带宽；
+2. **乐观并发锁碰撞截面扩大**：在连续快速点击或多组件交互下，不相干的旧表 unset 操作会平白增加宿主 `revision` 乐观锁冲突与状态撕裂（State Tearing）的概率；
+3. **状态机与测试代码复杂度倍增**：控制器必须在内存中维护 `legacyActive`、`legacyCarry` 以及多张表的并集计算逻辑，单测必须为“旧表存在但新表空”、“新表有值但旧表也有值”等各种过渡态编写大量陈旧测试，拖慢重构节奏。
+
+### 14.2 纯净平铺原子批处理（Pure Flattening Pattern）核心原则
+1. **物理拔除废弃字段声明**：主版本升级时，在 `Config` Schema 与类型接口中彻底删除旧字段，仅保留当前单一事实源字典（如 `disabled: Record<string, boolean>`）；
+2. **单项操作 Payload 压缩至 1 条 (True 1-Op Mutation)**：
+   - 关闭项：`{ op: 'set', path: [FIELD, itemName], value: true }`；
+   - 开启项：`{ op: 'unset', path: [FIELD, itemName] }`；
+   - 坚决不发射任何旧字段的 unset，RPC 负载直降 66%；
+3. **批量操作精准平铺为 N 条 (N-Ops Single Atomic Batch)**：
+   - 全部开启或全部关闭时，将当前列表包含的 N 个条目在内存中拍平为数组，单次调用 `form.mutate(allOps, revision)` 提交，操作数量严格等于 N 条，不多一条无用操作；
+4. **旧表绝缘防线（Legacy Isolation Gate）**：
+   - 读取端纯粹从唯一字典提取有效项，即使外部配置残存旧字段也严格忽略、绝不回退合并；
+   - 静态门禁增加全仓扫描断言，铁腕拦截任何试图在客户端重新引入旧字段引用或 `LEGACY_FIELDS` 的行为。
+
 ---
 
 ## 相关 DSH 源码

@@ -710,6 +710,86 @@ export const Config = Schema.object({
 | **原型链攻击防御** | 需在 transform 回调里小心处理 | 统一经 `Object.create(null)` 纯函数集中防御，零污染 |
 | **代码可测试性** | 强依赖 Cordis/Schemastery 容器环境 | 纯函数零依赖，纯 Node 环境毫秒级脱机单测 |
 
+## 十一、Schemastery 3.18.5+ 易变字段访问器模式与多级递归解包契约 (Volatile Accessor Pattern)
+
+### 11.1 机制演进与对象包装现象
+
+在最新版 `@deepseek-ai/schemastery@~3.18.5`（随 DSH 0.2.1-rc.2 引入）中，标记为 `volatile` 的 Schema 字段在运行时数据流中发生了重大契约演进：
+- 经过 `Config(rawInput)` 校验并赋予默认值后，易变字段在返回的对象中**不再以纯字面量（Primitive Scalar）直接呈现**；
+- 而是被封装为内部带有只读响应式访问器与底层标记符号的对象：
+  ```javascript
+  {
+    [Symbol(cosmokit.volatile.write)]: [Function: [cosmokit.volatile.write]],
+    get: [Function: get]
+  }
+  ```
+
+### 11.2 单测与运行时假失败陷阱
+
+当开发者在单元测试或运行时逻辑中直接比对配置默认值或读取解析结果时：
+```typescript
+const resolved = Config({})
+// 致命陷阱：在 Schemastery 3.18.5+ 下抛出严格断言异常！
+assert.equal(resolved.myMode, 'standard')
+```
+会触发如下报错：
+```text
+Expected values to be strictly equal:
++ actual: {
++   [Symbol(cosmokit.volatile.write)]: [Function],
++   get: [Function: get]
++ }
+- expected: 'standard'
+```
+若直接把该对象传给期望接收字符串的底层 I/O 函数，还会连带引发 `TypeError [ERR_INVALID_ARG_TYPE]` 级联崩溃。
+
+### 11.3 跨插件通用的多级递归解包纯函数 (Universal unwrapLazy)
+
+为了让插件在宿主从旧版平滑升级到 Schemastery 3.18.5+ 时保持 100% 稳固兼容，严禁在业务逻辑中直接假设易变字段恒为标量；必须在配置读取与测试断言边界统一通过通用的纯函数 `unwrapLazy` 进行防御性展开：
+
+```typescript
+/**
+ * 跨插件通用的多级懒求值与响应式访问器解包纯函数。
+ * 兼容旧版的无参函数闭包与 Schemastery 3.18.5+ 的对象型 get() 访问器。
+ *
+ * @param raw 原始候选值（可能是标量、函数闭包或访问器包装对象）
+ * @param defaultValue 当值为空、未定义或求值异常时的保底默认值
+ * @returns 展开后的最终标量或数据实体
+ */
+export function unwrapLazy<T>(raw: unknown, defaultValue: T): T {
+  let value: unknown = raw
+  for (let i = 0; i < 4; i += 1) {
+    if (typeof value === 'function') {
+      try {
+        value = (value as () => unknown)()
+      } catch {
+        return defaultValue
+      }
+    } else if (
+      value &&
+      typeof value === 'object' &&
+      typeof (value as { get?: unknown }).get === 'function'
+    ) {
+      try {
+        value = (value as { get: () => unknown }).get()
+      } catch {
+        return defaultValue
+      }
+    } else {
+      break
+    }
+  }
+  return value === undefined || value === null ? defaultValue : (value as T)
+}
+```
+
+#### 准入与测试守则：
+1. **测试断言必须经 `unwrapLazy` 解包**：断言 `Config` 默认值时，使用 `assert.equal(unwrapLazy(resolved.field, 'default'), 'default')`，严禁直连标量恒等比对；
+2. **状态机与持久化前置解包**：自愈器提取字典、宿主 settings 更新以及持久化 YAML 渲染前，统一执行解包，杜绝包含 `[Symbol]` 的复杂对象被静默序列化为损坏字符串；
+3. **有界解包防死循环**：循环解包上限严格钉死为 4 次，并在 catch 块中优雅回退至保底默认值，杜绝循环依赖或异常抛出阻断宿主引导。
+
+---
+
 ## 相关 DSH 源码
 
 上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。

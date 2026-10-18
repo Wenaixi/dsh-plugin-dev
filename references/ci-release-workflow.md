@@ -77,3 +77,97 @@ apps/cli  <-  @deepseek-ai/dsh@0.2.0-rc.2
 - **最佳工程实践**：
   - 在 PowerShell / pwsh 下传递包含 `|` 的参数时，**统一使用单引号包裹**：`gh repo edit --description 'A | B'`；
   - 若在模板字符串中动态拼接，优先使用反引号（`` `| ``）进行显式转义。
+
+## 四、CI 纯净容器编译与单测对等依赖缺失陷阱 (CI Clean Container Peer Dependency & Scope Resolution Trap)
+
+### 3. 单包插件工程的 CI 缓存踩坑与工作区声明隔离（The Empty Workspace File Trap）
+- **典型症状**：在 GitHub Actions 流水线中，构建任务在刚进入 `actions/setup-node@v4`（配置了 `cache: pnpm`）时瞬间崩溃退出（Exit Code 1），日志报错：  
+  ` ERROR  packages field missing or empty`  
+  `For help, run: pnpm help store`  
+  导致流水线连 `pnpm install` 步骤都未开始就地暴毙。
+- **根因分析**：本地在执行 `pnpm update` 或某些依赖维护命令时，pnpm 可能在单包工程根目录自动生成了一个默认但空的 `pnpm-workspace.yaml`。若开发者未加甄别随 Git commit 提交到了远程，GitHub Actions 的 `actions/setup-node` 插件在检测到根目录存在 `pnpm-workspace.yaml` 时，会强制以 monorepo 多包工作区模式执行 `pnpm store path --silent` 来探测缓存目录；而因为该文件没有合法的 `packages:` 声明，pnpm 的 store 查询命令立刻抛错拒绝执行。
+- **最佳工程实践**：
+  - 单包（Single Package）DSH 插件工程**严禁提交无有效 packages 声明的 `pnpm-workspace.yaml`**；
+  - 本地维护依赖后，执行 `git status` 必须严格审查是否有意外生成的 `pnpm-workspace.yaml`，若有必须立即物理删除（`git rm -f pnpm-workspace.yaml`）；
+  - 单包工程应保持根目录纯净，仅保留 `package.json` 与 `pnpm-lock.yaml`。
+### 4.1 典型症状与跨端假象
+
+在本地开发机执行 `npm test` 全部通过，一旦推送到 GitHub Actions 远程 Ubuntu Runner（`npm ci` + `npm test`）却在单测启动阶段瞬间崩溃：
+```text
+# Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@deepseek-ai/dsh-scope' imported from /home/runner/work/.../node_modules/@deepseek-ai/dsh-skill/lib/index.js
+#   code: 'ERR_MODULE_NOT_FOUND'
+```
+
+### 4.2 深度根因分析
+
+1. **宿主注入 vs 脱机单测脱节**：
+   - 在生产或真实 DSH 运行时中，`@deepseek-ai/dsh-scope` 或类似的基础底座包是由宿主运行时作为单例容器全局提供的；
+   - 但在脱机单元测试中（例如 Provider 行为单测），测试直接以纯 Node.js ESM 模式加载编译产物，依赖链条直接击穿到底层源码。
+2. **内部隐式直接引用**：
+   - 上游底座包（如 `@deepseek-ai/dsh-skill`）在其已发布的编译产物 `lib/index.js` 顶层直接写着：
+     ```javascript
+     import { NamedEntries, ScopedLayers, scopeChainOf, scopeOf } from "@deepseek-ai/dsh-scope";
+     ```
+3. **npm ci 与 legacy-peer-deps 的深层拦截**：
+   - DSH 插件为了避免复杂的对等依赖递归冲突，通常在 `.npmrc` 中配置了 `legacy-peer-deps=true`；
+   - 在本地机器上，开发者先前调试或全局安装过宿主，包通常已被缓存或存在于上层目录中（假阳性）；
+   - 但在 GitHub Actions 的全新干净 Ubuntu 容器中，`npm ci` 只会严格安装 `package-lock.json` 中登记的直接依赖，不会自动为对等依赖拉取深层关联包，导致运行时解析瞬间爆出 `ERR_MODULE_NOT_FOUND`。
+
+### 4.3 黄金工程规范：构建与测试对等依赖显式声明
+
+- **核心铁律**：**凡是在本地编译（tsc）或单测运行时链路中会被直接 import 的包，严禁仅寄希望于宿主注入，必须显式在 `package.json.devDependencies` 中登记，并完整同步至 `package-lock.json`**。
+- **配置示例**：
+  ```json
+  {
+    "peerDependencies": {
+      "@deepseek-ai/cordis": ">=4.0.4 <5.0.0",
+      "@deepseek-ai/dsh-skill": ">=0.2.0-rc.2 <0.3.0-0",
+      "@deepseek-ai/schemastery": ">=3.18.4 <4.0.0"
+    },
+    "devDependencies": {
+      "@deepseek-ai/cordis": "^4.0.5",
+      "@deepseek-ai/dsh-skill": "^0.2.1-rc.2",
+      "@deepseek-ai/dsh-scope": "^0.2.1-rc.2",
+      "@deepseek-ai/schemastery": "^3.18.5"
+    }
+  }
+  ```
+- 锁文件同步命令必须带 `--package-lock-only`，确保开发依赖与版本声明零差异入锁：
+  ```bash
+  npm i --package-lock-only
+  ```
+
+---
+
+## 五、宿主微内核对等依赖严格版本门禁规则 (DSH Host Peer Dependency Semver Gate Rule)
+
+### 5.1 宿主版本拦截机制
+
+DSH 微内核在引导 profile（`prepareProfile` / `loadProfileDirectory`）时，会对所有声明式插件行的 `peerDependencies` 与当前宿主自身的实际版本执行严格语义化版本（Semver）校验。
+
+一旦插件声明的 `peerDependencies` 下限高于当前运行的宿主版本，宿主加载器会在启动阶段**无情执行静默或警告级物理禁用**：
+```text
+dsh: disabling profile plugin row "<rowId>": Plugin <name>@<version> is incompatible with dsh 0.2.0-rc.2: peerDependencies {"@deepseek-ai/dsh-skill":"^0.2.1-rc.2"}.
+Running it may cause crashes or data loss. Update the plugin or install a plugin version compatible with this dsh runtime.
+```
+此时宿主虽然可能继续启动，但插件行被物理标记为 disabled，服务不注册、界面不挂载，表现为极其隐蔽的功能完全失效。
+
+### 5.2 最佳声明实践：生命周期跨度版本区间 (Range Syntax)
+
+为了让插件既能充分享受最新小版本引入的修复和新能力，又不会在相近小版本（如 RC 迭代期）被宿主直接当作不兼容而禁用：
+- **反模式（过度收窄）**：`"@deepseek-ai/dsh-skill": "^0.2.1-rc.2"`（在 0.2.0-rc.2 宿主上直接被物理禁用）；
+- **反模式（远古宽松包袱）**：`"@deepseek-ai/dsh-skill": ">=0.0.1-rc.1 <0.3.0-0"`（允许远古老版本，迫使代码充斥降级垫片）；
+- **标准范式（生命周期区间）**：
+  ```json
+  {
+    "peerDependencies": {
+      "@deepseek-ai/cordis": ">=4.0.4 <5.0.0",
+      "@deepseek-ai/dsh-skill": ">=0.2.0-rc.2 <0.3.0-0",
+      "@deepseek-ai/schemastery": ">=3.18.4 <4.0.0"
+    }
+  }
+  ```
+- **设计判据**：
+  1. 彻底斩断远古已废弃的大版本包袱（如 0.0.x / 0.1.x）；
+  2. 下限设为当前核心架构定型时的基准 RC 版本（如 `0.2.0-rc.2`）；
+  3. 上限严格卡死在下一次重大架构重构前（如 `<0.3.0-0`），平滑承接宿主小版本补丁更新。

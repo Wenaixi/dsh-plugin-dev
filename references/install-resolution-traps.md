@@ -481,24 +481,158 @@ pnpm add <scope>/<pkg>@<version> --ignore-scripts
 
 ---
 
-## 十一、官方依据
+## 十一、宿主版本兼容性判定闸门与 engines.dsh 仲裁铁律（incompatible-version 拦截根因与防御）
+
+### 11.1 异常现象与报错表征
+
+在 DSH Web 界面、插件管理页或执行 `dsh plugin add` / `selectBundle` 激活插件时，界面提示插件卡片为异常状态，并弹出红字阻止激活：
+
+```text
+<plugin> 与 DSH <runtimeVersion> 不兼容（要求 <peerPackage> <peerRange>...），运行它可能导致崩溃或数据丢失。请卸载后重新安装与当前 DSH 兼容的版本。
+```
+
+日志与控制台对应抛出：
+```text
+ManagementFailure: incompatible-version
+```
+
+### 11.2 源码根因剖析：evaluatePluginCompatibility 校验机制
+
+宿主对插件版本兼容性的判定收敛在 `dsh-app-boot`（`evaluatePluginCompatibility`）中。其核心校验逻辑如下：
+
+```javascript
+function evaluatePluginCompatibility(manifest, exemptions = {}, runtimeVersion = getDshRuntimeVersion()) {
+  runtimeVersionOf(runtimeVersion);
+  const fields = objectOf(manifest, "Plugin manifest");
+  if (!Object.hasOwn(fields, "peerDependencies")) return void 0;
+  const dependencies = objectOf(fields.peerDependencies, "Plugin manifest peerDependencies");
+  const peers = {};
+  for (const [name, range] of Object.entries(dependencies)) {
+    if (typeof range !== "string") throw new Error(`Plugin manifest peerDependencies[${name}] must be a string`);
+    if (name !== "@deepseek-ai/dsh" && !name.startsWith("@deepseek-ai/dsh-")) continue;
+    const requirement = [
+      "workspace:^",
+      "workspace:~",
+      "workspace:*"
+    ].includes(range) ? runtimeVersion : range;
+    if (requirement.trim() === "" || !semver.satisfies(runtimeVersion, requirement, { includePrerelease: true })) {
+      peers[name] = range;
+    }
+  }
+  if (Object.keys(peers).length === 0) return void 0;
+  const name = identityField(fields, "name");
+  const version = identityField(fields, "version");
+  const key = `${name}@${version}`;
+  return {
+    name,
+    version,
+    runtimeVersion,
+    peers,
+    exempted: (Object.hasOwn(exemptions, key) ? exemptions[key] : void 0)?.includes(runtimeVersion) === true
+  };
+}
+```
+
+#### 致命陷阱：SemVer 预发布版本（Pre-release）与精准等于匹配
+根据 SemVer 规范，带有预发布标签的版本（如 `0.2.1-rc.2`）只有在指定范围包含明确相同预发布前缀且主次版本相同时，才判定为匹配。
+- **错误写法**：在插件的 `peerDependencies` 中写死精确的预发布版本，例如 `"@deepseek-ai/dsh-client-locale": "0.2.0-rc.2"`；
+- **崩溃机理**：当宿主升级到 `0.2.1-rc.2` 时，`semver.satisfies("0.2.1-rc.2", "0.2.0-rc.2", { includePrerelease: true })` 恒为 `false`！
+- **连锁反应**：宿主收集到 `peers["@deepseek-ai/dsh-client-locale"] = "0.2.0-rc.2"`，由于插件未获得豁免（`!compatibility.exempted`），直接触发 `ManagementFailure("incompatible-version")`，导致插件即使代码 100% 运行正常，也会被宿主硬性拒载！
+
+### 11.3 官方推荐 engines.dsh 仲裁机制（DSH 0.2.1+）
+
+在 DSH 0.2.1 系列及官方插件索引规范中，宿主正式引入并优先支持 `package.json.engines.dsh` 字段：
+- 生成器与包管理中心**优先读取 `engines.dsh`** 并去除首尾空白；
+- 没有该字段时，宿主才会将所有 `@deepseek-ai/dsh` 与 `@deepseek-ai/dsh-*` 的 `peerDependencies` 范围做合取计算。
+
+### 11.4 通用工程规范与防御准则
+
+#### 1. 显式声明 `engines.dsh` 范围
+在插件 `package.json` 中显式注明对 DSH 运行时的支持范围（支持大于等于某基础版本的所有后续版本）：
+```json
+{
+  "engines": {
+    "node": ">=20",
+    "dsh": ">=0.2.0-rc.2"
+  }
+}
+```
+
+#### 2. `peerDependencies` 必须声明为半开区间
+严禁在 `peerDependencies` 中写死单点预发布版本，一律采用带有预发布起点的半开区间或联合范围：
+```json
+{
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.4",
+    "@deepseek-ai/dsh-client-locale": ">=0.2.0-rc.2",
+    "@deepseek-ai/dsh-api-session-controller": ">=0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-session": ">=0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-conversation": ">=0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-renderer": ">=0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-plugin-manager": ">=0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-primitives": ">=0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-settings": ">=0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-slots": ">=0.2.0-rc.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}
+```
+**收益**：`>=0.2.0-rc.2` 能同时在 `0.2.0-rc.2`、`0.2.1-rc.2`、`0.2.1` 正式版及未来小版本中顺利通过 `semver.satisfies`，杜绝宿主每次小版本演进时对插件的静默拦截。
+
+#### 3. 运行期豁免仅作为测试权宜手段（dsh plugin allow-version）
+宿主提供了 `dsh plugin allow-version <pkg>@<version>` 命令向 profile 的 `compatibility.json` 写入版本白名单。但这只用于开发人员紧急测试未经适配的远古插件，正式发布的插件必须通过修正 `engines.dsh` 与 `peerDependencies` 达成原生兼容。
+
+---
+
+## 十二、上游废弃诊断包与伴生导出彻底解耦规范（Runtime Invariants Deprecation）
+
+### 12.1 架构背景：运行时机制退役与包生态精简
+
+在 DSH 的演进过程中，部分早期设计的运行时辅助包或诊断伴生接口可能会被官方彻底下架并移出官方 npm 注册表和核心 bundle 树（例如 DSH 0.2.1 系列彻底移除了 `@deepseek-ai/dsh-invariants` 运行时插件，并删除了各官方包中的 `./invariant` 导出）。
+
+### 12.2 滞后依赖引发的连带故障
+
+若第三方插件未及时感知上游拆解，继续在代码中保留历史伴生包的依赖：
+1. **安装期解析失败**：官方新版本不再发布已废弃包的对应版本（例如官方发布了 `0.2.1-rc.2`，但废弃包停留在 `0.2.0-rc.2` 或更早），导致包管理器在解析相同版本 peer 时报 `No matching version found`；
+2. **兼容性仲裁全红**：`evaluatePluginCompatibility` 会因为未满足已退役包的版本区间而直接抛出 `incompatible-version`；
+3. **加载期注入崩溃**：插件声明注入已废弃的服务（如 `ctx.inject(['invariants'], ...)`），因宿主服务名册中不再包含该提供方，导致插件 fiber 永远处于挂起（Pending）或在启动审计中报缺失必需依赖失败。
+
+### 12.3 彻底解耦与孤儿产物清理四步法
+
+当上游移出某项诊断机制或伴生能力时，插件必须执行四步彻底清障：
+
+1. **源码解耦**：彻底删除引用该伴生包的本地源码文件（如 `src/invariant.ts`），停止在主逻辑中注入该服务；
+2. **构建流水线入口解耦**：检查打包工具配置（如 `tsdown.config.ts` 或 `rollup.config.js`），将废弃模块从构建 `entry` 列表中移除；
+3. **物理清除孤儿编译产物**：执行 `rm -rf lib/types`，清理编译输出目录中遗留的旧 `.d.ts` 和 `.js` 镜像文件，杜绝历史产物借由发布白名单混入正式 npm 包；
+4. **包清单与白名单同步**：
+   - 从 `package.json.exports` 中注销该子路径（如删除 `"./invariant"`）；
+   - 从 `package.json.files` 白名单中移除对应的产物路径；
+   - 从 `peerDependencies` 与 `devDependencies` 中彻底清除该废弃包名。
+
+---
+
+## 十三、官方依据
 
 - pnpm `minimumReleaseAge` 设置项与默认值：<https://pnpm.io/settings/dependency-resolution>
 - pnpm 供应链安全说明（冷却期的设计动机）：<https://pnpm.io/supply-chain-security>
 - 将默认值设为 1 天的变更提案与动机：<https://github.com/pnpm/pnpm/pull/11158>
+- DSH 插件市场索引生成器（engines.dsh 解析规则）：`@deepseek-ai/dsh-plugin-market-generator`
+- DSH 宿主版本兼容性判定实现：`@deepseek-ai/dsh-app-boot/evaluatePluginCompatibility`
 
 ---
 
-## 十二、相关 DSH 源码
+## 十四、相关 DSH 源码
 
 上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
 vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
-packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.0-rc.2
-packages/bundle/base  <-  @deepseek-ai/dsh-base@0.2.0-rc.2
-packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@0.2.0-rc.2
-packages/skill/skill  <-  @deepseek-ai/dsh-skill@0.2.0-rc.2
-packages/bundle/web-app  <-  @deepseek-ai/dsh-web-app@0.2.0-rc.2
+packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.1-rc.2
+packages/bundle/base  <-  @deepseek-ai/dsh-base@0.2.1-rc.2
+packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@0.2.1-rc.2
+packages/skill/skill  <-  @deepseek-ai/dsh-skill@0.2.1-rc.2
+packages/bundle/web-app  <-  @deepseek-ai/dsh-web-app@0.2.1-rc.2
+apps/plugin-market-generator  <-  @deepseek-ai/dsh-plugin-market-generator
 ```

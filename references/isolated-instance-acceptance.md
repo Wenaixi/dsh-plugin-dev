@@ -39,18 +39,15 @@ dsh <新实例名> --from-default-profile web
 | Web 或 CLI 实例 | dsshome 下该 profile 目录 | 结构与 CLI 完全一致，最适合直接复用 |
 | 桌面版实例 | 同路径下的 desktop | CLI 对它的 dump 与 boot 被拒，但 plugin 列表与增删仍可用；改文件前先完全退出桌面应用 |
 | 本机其他任意实例 | 同上 | 只复用你需要的那几项，不要整体覆盖 |
-
-**只追加，不覆盖。**
+**只追加，不覆盖（注意 YAML 顶层语法冲突）。**
 
 1. 先备份目标实例的 package.json、cordis.patch.yml、pnpm-lock.yaml、pnpm-workspace.yaml；
-2. 按条目 id 求差集，只把源里缺的条目追加到文件末尾，并加显式分界注释标明来源与日期；
-3. 同名条目保留字段更完整的那份，不要盲目覆盖；
-4. 追加后做 YAML 解析校验，再用目标运行时的 plugin 列表命令确认零报错。
-
-**凭据不需要复制。** 凭据是全局共享的：新实例和旧实例读同一份 dshhome 下的凭据文件与环境文件。但必须先检查配置里引用的每个环境变量在全局凭据里真的存在——引用了不存在的 key，模型不可用，而报错往往出现在第一次对话时而不是启动时。
-
-### 只装基础插件 + 你的插件
-
+2. **严防空数组顶层冲突陷阱**：从官方模板派生（`--from-default-profile`）生成的 `cordis.patch.yml` 默认内容往往是一个孤立的空数组 `[]`。若直接往末尾盲目追加（append）条目 `- id: ...`，会导致文件内出现两个独立的顶层 YAML 结构（一个已完结的 flow-sequence 后面跟着 block-sequence），宿主 `loadOverlayPatches` 时必抛：
+   `YAMLException: end of the stream or a document separator is expected`！
+   **标准做法**：检测文件若仅包含 `[]`，必须**整体覆写**为合法的顶级列表，或在解析为数组对象后再写回，绝不可盲目字符串追加；
+3. 按条目 id 求差集，只把源里缺的条目追加到列表末尾，并加显式分界注释标明来源与日期；
+4. 同名条目保留字段更完整的那份，不要盲目覆盖；
+5. 变更后做 YAML 解析校验，再用目标运行时的 dump-config 命令确认零报错。
 新实例建好后，插件清单里只应保留两类：
 
 1. **基础插件**：你的插件真正必需的那些运行时能力（例如浏览器界面所需的行、你要注入的服务提供者）。判定标准是读源码确认的注入列表，不是凭感觉。
@@ -97,6 +94,48 @@ dsh plugin --profile <实例名> add <本地插件目录>
      # 预期输出：D:\path\to\your\workspace
      ```
    - 改动源码后仅需在工作区运行 `npm run build`，产物立刻在宿主端就地生效；重启宿主后浏览器强刷即可加载最新逻辑。
+
+### 配置文件生成：Windows PowerShell UTF-8 BOM 诱发 Node.js 引导崩溃陷阱 (The UTF-8 BOM Trap)
+
+在 Windows 环境下编写自动化脚本创建或修改隔离实例的 `package.json`、`cordis.patch.yml` 时，存在隐蔽的 BOM 编码陷阱：
+
+#### 1. 陷阱机理：PowerShell 默认 UTF-8 BOM 与 Node.js 严格规范冲突
+- Windows PowerShell 5.1/7.x 的 `Out-File -Encoding utf8` 或 `Set-Content` 默认会在文件开头写入 3 个字节的 UTF-8 字节序标记 BOM（`\uFEFF`，十六进制 `EF BB BF`）；
+- DSH 宿主引导器（`dsh-app-boot` 中的 `readProfileManifest`）读取 `package.json` 后直接调用 Node.js 原生 `JSON.parse(content)`；
+- 根据 JSON 工业规范（RFC 8259），标准 JSON 严禁携带任何 BOM。Node.js 遇到开头的 `\uFEFF` 会立即抛出致命语法崩溃：
+  ```text
+
+### 零端口无感装配与 Schema 校验闭环（Headless Verification via `--dump-config`）
+
+在启动完整的 Web GUI 服务或消耗模型额度进行浏览器自动化之前，必须优先使用 DSH 提供的无感配置合成探针：
+
+```bash
+dsh --profile <实例名> --dump-config
+```
+
+#### 1. 为什么它是最快且最硬核的第一道防线
+- **完整经历宿主引导生命周期**：它会在进程内部依次执行 Profile 加载、`bundles` 树合成、`peerDependencies` 与 `engines.dsh` 版本兼容性语义闸门判定、`cordis.patch.yml` 补丁注入、Schemastery 跨端 Schema 校验、以及 Volatile 引用解析；
+- **零端口占用、零网络监听**：完全不需要占用 3080/8080 等网络端口，不与任何正在运行的生产实例抢占端口；
+- **零 Token 消耗、毫秒级反馈**：在不消耗任何大模型额度、不依赖任何浏览器驱动的情况下，在 1 秒内完成底层全部契约体检；
+- **可失败性保证**：若存在 YAML 语法错误、`peerDependencies` 版本冲突导致 bundle 被跳过（`skipping profile bundle`）、或配置不满足 Schema，命令退出码立即为 1 并在 stderr 输出精确堆栈；成功时退出码为 0，并在 stdout 打印带有 `# == <包名>` 分界注释的最终组合配置树；
+- **真机判据**：退出码为 0 且在输出中检索到 `# == <包名>` 与预期的配置键值，才证明插件在宿主加载器中真正冷装成功。
+  SyntaxError: Unexpected token '﻿', "﻿{... is not valid JSON
+      at JSON.parse (<anonymous>)
+      at readProfileManifest (...)
+      at loadProfile (...)
+  ```
+- **后果**：整个 CLI 启动流程在引导首步瞬间中断退出码 1，开发者常误判为 JSON 内容缩进或括号错误。
+
+#### 2. 标准无 BOM 写入规范
+在自动化脚本中生成任何 JSON/YAML 配置文件时，**严禁使用默认的 `Out-File -Encoding utf8`**。必须采用严格无 BOM 的 UTF-8 写入：
+```powershell
+# Windows PowerShell 原生无 BOM 安全写入
+[System.IO.File]::WriteAllText($path, $jsonContent, [System.Text.UTF8Encoding]::new($false))
+```
+或通过 Node.js 一行命令执行写入：
+```bash
+node -e "require('node:fs').writeFileSync(process.argv[1], process.argv[2], 'utf8')" "$path" "$jsonContent"
+```
 
 ---
 
@@ -270,6 +309,113 @@ if (manifestOnly && bundles === lastBundles) return;
 | 修复有对照组 | 用修复前的源码跑同一脚本确认症状在，只有这一条能把「假根因」排除 |
 | 断言可失败 | 每条断言都做过一次人为破坏，确认会红；破坏后已还原并重跑全绿 |
 | 产物差集为空 | 产物目录与源码目录的文件名集合做差集，出现差集即阻断 |
+
+---
+
+## 七、独立自动化实例验收踩坑与稳态套件设计 (Automated Isolated Acceptance Hardening)
+
+在为插件编写无需人工介入的纯自动化端到端验收脚本（如 `scripts/test-isolated-instance.js`）时，运行在临时 `DSH_HOME` 下的真实宿主子进程会遭遇一系列与交互式终端完全不同的平台级隐蔽陷阱，必须严格遵守以下四大硬化契约：
+
+---
+
+### 7.1 官方发布模板 vs 自定义 Profile 派生规则 (Shipped vs Custom Profile Derivation)
+
+#### 致命陷阱
+开发者试图在临时 `DSH_HOME` 中初始化一个干净的 `web` profile，写下了如下命令：
+```bash
+# 致命报错：DSH CLI 抛出未捕获异常并直接退出！
+dsh web --from-default-profile web --dump-config
+```
+触发报错：
+```text
+Error: dsh: profile "web" is shipped and cannot be a custom profile target; omit --from-default-profile to use it
+    at initializeProfileFromDefault (profile-boot.js:146:52)
+```
+
+#### 深度根因与解决契约
+- **官方内建模板（Shipped Profiles）**：`web`、`desktop`、`tui` 是宿主直接随包分发的内置标准模板。在新创建的 `DSH_HOME` 中，**直接运行 `dsh web --dump-config`**，宿主引导层会自动检测到该 profile 不存在并自发将其初始化为标准官方模板；
+- **自定义派生模板（Custom Profiles）**：只有当目标 profile 名称是**非官方内置名称**（如 `test-custom`、`rescue`）时，才允许且必须传递 `--from-default-profile <shippedName>`；
+- **自动化测试规范**：
+  ```javascript
+  // 初始化纯净的官方 web 实例：绝不带 --from-default-profile
+  spawnSync(process.execPath, [dshBin, 'web', '--dump-config'], { env });
+  ```
+
+---
+
+### 7.2 动态空闲端口探测与端口占用免疫 (Ephemeral Free Port Allocation)
+
+#### 致命陷阱
+在自动化验收脚本中为了避开默认的 `3080` 端口，开发者通常会随手硬编码一个备用端口（例如 `3099` 或 `3088`）：
+```javascript
+spawn(process.execPath, [dshBin, 'web', '--port', '3099', '--no-open'], { env });
+```
+一旦前次测试未正常退出、后台进程残留或宿主机其他服务碰巧监听了该端口，Web 服务器在引导期瞬间崩溃：
+```text
+Failed plugins (1):
+  webserver (required)
+    Error: listen EADDRINUSE: address already in use 127.0.0.1:3099
+```
+
+#### 最佳工程实践：操作系统动态申请保底空闲端口
+自动化脚本在启动 DSH Web 实例前，必须先利用 Node.js 底层 Socket 向操作系统瞬时申请一个绝对未被占用的临时高位端口，释放后立即分配给 DSH：
+```javascript
+import net from 'node:net';
+
+// 动态申请一个绝对空闲的端口
+const server = net.createServer();
+await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+const freePort = (server.address() as net.AddressInfo).port;
+await new Promise(resolve => server.close(resolve));
+
+// 启动独立实例，彻底免疫 EADDRINUSE
+const child = spawn(process.execPath, [dshBin, 'web', '--port', String(freePort), '--no-open'], { env });
+```
+
+---
+
+### 7.3 Windows ESM 路径协议与本地代理回环豁免 (Windows ESM pathToFileURL & NO_PROXY Trap)
+
+在自动化脚本中探针式直连 Web 服务或动态引入测试模块时，有两个跨平台的平台级断路陷阱：
+
+#### 陷阱一：Windows 动态 import 协议不支持
+在测试代码中通过绝对路径动态导入 ES 模块：
+```javascript
+// Windows 致命报错：ERR_UNSUPPORTED_ESM_URL_SCHEME
+await import("D:\\my-workspace\\lib\\index.js");
+```
+- **根因**：Node.js ESM 加载器在 Windows 上将盘符 `D:` 误判为不合法的 URL 协议（Received protocol 'd:'）；
+- **修复**：必须统一使用 `node:url` 的 `pathToFileURL` 转换为规范的 `file://` 协议：
+  ```javascript
+  import { pathToFileURL } from 'node:url';
+  await import(pathToFileURL(absPath).href);
+  ```
+
+#### 陷阱二：终端代理劫持本地回环请求导致握手超时
+当宿主机环境配置了系统代理或终端代理（如 `$env:HTTP_PROXY = "http://127.0.0.1:10801"`）用于拉取外部资源时：
+- Node.js 的全局 `fetch` 或命令行的 `curl` 会无差别将发往 `http://127.0.0.1:<freePort>/` 的本地回环请求也强行路由至该代理服务器；
+- 代理服务器无法路由回环端口，导致测试脚本轮询探针一直报 `Connection Timeout` 或握手超时，误判 Web 实例未能正常启动；
+- **规避铁律**：测试脚本启动子进程和发送 HTTP 请求时，必须强制注入本地回环豁免环境变量，或显式绕过代理：
+  ```javascript
+  const env = {
+    ...process.env,
+    NO_PROXY: '127.0.0.1,localhost',
+    no_proxy: '127.0.0.1,localhost',
+  };
+  // 使用 curl 探测时必须追加参数
+  spawnSync('curl.exe', ['-s', '-i', '--noproxy', '*', targetUrl]);
+  ```
+
+---
+
+### 7.4 自动化验收闭环：开箱即用的 Runner 设计骨架
+
+一个生产级的隔离自动化验收脚本应具备五阶段确定性状态机：
+1. **沙盒隔离**：创建唯一的临时目录（`AppData/Local/Temp/dsh-test-*`）并置为 `DSH_HOME`；
+2. **直连挂载**：初始化内置模板并利用 `mklink /J` 直连开发工作区根目录；
+3. **动态拉起**：申请空闲端口并带豁免环境变量启动，正则捕获标准输出中的 `token=...` 提取认证凭据；
+4. **功能探针**：直连 Web 接口回读状态码与真机验证运行时能力；
+5. **安全销毁**：捕获 `finally` 块，断开目录联接并强制递归销毁临时目录，保证零环境污染。
 
 ---
 

@@ -4,6 +4,13 @@
 
 新插件先读以下通用专题；它们只描述可迁移的机制和验证判据，不承载任何单一仓库的包名、版本、路径或事故叙述。
 
+### v0.2.1 核心架构专项指南
+- [agent-teams-architecture.md](./agent-teams-architecture.md)：**DSH v0.2.1 原生多智能体团队协作架构**——隐式根 Roster 名册管理、Team Lead 与 Teammate 对等成员状态机（`running` / `inactive` / `provisioning` / `failed`）、点对点收件箱通信（`send_message`）、基于 `TeamActivity` 的非自旋事件驱动等待（`wait_agent` 杜绝 busy-polling）、共享任务看板 DAG 编排（`team_task_*`）与 CAS 乐观锁（`expected_revision` 强校验）、建议性写作用域（`write_scopes`）以及 `FS_STALE_VERSION` 版本并发冲突回读重基（rebase）容错防线。
+- [plan-mode-and-user-review-gate.md](./plan-mode-and-user-review-gate.md)：**DSH v0.2.1 计划模式与用户审批闸门**——`planMode` 服务注入与会话投影折叠（`plan` projection 跨 resume/fork 保全）、探索期只读执行纪律（严禁未批先写代码）、沙箱隔离与审批策略的正交解耦、`exit_plan_mode` 单一交付工具交互契约（呈递 Markdown 计划由用户评审）以及 `/plan off` 快捷指令通道。
+- [goal-driven-system.md](./goal-driven-system.md)：**DSH v0.2.1 自主长程目标驱动系统**——`goals` 服务与品牌类型 `GoalId`、四态生命周期状态机（`active` / `paused` / `blocked` / `complete`）、跨轮次自动延续驱动器（`goal-round-driver` 自动注入 `<goal_round>` 提示词无缝推进工作）、轮次安全熔断（`roundsStarted` 与 `maxGoalRounds`）以及三轮持久阻塞判定铁律（连续 3 轮不可抗力方可标记 `blocked`）。
+- [session-format-v4-and-migration.md](./session-format-v4-and-migration.md)：**DSH v0.2.1 Session 格式 V4 演进与平滑迁移机制**——为什么需要 V4 格式（承载团队通信 `agent/inbox`、计划模式事件、目标快照）、确定性迁移管道（`defineSessionFormatMigration` 与 `assertReleasedV3Header`）、消息转换器 `mapEventMessages` 深度保全大模型 Prompt Cache 前缀一致性、以及 `session-checkpoint-policy` 周期性快照与 `session-query-sqlite` 本地高速全文索引接缝。
+- [persistent-shells-and-observation-policy.md](./persistent-shells-and-observation-policy.md)：**DSH v0.2.1 持续伪终端 (PTY) 与强一致文件观察策略守卫**——长驻 PTY 终端工具（`tool-pwsh-persistent` / `tool-bash-persistent`）的环境变量与目录保全、基于 `Symbol.dispose` / `Symbol.asyncDispose` 的对称资源清理、文件观察策略守卫（`dsh-fs-observation-policy`）的 `ObservedStateGate` 弱引用会话属主映射与「写前必读」物理拦截门禁、以及 `dsh-sandbox-windows-acl` 基于 Koffi 的 Win32 原生 DACL 安全描述符系统级隔离。
+
 **动手前的第一道门**：本目录所有正文都属于线索级材料，任何 API、字段与默认行为都必须再回到真实源码核对。流程见 [source-verification-and-caches.md](./source-verification-and-caches.md)。
 
 **交付前的最后一道门**：功能写完不等于可用，必须在隔离新实例上完成四态安装与浏览器逐项验证。流程见 [isolated-instance-acceptance.md](./isolated-instance-acceptance.md)。
@@ -133,6 +140,8 @@
 ### 十、多模态附件、人机交互与最终交付物呈递 (Multimodal & Deliverables)
 - **[multimodal-and-deliverables.md](./multimodal-and-deliverables.md)**：
   多模态与人机交互权威指南——最终交付物卡片 (`present` 工具与前端 Deliverables 原生打开/预览)、人机协同结构化提问 (`ask_user_question` 与 `ctx.userQuestions` 挂起/恢复)、多模态图像附件规范化存储 (`dsh-attachment-local`)、以及长上下文工具结果智能剪枝 (`compaction-tool-result-pruner`)。
+- **[plan-mode-and-user-review-gate.md](./plan-mode-and-user-review-gate.md)**：
+  计划模式与用户评审闸门权威剖析——复杂多步高危任务中「先思考规划，用户确认后再动手」的防线设计；`ctx.planMode` 核心服务与 `Inactive/Planning/AwaitingApproval/Executing` 四态状态机；权威代际纪元 (`Epoch`) 单调递增与防脏写入机制；会话投影在 Timeline 中的步骤智能折叠收拢与 Resume/Fork 状态精准保全；规划期自动注入的 `Marker` 指导片段、严苛只读纪律（强拦截写文件与副作用终端指令）与沙箱权限正交解耦准则；`exit_plan_mode` 单一交付契约、用户评审双向反馈分支与 `/plan off` 快捷退出通道。
 
 ### 十一、Webhook 外部集成、无头模式与长工作流 (Webhook, Headless & Workflows)
 - **[webhook-headless-and-workflows.md](./webhook-headless-and-workflows.md)**：
@@ -157,6 +166,8 @@
 ### 十六、子智能体引擎、文件系统安全观察与 ACP 协议 (Subagents, FS Policy & ACP)
 - **[subagents-fs-policy-and-acp.md](./subagents-fs-policy-and-acp.md)**：
   子智能体生命周期与文件安全策略指南——`ctx.subagents` 服务切面、三大提供方 (`spawn-in-process` 独立运行 / `fork-in-process` 继承分叉 / `acp` 远程进程)、单次 (`start`) vs 持续通信 (`startContinuable`)、文件系统弱引用观察表与防覆盖锁机制 (`fs-observation-policy`)、以及自动化 Agent Client Protocol (ACP)。
+- **[agent-teams-architecture.md](./agent-teams-architecture.md)**：
+  DSH 原生多智能体团队协作架构权威剖析——从单 Agent/单向 Subagent 演化至隐式根 Agent Teams 体系；Team Lead 唯一主导与长驻对等成员 (`teammates`) 四态生命周期状态机；`send_message` 异步通信、`interrupt_agent` 非自旋优雅停机与基于 `TeamActivity` 的事件驱动挂起等待 (`wait_agent`)；共享任务看板 (Shared Task DAG) 的原子变迁动作集、`expected_revision` CAS 并发控制与 `blocked_by` 拓扑解算；建议性写入范围 (`write_scopes`) 与底层并发冲突 `FS_STALE_VERSION` 重基重试三段式范式。
 
 ### 十七、社区实践图谱：高星插件共性工程经验 (Community Patterns)
 - **[community-patterns.md](./community-patterns.md)**：

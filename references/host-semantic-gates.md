@@ -117,28 +117,31 @@
 
 ---
 
+### 2.10 宿主版本兼容性判定闸门 (evaluatePluginCompatibility 与 engines.dsh 仲裁)
+
+宿主在加载 Profile 的 `bundles` 栈（`loadProfileDirectory` / `prepareProfile`）、列出已安装插件或用户激活插件（`selectBundle`）时，对每一个参与装配的插件进行运行时版本兼容性判定。
+
+- **宿主源码闸门**：`dsh-app-boot` 中的 `evaluatePluginCompatibility(manifest, exemptions, runtimeVersion)`，遍历插件所有以 `@deepseek-ai/dsh` 开头的 `peerDependencies`，逐项执行：
+  `semver.satisfies(runtimeVersion, requirement, { includePrerelease: true })`
+- **致命判定陷阱**：
+  若插件在 `peerDependencies` 中写死单一的预发布版本（如 `"@deepseek-ai/dsh-client-locale": "0.2.0-rc.2"`），当宿主升级到相邻小版本（如 `0.2.1-rc.2`）时，SemVer 预发布规则判定不满足，宿主立即收集该 peer 依赖；若未获得豁免，直接抛出 `ManagementFailure("incompatible-version")`。
+- **真机表现**：
+  1. 界面呈现：Web 端与桌面端插件管理页将插件卡片直接标红并显示为“异常”状态，提示：
+     `{plugin} 与 DSH {version} 不兼容（要求 {requirements}），运行它可能导致崩溃或数据丢失。请卸载后重新安装与当前 DSH 兼容的版本。`
+  2. CLI 装配表现：在 `loadProfileDirectory` 阶段跳过该 bundle（`dsh: skipping profile bundle "<pkg>"`），导致后续 `cordis.patch.yml` 补丁因找不到挂载目标报错 `patch: entry "<plugin-id>" not found`。
+- **为何静态门禁测不到**：本地开发环境测试与 `tsc` 编译只针对本地 node_modules 下的代码，无法感知外部用户机器上宿主运行时的具体微小版本号，静态断言 100% 全绿但真机直接被阻断激活。
+- **真机判据与工程规范**：
+  1. 官方一等公民引擎声明：在 `package.json` 中显式声明 `"engines": { "node": ">=20", "dsh": ">=0.2.0-rc.2" }`（DSH >=0.2.1 优先按 `engines.dsh` 裁决）；
+  2. `peerDependencies` 必须采用半开区间（如 `">=0.2.0-rc.2"`），严禁锁定单点预发布版本；
+  3. 破坏实验验证：人为将 peer 依赖改写为不满足宿主的范围，断言真机准确抛出 `incompatible-version`，证明闸门判定真实有效。
+
+---
+
 ## 三、怎么组织真机判据
 
 ### 3.1 逐条独立，不要打包成一个 happy path
 
 每条判据独立触发、独立取证。打成一个大脚本时，第一条失败后面全不执行，你会误以为后面几条也通过了。
-### 2.10 插件版本与 Peer 依赖语义闸门（engines.dsh 与 bundle 静默跳过机制）
-
-宿主在加载 Profile 的 `bundles` 栈（`loadProfileDirectory` / `prepareProfile`）时，对每一个参与装配的插件进行运行时版本兼容性语义判定。
-
-- **官方判定优先级（DSH >= 0.2.1）**：第三方插件的版本兼容性**优先按 `engines.dsh` 判断**；未声明时才沿用原有规则检查 `peerDependencies` 与宿主已安装核心包版本的交集。
-- **宿主静默跳过闸门（Silent Bundle Skip Gate）**：
-  若当前运行的宿主版本未满足插件声明的 `peerDependencies`（例如 peer 要求 `@deepseek-ai/dsh-skill: >=0.2.1-rc.1`，而当前运行宿主为 `0.2.0-rc.2`），宿主在装配时**不会直接崩溃退出**，而是在 stderr 输出告警并**直接将该插件从活跃 bundle 树中静默跳过（skipping profile bundle）**：
-  `dsh: skipping profile bundle "<pkg>": Error: Plugin <pkg>@X.Y.Z is incompatible with dsh <v>: peerDependencies {...}.`
-- **级联失效表征（The Cascading Patch Drop）**：
-  由于宿主跳过了 bundle 装配，随后的 Profile 补丁层（`cordis.patch.yml`）在按 ID 注入配置时会因找不到对应的插件条目而抛出：
-  `dsh: [cordis.patch.yml] patch: entry "<plugin-id>" not found`
-  表现为：宿主成功启动或 dump-config 退出码非 0，界面上完全看不到插件，补丁无法挂载。
-- **为何静态门禁测不到**：静态 TypeScript 编译和纯 Node 单元测试仅校验代码逻辑，根本无法感知外部宿主环境究竟处于哪一个微小版本号。
-- **通用工程规范**：
-  1. 现代插件应在 `package.json` 显式声明 `"engines": { "dsh": ">=0.2.0-rc.2 <0.3.0-0" }` 享受官方一等公民门禁判定；
-  2. `peerDependencies` 的版本区间必须理性设计，应合理覆盖当前 LTS 版本与下一代候选版本，避免因单一过于狭窄的 rc 版本硬锁死导致在相邻微版本宿主上触发静默跳过；
-  3. 隔离实例验证时，调用 `dsh --profile <name> --dump-config` 必须同时检查 exitCode 与 stderr，出现 `skipping profile bundle` 必须立即排查版本范围。
 
 ### 3.2 每条判据要有「反向证据」
 

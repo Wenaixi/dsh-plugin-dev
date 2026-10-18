@@ -108,11 +108,17 @@ description: "Use when creating, modifying, reviewing, debugging, verifying, or 
 - **纯净平铺原子批处理 (Pure Flattening Pattern)**：主版本放弃旧版兼容时，坚决从 Schema、运行时与控制器中拔除废弃字段；单项切换严格发射 1 条 op（禁止追加旧表 unsets），批量操作严格发射 N 条 op，将 RPC payload 与 revision 乐观锁冲突降至物理极小值。详见 [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §十四。
 - **模板补丁空数组覆盖律**：从官方模板派生 Profile（`--from-default-profile`）生成的 `cordis.patch.yml` 初始内容为 `[]`，严禁盲目向后追加条目（引发 `YAMLException: end of the stream or a document separator is expected`），必须整体覆写为合法的单顶级序列。详见 [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §一。
 - **零端口无感装配检验**：在启动 GUI 或消耗 Token 之前，优先调用 `dsh --profile <name> --dump-config`，1 秒内完成语法、Schema 校验、volatile 解包与组合树真值回读，0 端口占用、0 Token 消耗。详见 [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §一。
+- **预发布兼容区间有界性（Bounded Pre-release Range Rule）**：在 `package.json` 的 `peerDependencies` 与 `engines.dsh` 中，严禁写死单个带 pre-release 标签的精确版本（如 `"0.2.1-rc.2"`），必须采用带明确起止边界的语义化区间（如 `">=0.2.0-rc.1 <=0.2.1-rc.2"`），既能准确淘汰已废弃历史旧版（如 0.1.x），又能避免宿主前序版本或相邻测试版在 `evaluatePluginCompatibility` 判定中因精确等于失败而跳过挂载。详见 [install-resolution-traps.md](references/install-resolution-traps.md) §十一。
+- **发布包版本不可变性（Package Immutability Rule）**：npm 官方注册表对已发布的包实行物理不可变锁定，严禁同版本覆写。修复 `peerDependencies`、`engines` 或逻辑缺陷时，**必须递增全新的 SemVer 版本号（如 `x.y.z+1`）**，切勿试图通过 force-push tag 覆盖已存在的线上旧版本包（CI 会跳过发布导致用户继续拉取旧包）。发版后必须通过 `npm view <pkg>@<ver> peerDependencies --json --registry=https://registry.npmjs.org` 真实回读元数据。详见 [publish-npm-verification.md](references/publish-npm-verification.md) §八、[install-resolution-traps.md](references/install-resolution-traps.md) §十二。
+- **状态机单一关闭表示（Single-off Contract）**：具有多档运行模式加关闭态（`off`）的状态机，在系统内部对于“关闭态”只认一种法定真值即 `null`。所有从配置、命令、事件、volatile 引用流入的模式值在进入状态机时必须立即归一为 `mode === 'off' ? null : mode`，严禁在状态机内部存储字符串 `'off'`，确保内存状态与磁盘 flag 文件的删除（`storage.clear()`）100% 镜像同态，彻底消除“内存已关闭但磁盘 flag 文件残留”的状态撕裂。详见 [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十六。
 
 ## 场景路由
 
 | 需求或症状 | 先读 |
 | --- | --- |
+| 宿主启动报 skipping profile bundle 或 incompatible with dsh（要求某 peerDependency） | [install-resolution-traps.md](references/install-resolution-traps.md) §十一 |
+| 修复了依赖并强推 tag 但新安装依然复现旧报错、npm 包不可变与幽灵发布 | [publish-npm-verification.md](references/publish-npm-verification.md) §八 |
+| 插件模式切换为 off 但磁盘 flag 文件依然残留、跨进程误判已激活、状态机关闭态撕裂 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十六 |
 | 宿主成功启动或 dump 正常，但插件功能完全没加载、patch 报 entry not found、bundle 被静默跳过 | [host-semantic-gates.md](references/host-semantic-gates.md) §2.10 |
 | GitHub Actions 在 setup-node 阶段报错 ERROR packages field missing or empty、CI 未装依赖即中断 | [ci-release-workflow.md](references/ci-release-workflow.md) §三.3 |
 | 单开关操作每次发送 3 条 ops、批量操作 payload 膨胀、旧表 unset 拖垮并发性能与 revision 锁 | [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §十四 |

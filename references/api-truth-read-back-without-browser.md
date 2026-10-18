@@ -75,14 +75,38 @@ Invoke-WebRequest -Uri "http://127.0.0.1:$PORT/api/settings/describe" -Method Po
 
 ---
 
-## 四、mutate 的 expectedRevision 边界
+## 四、mutate 的 expectedRevision 边界与标准报文模板
 
+### 4.1 expectedRevision 边界陷阱
 `settings/mutate` 参数 `{ ns, ops, expectedRevision? }`：
 
-- **省略该字段** = 无条件写入；
-- **传 `null` 会 wire 校验失败**（`field "expectedRevision" failed boundary validation`）——undefined 与 null 在线格式上不等价，缺省就整个不出现。
+- **省略该字段** = 无条件写入（自动化测试与强制重置常用）；
+- **传 `null` 会 wire 校验失败**：在 Typert RPC 网关的底层参数校验中，`expectedRevision` 定义为可选非负整数。若在 JSON 报文中显式传递了 `"expectedRevision": null`，网关会直接返回 `result: { ok: false, error: 'field "expectedRevision" failed boundary validation' }`。
+- **铁律**：无条件写入时，该字段在 `args` 对象中必须**彻底缺省（完全不出现）**，绝对不能用 `null` 占位。
 
-ops 形态：`[{ op: 'set', path: ['fieldName'], value }, { op: 'unset', path: [...] }]`。
+### 4.2 标准原子写入报文形态
+```json
+{
+  "type": "client-request",
+  "rpcId": "3b241101-52d3-49d2-971c-4b532729a888",
+  "method": "settings/mutate",
+  "payload": {
+    "args": {
+      "ns": "my-plugin",
+      "ops": [
+        { "op": "set", "path": ["defaultMode"], "value": "ultra" },
+        { "op": "unset", "path": ["deprecatedField"] }
+      ]
+    }
+  }
+}
+```
+
+### 4.3 PowerShell 脚本中的响应解包注意点
+使用 `Invoke-RestMethod` 时，Typert RPC 即使业务逻辑返回失败（如乐观锁冲突或格式错误），HTTP 状态码通常依然为 `200 OK`，错误信息包在响应体内部：
+- 成功：`response.result.ok === true`，最新命名空间状态在 `response.result.value`；
+- 失败：`response.result.ok === false`，错误说明在 `response.result.error`。
+编写断言脚本时，必须首先检查 `$res.result.ok` 是否为 true，切勿直接盲目索引 `$res.result.value`。
 
 ---
 
@@ -96,8 +120,8 @@ ops 形态：`[{ op: 'set', path: ['fieldName'], value }, { op: 'unset', path: [
 ## 相关 DSH 源码
 
 ```text
-packages/client/connection  <-  @deepseek-ai/dsh-client-connection@0.2.0-rc.2
+packages/client/connection  <-  @deepseek-ai/dsh-client-connection@0.2.1-rc.2
   lib/types/browser-auth.d.ts（launch token -> dsh-auth cookie）
-packages/boot/api-settings-controller  <-  @deepseek-ai/dsh-api-settings-controller@0.2.0-rc.2
+packages/boot/api-settings-controller  <-  @deepseek-ai/dsh-api-settings-controller@0.2.1-rc.2
   lib/index.js（describe/mutate/update 方法与 SettingsNamespaceView）
 ```

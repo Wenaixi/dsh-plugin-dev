@@ -130,6 +130,28 @@ git push origin vX.Y.Z --force                   # 5. 强制覆盖远端 tag 触
   ```
 - **脱困代价**：一旦某个版本号进入被锁死的 staged 状态，npm 通常会持续拒绝该版本号的再次提交。唯一的脱困办法是必须递增（bump）一个全新的版本号重新走发版流程。因此，发布自动化必须严格遵守幂等检查与时延轮询等待机制。
 
+### 6.3 连续多版本发布与读副本扩散时延 (Read-Replica Propagation Lag)
+
+#### 1. 现象与误诊
+当连续发布多个版本（例如刚发了 `X.Y.0` 紧接着因修复环境依赖又发布了 `X.Y.1`）时，CI 流水线虽然明确输出了 `✅ Published package @scope/pkg@X.Y.1 → https://registry.npmjs.org/`，但随后在本地通过 `npm view @scope/pkg dist-tags.latest` 或直接请求 tarball 时，可能连续 1 至 3 分钟依然返回上一版本 `X.Y.0` 或返回 `E404`。开发者极易误诊为“发布未成功入库”而冲动再次执行 publish。
+
+#### 2. 分布式架构根因
+npm 官方 Registry 采用多地域分布式读写分离架构：
+- 发布操作（`npm/pnpm publish`）直连主写集群，一旦返回 200/201 即代表包文件与哈希签名已持久化写入底层存储；
+- 查询接口（`registry.npmjs.org` 的元数据与 CDN）依赖各边缘节点的异步日志复制。元数据索引更新与安全扫描队列（Security Scanning & Provenance Staging）存在约 1 至 5 分钟的全球扩散时延。
+
+#### 3. 权威验证与防缓存轮询规范
+自动化验收与人工复核时，必须遵循三条铁律：
+1. **以主写日志为准**：CI 或发布终端只要返回 `✅ Published package ...`，即视为发布事务完成，严禁重复发布同版本；
+2. **防缓存直连探测**：使用带时间戳的防缓存 HTTP 请求直接探测 npm 根元数据：
+   ```powershell
+   # PowerShell 穿透缓存轮询
+   $t = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+   $meta = Invoke-RestMethod -Uri "https://registry.npmjs.org/@scope/pkg?nocache=$t" -Headers @{ "Cache-Control" = "no-cache" }
+   $hasVersion = $meta.versions.PSObject.Properties.Name -contains $expectedVersion
+   ```
+3. **退避轮询策略**：自动化门禁脚本必须设置至少 3 分钟的重试窗口（每 10-15 秒轮询一次），在超过 3 分钟且无主写确认时方可判为异常。
+
 ---
 
 ## 七、权威发布真源四件套核验标准（Release Verification Quadruple）

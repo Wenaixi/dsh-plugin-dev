@@ -116,6 +116,41 @@ export function apply(ctx) {
 若最终选择运行时改写上游控制器（monkey patch），
 失效形态与对应门禁见 [shared-contract-capability-boundaries.md](./shared-contract-capability-boundaries.md)。
 
+---
+
+## 三之三、DSH 0.2.1+ 命令原子芯片化 (CommandChipNode) 架构演进与触发放宽持久性
+
+### 1. 架构演进：从字面文本装饰到原子 DecoratorNode
+
+在 DSH 早期版本中，已认领命令保留为行首字面文本，通过 TextNode transform 添加样式；这在输入图片、复杂粘贴或 IME 组字时容易因节点拆分合并循环导致 Lexical 更新异常。
+
+在 DSH 0.2.1-rc.2 架构中，官方将行首认领命令重构为原子的内联芯片节点：
+- **`CommandChipNode`**：继承自 Lexical 的 `DecoratorNode`，作为行首原子 inline 芯片呈现；
+- **两步删除手势**：从折叠光标出发，第一次方向删除把 chip 标记为选中（`data-selected`），第二次删除才整体移除它，避免逐字退格时破坏命令名；
+- **非 Occurrence 隔离**：命令 chip 仅携带 submit 闭包与 token 文本，不作为模型内容进入 `occurrences`。
+
+### 2. 触发放宽在芯片化架构下的持久必要性
+
+在官方输入触发器核心扫描器（`dsh-client-ui-input-trigger/src/core/detect.ts`）中，其词法扫描依然严格遵循：
+
+```typescript
+for (let i = caret - 1; i >= 0; i--) {
+  const ch = draft.charAt(i);
+  if (WHITESPACE.test(ch)) return null;
+  if (ch !== '/') continue;
+  if (guard.tier === 'claimed') continue; // 关键：已认领态下硬跳过所有斜杠！
+  if (!boundaryOk(draft, i, ch)) continue;
+  return { ... };
+}
+```
+
+**深层启示**：
+无论前端将认领命令渲染为纯文本还是原子 `CommandChipNode`，只要会话状态机识别到首段已有认领命令，就会向触发控制器传入 `guard.tier = 'claimed'`。由于上述硬编码规则的存在，**参数中的行内斜杠依然会被宿主全部静默跳过**。
+
+因此，插件通过可逆猴补在光标位于行内斜杠时将 `guard.tier` 放宽为 `plain` 的设计，在字面文本与原子芯片两代架构下**具有恒久的通用必要性**，是突破宿主参数补全抑制的唯一通用接缝。
+
+---
+
 ## 四、快捷键系统与命令联动 (`dsh-client-shortcuts`)
 
 双面插件还可以在浏览器端直接监听快捷键：
@@ -132,9 +167,10 @@ export function apply(ctx) {
 
 ```text
 vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
-packages/client/shortcuts  <-  @deepseek-ai/dsh-client-shortcuts@0.2.0-rc.2
-packages/client/ui-commands  <-  @deepseek-ai/dsh-client-ui-commands@0.2.0-rc.2
-packages/client/ui-input-trigger  <-  @deepseek-ai/dsh-client-ui-input-trigger@0.2.0-rc.2
-packages/client/ui-shortcuts  <-  @deepseek-ai/dsh-client-ui-shortcuts@0.2.0-rc.2
-packages/interaction/commands  <-  @deepseek-ai/dsh-commands@0.2.0-rc.2
+packages/client/shortcuts  <-  @deepseek-ai/dsh-client-shortcuts@0.2.1-rc.2
+packages/client/ui-commands  <-  @deepseek-ai/dsh-client-ui-commands@0.2.1-rc.2
+packages/client/ui-input-trigger  <-  @deepseek-ai/dsh-client-ui-input-trigger@0.2.1-rc.2
+packages/client/ui-shortcuts  <-  @deepseek-ai/dsh-client-ui-shortcuts@0.2.1-rc.2
+packages/interaction/commands  <-  @deepseek-ai/dsh-commands@0.2.1-rc.2
+packages/client/ui-conversation  <-  @deepseek-ai/dsh-client-ui-conversation@0.2.1-rc.2
 ```

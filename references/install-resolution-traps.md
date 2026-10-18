@@ -622,27 +622,18 @@ function evaluatePluginCompatibility(manifest, exemptions = {}, runtimeVersion =
 
 ---
 
-## 十四、相关 DSH 源码
-
-上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
-本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
-
-```text
-vendor/cordis  <-  @deepseek-ai/cordis@4.0.4
-packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.1-rc.2
-packages/bundle/base  <-  @deepseek-ai/dsh-base@0.2.1-rc.2
-packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@0.2.1-rc.2
-packages/skill/skill  <-  @deepseek-ai/dsh-skill@0.2.1-rc.2
-packages/bundle/web-app  <-  @deepseek-ai/dsh-web-app@0.2.1-rc.2
-apps/plugin-market-generator  <-  @deepseek-ai/dsh-plugin-market-generator
-```
-
 ## 相关 DSH 源码
 
 上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
+vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
+packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.1-rc.2
+packages/bundle/base  <-  @deepseek-ai/dsh-base@0.2.1-rc.2
 packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@0.2.1-rc.2
-packages/client/modules       <-  @deepseek-ai/dsh-client-modules@0.2.1-rc.2
+packages/client/modules  <-  @deepseek-ai/dsh-client-modules@0.2.1-rc.2
+packages/skill/skill  <-  @deepseek-ai/dsh-skill@0.2.1-rc.2
+packages/bundle/web-app  <-  @deepseek-ai/dsh-web-app@0.2.1-rc.2
+apps/plugin-market-generator  <-  @deepseek-ai/dsh-plugin-market-generator
 ```

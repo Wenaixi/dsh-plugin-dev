@@ -217,7 +217,15 @@ Cardinality 选错会导致重复渲染或完全不渲染；调试实时插槽�
 - `DSH_*` 变量归 Harness：先丢弃环境已有 `DSH_*` 再合并显式 env；`undefined` tombstone 删普通环境值；env 字符串=有意凭据转发。
 - `done` 只报 close 词汇（exitCode/signal），不带超时/取消分类（调用方读自己的 signal 判定）。
 
-### 3. 进程沙箱 (ctx.sandbox)
+### 3. 进程沙箱 (ctx.sandbox) 与双端对偶门面 (Twin Façades) 辨析
+
+需要严格区分**操作系统级进程文件沙箱 (`ctx.sandbox`)** 与 **Cordis 内存上下文门控 (Context Façade)**：
+1. **OS 级文件效果沙箱 (`ctx.sandbox`)**：仅对独立进程/Native Runner 生效，利用操作系统底层内核机制（Windows ACL、Linux Landlock/bwrap、macOS Seatbelt）限制文件系统的读写范围；
+2. **Host 端沙箱上下文门面 (`dsh-cordis-host-runner/sandboxContext`)**：通过 Proxy 拦截未在 `inject` 中显式声明的服务访问，剥离 `root`、`fiber`、`registry`、`plugin` 等宿主内部对象；
+3. **Browser 端动态上下文门面 (`dsh-cordis-client-runner/dynamicCordisContext`)**：浏览器端的对应对偶门面，对 `slots`（自动分配优先级与 ledger 追踪）和 `theme` 实施受控代理；
+4. **正交隔离**：上述二者与三者纯属 JavaScript 内存层面的访问控制门面，与 OS 级进程文件沙箱正交解耦、互不混淆。
+
+
 
 - `SandboxMode = 'read-only' | 'workspace-write' | 'danger-full-access'`：**只管文件效果，网络与进程可见性不在此词汇内**。
 - `danger-full-access` 直接 spawn 原始 argv、**不经过 ctx.sandbox**；只有两种 confined 模式可发提供方。

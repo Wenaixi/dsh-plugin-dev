@@ -121,6 +121,16 @@ ctx.tools.guard((exec) => {
 
 ## 五、自定义工具编写规范 (defineTool)
 
+根据最新 `dsh-tools` 运行时源码，`defineTool` 的标准参数规范完整涵盖：
+- `name` / `description`：工具全局唯一标识与提示词语义描述；
+- `parameters`：参数规范，底层自动通过 `parameterSchemaSpecToJsonSchema` 归一化校验；
+- `output`：包含 `schema` 与 `render(args, value)`，可选 `presentationMeta(args, value)`；
+- `execute(args, exec)`：核心执行方法，执行前由框架自动执行 Schema 校验；
+- `timeoutMs`：正有限整数，设置工具调用的超时毫秒数；
+- `isConcurrencySafe`：布尔值，标识工具是否支持多任务安全并发执行；
+- `deferLoading`：布尔值，是否在宿主初始化时推迟工具的动态加载；
+- `presentCall(args)` / `presentResult(args, result)`：用户界面调用态与结果态自定义呈现钩子。
+
 ```js
 import { defineTool } from '@deepseek-ai/dsh-tools'
 

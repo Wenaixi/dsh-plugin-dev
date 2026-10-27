@@ -30,6 +30,12 @@ my-feature-plugin/
 
 ### package.json 声明
 
+#### 多版本兼容与 engines.dsh 优先判定律
+根据 DSH 最新运行时判定源码（`dsh-app-boot/evaluatePluginCompatibility`）：
+1. **优先判定 `engines.dsh`**：插件在 `package.json` 中声明 `engines.dsh`（如 `">=0.2.0 <0.3.0"`）时，宿主将其作为唯一判定标准，此时忽略同族 peerDependencies。
+2. **源码真源获取**：默认支持最新版本 DSH；若需适配历史或未来版本，可前往官方开源仓库 [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) 检出对应 Release Tag 或 Branch 核验源码。
+3. **后备 peer 校验**：仅当未声明 `engines.dsh` 时，宿主逐一校验所有 `@deepseek-ai/dsh` 及 `@deepseek-ai/dsh-*` 的 peer 依赖范围。
+
 ```json
 {
   "name": "dsh-my-feature",

@@ -504,22 +504,8 @@ ManagementFailure: incompatible-version
 function evaluatePluginCompatibility(manifest, exemptions = {}, runtimeVersion = getDshRuntimeVersion()) {
   runtimeVersionOf(runtimeVersion);
   const fields = objectOf(manifest, "Plugin manifest");
-  if (!Object.hasOwn(fields, "peerDependencies")) return void 0;
-  const dependencies = objectOf(fields.peerDependencies, "Plugin manifest peerDependencies");
-  const peers = {};
-  for (const [name, range] of Object.entries(dependencies)) {
-    if (typeof range !== "string") throw new Error(`Plugin manifest peerDependencies[${name}] must be a string`);
-    if (name !== "@deepseek-ai/dsh" && !name.startsWith("@deepseek-ai/dsh-")) continue;
-    const requirement = [
-      "workspace:^",
-      "workspace:~",
-      "workspace:*"
-    ].includes(range) ? runtimeVersion : range;
-    if (requirement.trim() === "" || !semver.satisfies(runtimeVersion, requirement, { includePrerelease: true })) {
-      peers[name] = range;
-    }
-  }
-  if (Object.keys(peers).length === 0) return void 0;
+  const requirements = unmetRequirements(fields, runtimeVersion);
+  if (Object.keys(requirements).length === 0) return void 0;
   const name = identityField(fields, "name");
   const version = identityField(fields, "version");
   const key = `${name}@${version}`;
@@ -527,9 +513,28 @@ function evaluatePluginCompatibility(manifest, exemptions = {}, runtimeVersion =
     name,
     version,
     runtimeVersion,
-    peers,
+    requirements,
     exempted: (Object.hasOwn(exemptions, key) ? exemptions[key] : void 0)?.includes(runtimeVersion) === true
   };
+}
+
+function unmetRequirements(fields, runtimeVersion) {
+  const engines = Object.hasOwn(fields, "engines") ? objectOf(fields.engines, "Plugin manifest engines") : {};
+  if (Object.hasOwn(engines, "dsh")) {
+    const range = engines.dsh;
+    if (typeof range !== "string") throw new Error("Plugin manifest engines.dsh must be a string");
+    return satisfies(runtimeVersion, range) ? {} : { "engines.dsh": range };
+  }
+  if (!Object.hasOwn(fields, "peerDependencies")) return {};
+  const dependencies = objectOf(fields.peerDependencies, "Plugin manifest peerDependencies");
+  const unmet = {};
+  for (const [name, range] of Object.entries(dependencies)) {
+    if (typeof range !== "string") throw new Error(`Plugin manifest peerDependencies[${JSON.stringify(name)}] must be a string`);
+    if (name !== "@deepseek-ai/dsh" && !name.startsWith("@deepseek-ai/dsh-")) continue;
+    const requirement = ["workspace:^", "workspace:~", "workspace:*"].includes(range) ? runtimeVersion : range;
+    if (!satisfies(runtimeVersion, requirement)) unmet[name] = range;
+  }
+  return unmet;
 }
 ```
 

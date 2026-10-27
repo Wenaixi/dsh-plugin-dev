@@ -223,7 +223,7 @@ declare module '@deepseek-ai/cordis' {
     planMode: PlanModeController
     goals: GoalService
     sessionQuery: SessionQueryService
-    sessionCheckpointPolicy: SessionCheckpointPolicy
+    sandboxPolicy: SandboxPolicy
     workspaceRegistry: WorkspaceRegistry
     schedule: ScheduleService
 

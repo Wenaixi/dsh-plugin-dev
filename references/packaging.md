@@ -85,7 +85,14 @@ Bundle 携带的补丁文件用于在装配树中挂载插件实例：
       disabled: false
 ```
 
-## 生效配置层顺序（官方权威）
+## 生效配置层顺序（官方权威完整链条）
+
+根据 `dsh-app-boot`（`readProfilePatches` / `loadOverlayPatches`）源码，DSH 实际按以下层级严格自底向上覆写配置（后层胜出）：
+1. **Bundles 内置默认补丁**（`bundles` 声明所带的 `cordis.patch.yml`）；
+2. **Profile 实例补丁**（`$DSH_HOME/profiles/<profile>/cordis.patch.yml`）；
+3. **全局默认补丁**（`$DSH_HOME/cordis.patch.yml`）；
+4. **命令行动态 Overlays**（CLI `--patch <path>` 或 `context.overlays` 动态注入）；
+5. **系统遥测与诊断追加补丁**（运行时按需注入的 `telemetryPatch`）。
 
 ```
 1. dsh.profile.bundles 各包的 patch（按列表顺序，先 @deepseek-ai/dsh-base）

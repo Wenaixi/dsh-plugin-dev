@@ -71,3 +71,33 @@ jobs:
             if (errors > 0) process.exit(1);
             console.log("Docs check passed: 0 dead links, 0 orphans across " + files.length + " files.");
           '
+      - name: Check entry documents for hardcoded version tokens
+        run: |
+          node -e '
+            const fs = require("fs");
+            const entryFiles = ["SKILL.md", "README.md", "references/README.md"];
+            let errors = 0;
+            const versionRe = /\b(?:v?\d+\.\d+\.\d+(-rc\.\d+)?)\b/;
+            for (const file of entryFiles) {
+              if (!fs.existsSync(file)) continue;
+              const lines = fs.readFileSync(file, "utf8").split("\n");
+              let inCodeFence = false;
+              for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                if (line.trim().startsWith("```")) {
+                  inCodeFence = !inCodeFence;
+                  continue;
+                }
+                if (inCodeFence) continue;
+                if (versionRe.test(line)) {
+                  console.error(`Hardcoded version token in ${file}:${i + 1}: ${line.trim()}`);
+                  errors++;
+                }
+              }
+            }
+            if (errors > 0) {
+              console.error(`Found ${errors} hardcoded version tokens in entry documents. Use <version> or keep version history exclusive to CHANGELOG.md.`);
+              process.exit(1);
+            }
+            console.log("Version token check passed: entry documents are strictly version-agnostic.");
+          '

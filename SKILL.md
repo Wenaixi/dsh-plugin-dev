@@ -1,380 +1,75 @@
 ---
 name: dsh-plugin-dev
-description: "Use when creating, modifying, reviewing, debugging, verifying, or releasing DeepSeek Harness (DSH) or Cordis plugins, including source verification against real DSH code, service injection, events, tools, guards, LLM adapters, dual-face UI, slots, schedules, agent teams, patches, bundles, isolated-instance acceptance, and hot/cold install validation."
+description: DeepSeek Harness (DSH) 插件开发通用指南。覆盖插件形态选择、Cordis 依赖注入、生命周期管理、双面 UI（Host/Browser）通信、配置自愈、工具扩展、隔离实例验收与无版本绑定的工程法则。
 ---
 
-# DSH 插件开发
+# DeepSeek Harness (DSH) 插件开发通用指南
 
-面向 DSH/Cordis 插件开发、审查和排错的通用指南。具体 API、服务名、配置字段和版本行为必须以目标运行时、已安装包和可执行探针为准；本技能不替代官方类型声明。
+面向任何 DSH/Cordis 版本的插件开发规范与架构指引。具体 API、服务名、配置项与版本行为必须以目标运行时的真实源码、类型声明及运行探针为准。本指南不替代运行时代码。
 
 ## 第一道门：读源码，不读就不能写
 
-**本技能库的正文是导航，不是答案。** 动手前必须完成三件事：
+任何插件开发或维护，必须先按以下三层顺序查证目标运行时的真实实现，严禁凭记忆猜测：
+1. **本机已安装源码**：优先检索全局/本地依赖中的目标包（`lib/types/*.d.ts` 查契约，`lib/index.js` 查实现）；
+2. **桌面版运行时解包**：若无源码，通过解包工具分析运行时包体；
+3. **官方仓库检出**：仅在本地缺失时拉取对应版本的官方仓库。
+**可失败检验**：写下代码前，必须能明确指出所依赖接口出自目标包的哪个文件与具体导出。详见 [references/source-verification-and-caches.md](references/source-verification-and-caches.md)。
 
-1. 确认目标运行时与版本（CLI 形态还是桌面版形态、哪个版本、哪个 profile）。
-2. 按 [source-verification-and-caches.md](references/source-verification-and-caches.md) 的三层顺序打开真实源码：先 pnpm、再 npm、命中即停；本机安装的源码未混淆、读到了就不要解包桌面版；只有想看 TypeScript 原始写法才克隆云端上游仓库。
-3. 把读到的契约写下来——包名、注入名、字段、返回结构、路径。
+## 开工五步法
 
-可失败检验：**能否指出某个契约出自哪个包的哪个文件。指不出来，就等于没读。**
+1. **确立插件形态**：依据职责选择 Service 扩展、Tool 工具、Event 监听器、双面 UI 组件或复合 Bundle。详见 [references/plugin-anatomy.md](references/plugin-anatomy.md)。
+2. **声明显式依赖**：严格核对 `inject` 服务列表及其单复数约定，缺失依赖坚决不上线。详见 [references/services.md](references/services.md)。
+3. **约束可逆生命周期**：所有副作用（事件监听、DOM 挂载、定时器、全局补丁）必须登记对应的清理回收句柄（Disposer）。详见 [references/lifecycle.md](references/lifecycle.md)。
+4. **先行为断言后实现**：为核心逻辑编写可失败的轻量验证脚本，先证明预期状态再投入业务编写。
+5. **隔离实例四态验收**：在新 profile 隔离实例下验证冷启动、热加载、配置热更新、完整卸载四种状态。详见 [references/isolated-instance-acceptance.md](references/isolated-instance-acceptance.md)。
 
-## 先做什么
+## 不可变工程原则
 
-1. 明确插件形态：函数插件、工具插件、Service、LLM 适配器、双面 UI、Bundle，或它们的组合。
-2. 列出必需依赖、可选依赖、外部资源和用户可见效果。
-3. 为每个必需依赖找到真实提供方，并核对 `inject`、入口参数、生命周期和错误语义。
-4. 先建立最小行为测试，再实现代码；测试应穿过公开接口或真实运行时 seam。
-5. 把每个副作用放进可逆生命周期；验证激活、失效、卸载和重复激活。
-6. 交付前在隔离新实例上验收：冷装、热装、热更新、卸载各过一遍，浏览器逐项点过并回读真值，模型由用户选定。
+1. **源码至上**：真实运行时代码行为 > 打包产物/JSDoc > 官方文档叙述 > 社区文章 > 本技能库文本。
+2. **显式依赖与单复数铁律**：服务的注册名与消费名必须完全匹配，不得混淆单复数。详见 [references/services.md](references/services.md)。
+3. **生命周期 100% 深度可逆**：拦截宿主行为必须支持无痕卸载，卸载后宿主环境行为与状态完全还原。详见 [references/lifecycle.md](references/lifecycle.md)。
+4. **跨端物理隔离**：严禁在 Browser 端直接调用 Node 原生模块；严禁将 Host Context 泄露给前端组件。详见 [references/three-roles.md](references/three-roles.md)。
+5. **事件流严格可观测**：不假设事件派发时序，关键流程必须具备取消信号感知与传递能力。详见 [references/events.md](references/events.md)。
+6. **配置渐进兼容与自愈**：Schema 演进严禁引入破坏性必填字段，配置读写必须具备结构自愈与校验能力。详见 [references/config.md](references/config.md)。
+7. **先状态后症状**：排查故障前必须先核验进程树、端口占用、真实写盘路径与加载状态。详见 [references/debugging.md](references/debugging.md)。
+8. **原子化与幂等操作**：状态修改采用先备份后原子替换，写入后立即回读验证落盘真值。详见 [references/storage-terminals-and-checkpoints.md](references/storage-terminals-and-checkpoints.md)。
+9. **深模块设计 (Deep Module)**：对外暴露最简洁的接口，把复杂的平台差异和多版本兼容隐藏在内部。详见 [references/architecture-refactor-experience.md](references/architecture-refactor-experience.md)。
+10. **简洁优先 (YAGNI)**：拒绝未被要求的抽象和层级，标准库与平台原生能力优先，消除冗余样板。
 
-## 不可变原则
+## 场景速查路由表
 
-- **事实优先**：文档是线索，当前运行时行为、安装包源码/类型、官方上游源码和可复现实验才是证据；本技能库自身也属于线索级。
-- **源码至上**：读参考文档只是起点。没有打开真实源码核对过的 API、字段与默认行为，不得进入实现。
-- **验收隔离**：插件完成的标志是隔离新实例上四种安装形态全过且浏览器逐项回读真值，不是日常 profile 里能跑。
-- **显式依赖**：必需服务通过正式注入表达；延迟查找只用于明确设计的可选能力，不能用来掩盖缺失依赖。
-- **最小权限**：只声明真正需要的服务、插槽、文件能力和网络能力。
-- **可逆副作用**：监听器、定时器、连接、注册、缓存、后台 Promise 都必须有 disposer、取消和错误处理。
-- **取消穿透**：遍历、I/O、网络、工具执行和后台任务都要传递并检查取消信号。
-- **事件不可猜测**：广播、串行、并行、瀑布和短路事件的等待、返回、错误和取消语义必须逐一核验。
-- **跨端隔离**：Host、Browser 和隔离进程不是同一个运行面；只通过正式数据通道传递能力。
-- **写入回读**：配置、UI、文件和发布操作都必须回读实际真值；点击、退出码或截图不能单独证明成功。
-- **断言可失败**：每条重要门禁都要通过人为破坏证明它真的会失败，优先验证行为和产物而不是源码文本。
-- **先证状态再论症状**：同一症状可能来自「从未进入目标状态」或「已进入但被丢弃」，观测完全一样。先找一个状态发生的标记并断言它，再讨论原因。
-- **承诺同步**：删除或改名能力时，同步检查入口、文档、配置、导出、示例和发布物。
-- **废弃不是删除**：配置字段废弃时保留 schema 声明与 volatile 标注，只在写入侧不再触碰它。删声明让用户历史配置被静默丢弃；去 volatile 标注会让清掉它的 unset 也被宿主写入闸门拒绝。详见 [config-field-lifecycle.md](references/config-field-lifecycle.md)。
-- **先问哪一层**：构建期常量、编译期写死的清单、文档里的历史结论都会过期。真值在运行时响应、磁盘文件和源码里；三者对不上时先确认自己引的是哪一层。
-- **门禁不写死会变的东西**：把具体版本号或阈值抄进门禁，等于每次变更都要改门禁本身，漏改即失效。断言应校验「几处一致」，不是「某处等于某字符串」。
-- **分清静态与真机**：有一类门禁在原理上无法用静态断言覆盖——宿主运行时的语义闸门。写门禁前先对一遍 [host-semantic-gates.md](references/host-semantic-gates.md)，把真机项排进隔离实例验收，不要留在脚本里假装已覆盖。
-- **先判能力再写方案**：需求是「同一份数据按调用方给出不同表现」时，先沿链路收敛——枚举全部消费方、追到投影函数的字段白名单、抄缓存键的构成维度、核对作用域参数。四条全过才有受支持路径；有一条不过就是上游数据模型不支持，此时该做的是选覆写路径并写清代价，而不是继续找写法。判定程序见 [shared-contract-capability-boundaries.md](references/shared-contract-capability-boundaries.md)。
-- **原子批处理**：多字段或列表项变更必须由客户端平铺为单次原子 `form.mutate(allOps)`，严禁并发触发多次独立 `mutate` 竞争宿主 revision 乐观锁，杜绝状态撕裂与局部失败。详见 [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §九。
-- **内存语法解析**：构建与门禁语法校验严禁使用跨进程 `spawnSync('node --check')`，改用 Node 原生 `node:vm`（`new vm.Script`）纯内存解析，彻底免疫 Windows 沙箱命名管道 EPERM 崩溃。详见 [sandbox-process-and-pipe-traps.md](references/sandbox-process-and-pipe-traps.md)。
-- **缺省值缓存隔离**：探测宿主全局设置时，对 `undefined` 缺省结果必须引入独立的布尔标志位区分「未探测」与「已探测为 undefined」，杜绝每次请求穿透缓存重复全量反射扫描；并在配置重载（`app-boot/config-reload`）中同步复位。详见 [provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) §九。
-- **取消优先穿透**：I/O 变动探测的异常捕获块严禁无差别吞没异常，必须优先判断并 rethrow `AbortError`，保障协作式取消链路畅通。详见 [provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) §十。
-- **增量替换通知**：向会话注入动态目录时严禁篡改已持久化的历史事件，严格遵循 Append-only 增量替换通知模型（`renderCatalogUpdate`），保全大模型长会话 Prompt Cache。详见 [session-prompt-cache-and-catalog-update.md](references/session-prompt-cache-and-catalog-update.md)。
-- **双层提示词与零缓存破坏**：插件自身模式切档严禁修改顶层 SystemPrompt 前缀（基线终身静态化），必须通过 `agent/pre-step` 尾部追加增量提醒并就地更新，彻底保全大模型 KV Cache（Prompt Cache）。详见 [session-prompt-cache-and-catalog-update.md](references/session-prompt-cache-and-catalog-update.md) §六。
-- **轮次拦截深模块化**：在 `agent/pre-step` 与 `session/event` 拦截用户指令时，坚决避免将消息展平、waterfall 穿透、变动对比、原地替换与状态标记散落在入口胶水代码中，必须收敛为单一的 `TurnCoordinator` 深模块，并捍卫 6 大核心不变量。详见 [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §八。
-- **全状态存储虚拟化**：插件持久化存储严禁硬编码调用 `node:fs` 读写磁盘，所有私有文件 I/O 必须由存储适配器代理，并向单测暴露纯内存适配器（`createMemoryStorage`），物理零磁盘触碰。详见 [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §九。
-- **包引擎与 CI 兼容基线**：`package.json.engines` 仅声明 Node 基础运行底座（`node: ">=20"`），严禁锁死 `engines.pnpm`（防 CI 触发 `ERR_PNPM_UNSUPPORTED_ENGINE` 与 `ERR_UNKNOWN_BUILTIN_MODULE` 恶性死锁）。详见 [ci-release-workflow.md](references/ci-release-workflow.md) §三。
-- **控制器深度抽象**：双面客户端配置交互必须抽象为领域控制器深模块（`CardController` / `PanelModel`），统一封装 `ConfigForm` 交互与单次原子 ops 拍平，React 视图仅通过 `useSyncExternalStore` 接入不可变快照，从根源杜绝并发渲染状态撕裂；并在纯 Node 环境下利用 `node:vm` 建立毫秒级脱机单测（The interface is the test surface）。详见 [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md)。
-- **重置边界正交隔离**：列表工具条上的批量重置操作严格局限于该列表项字典路径，严禁越权侧漏抹除用户独立的全局标量配置（如语言或主题偏好）。详见 [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §十。
-- **配置容灾与自愈闭环**：外部配置不可信。向前端暴露的易变或字典字段在 Schema 中声明为无闭包的纯类型（如 `Schema.any().default(...).volatile()`），严禁在 volatile 节点使用 `Schema.transform`（防跨端 JSON 序列化丢失回调导致客户端反序列化抛错）；数据清洗与容灾自愈由双侧无副作用纯函数在运行时承担；容灾提取键值字典必须使用 `Object.create(null)` 彻底免疫 `constructor` 原型假阳性与原型污染；自愈重生回写聚合为单次原子批处理，组件挂载与控制器构造严禁自发发起写入副作用（No Side-effect on Mount）。详见 [config.md](references/config.md) §九、§十。
-- **崩溃安全原子写盘**：插件私有本地文件（配置、状态、缓存）物理写盘严禁直接调用 `writeFileSync` 原地覆写，一律使用“同目录唯一临时文件写入 -> `renameSync` 原子替换”；在 Windows 极端文件占用环境下若 rename 失败安全回退直写并清理临时文件，从物理底层彻底消除由于掉电或进程中断导致的 0 字节与半截断破坏。详见 [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §一。
-- **配置损坏自愈与留样备份**：物理配置文件读取严禁在 `JSON.parse` 报错时直接丢弃用户数据回退空对象；必须通过轻度语法修补（清洗控制字符、去悬挂逗号、补齐闭合大括号）与模式正则深度提取进行多阶启发式抢救，现场留样备份损坏文件（`.corrupted.<timestamp>`，轮转保留 ≤3 份），并原地自动自愈重写为合法标准 JSON，使系统和后续外部读取平滑自愈。详见 [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §二、§三。
-- **状态跃迁原子事务**：拦截器中的状态变动检测与已发射标记回写严禁拆分为多步外泄调用，必须由状态机深模块提供原子跃迁接口（`consumeSessionTransition`）自闭环消费，对比判定与标记回写在单个原子事务内完成，“问一次即完成消费”，彻底捍卫单通知幂等不变量并免疫重试流水线撕裂。详见 [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十。
-- **持久化单向接缝**：多通道持久化（如 Settings 官方通道与文件回退通道）必须收敛于统一的 `ConfigSink` 接口接缝，底层磁盘 I/O 独占内聚在 `FileSink` 内部，配置定义模块彻底纯化为无状态模块，严禁上层暴露裸写盘函数形成旁路写盘双轨制漏洞。详见 [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十一。
-- **跨 Realm 断言拍平**：在纯 Node 环境下使用 `node:vm` 脱机测试客户端控制器时，沙箱内对象跨 Realm 比对因原型链隔离会被 `assert/strict` 拒绝（报 `Values have same structure but are not reference-equal`）；断言前必须使用 `toJson = (v) => JSON.parse(JSON.stringify(v))` 拍平数据结构，杜绝假失败误判。详见 [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md) §六。
-- **YAML 损坏截断与空值毒丸防御**：YAML 补丁（`cordis.patch.yml`）遭遇断电截断时未写完的列表项（如 `- `）会被解析器静默转为 `null`，数组提取与清洗必须强制施加 `typeof === 'string'` 过滤，杜绝静默注入引发空指针；语法损坏时自动切换为行级启发式状态机抢救。详见 [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §六。
-- **运行时持久化自愈回写闭环**：`apply` 入口深度清洗内存配置，若检测到修正且宿主 `settings` 就绪，必须通过 `settings.update` 自动将纯净 volatile 字段回写宿主，消除宿主存储中的持久化脏数据。详见 [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §七。
-- **配置重生成反引号转义隔离**：生成包含 `!!js` 动态表达式（含内层反引号）的配置文件时，严禁使用外层模板字符串直拼，一律采用字符串数组 `join('\n')` 物理隔离，杜绝反引号提前闭合截断文件与引发编译崩溃。详见 [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §八。
-- **客户端插槽防崩与防白屏守卫**：双面客户端组件严禁直接解构不可信的 `state.user`/`value`，必须使用防污解构与 `strArray` 清洗器兜底，杜绝组件崩溃被宿主降级为静默 `<div data-slot-error>`。详见 [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §九。
-- **遍历取消绝对穿透**：多条目/多文件循环扫描的 catch 块严禁无差别捕获，必须优先执行 `if (signal?.aborted || (err as DOMException)?.name === 'AbortError') throw err`；严禁将外部取消误判为业务解析损坏记入脏错误状态，严禁自定义 Abort reason 被静默吞没。详见 [provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) §十。
-- **构建先验后写原子时序**：双面或编译型插件构建流水线必须严格遵循「纯内存前置校验 -> 零漂移后安全写入目标磁盘 -> 最终产物落地核验」时序；严禁先覆写分发目录再做校验，彻底消除因漂移退出导致的脏产物落盘污染。详见 [deep-refactor-and-governance-hardening.md](references/deep-refactor-and-governance-hardening.md) §一。
-- **编译器死代码零容忍与导入解耦**：模块入口严禁顶层 import 本地未直接消费的符号，纯对外公开接口必须物理分离为 `export { ... } from './module'` 委托重导出；保证 `tsconfig.json` 能够永久开启 `noUnusedLocals: true` 与 `noUnusedParameters: true` 严格死代码拦截。详见 [deep-refactor-and-governance-hardening.md](references/deep-refactor-and-governance-hardening.md) §二。
-- **Tag 指针绝对对齐与纠偏铁律**：打 Tag 前后必须执行 `git rev-parse HEAD === git rev-parse "<tag>^{commit}"` 双向指针核验；一旦 Tag 误落入历史提交，严格执行「删 tag -> 在最新 HEAD 重打 tag -> 推 main -> 推 tag」标准纠偏序列，杜绝 CI 发布旧产物。详见 [deep-refactor-and-governance-hardening.md](references/deep-refactor-and-governance-hardening.md) §三。
-- **私有复杂度就地内聚防浅模块膨胀**：单消费方、纯内部的私有逻辑（如宿主配置解构或内部操作组装）严禁冲动抽离为独立的浅类（Shallow Module）；就地内聚在私有方法中不仅减少函数签名膨胀、维护单一测试表面，更能保全短路求值性能。详见 [deep-refactor-and-governance-hardening.md](references/deep-refactor-and-governance-hardening.md) §四。
-- **多持久化语法自愈纯函数化**：当插件管理多个本地私有持久化 JSON（如主配置、会话表、缓存映射等）时，必须提炼通用的零 I/O 纯函数 `repairJsonSyntax(raw)` 统一闭合缺失大/中括号并清洗悬挂逗号；严禁在各业务存储模块各自手写重复的括号计数与正则修复样板。详见 [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §十一。
-- **损坏现场留样备份入口时序**：物理文件读取一旦标准 `JSON.parse` 抛出语法异常，必须在进入 catch 块的第一时间立即执行现场留样备份（`.corrupted.<timestamp>`，轮转保留 ≤3 份），严禁将备份调用滞后放置在第一阶语法修补之后，杜绝因第一阶语法修复成功提前 return 造成案发现场漏备份。详见 [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §十二。
-- **多通道上下文目标解构单一真源与依赖消环**：多通道异构宿主上下文（如 `agent.session.id` / `scope.session.id` / `session.id`）提取逻辑必须下沉至基础无状态模块（`resolveSessionTarget`）作为全仓单一真源；消费子系统单向引用，严禁提示词引擎与轮次拦截器相互反向导入引发 ESM 双向循环依赖死锁。详见 [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十二。
-- **PowerShell 自动化命令链分号兼容规范**：跨平台或 Windows 自动化执行器连续执行终端命令严禁使用 `cmd1 && cmd2`（易在受限管道解析器引发 InvalidEndOfLine 语法解析中断），一律使用标准分号 `;` 分隔或拆分为独立执行调用。详见 [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十三。
-- **同步栈内存互斥防微任务竞态**：双面客户端在防范高频连击时，严禁依赖 React 的 `useState(busy)` 守卫；React 18 合成事件批处理机制下，状态更新属于异步调度，在下次 commit 渲染前闭包内 busy 仍为 false，快速连击能轻易穿透守卫并携带相同 revision 发射多次并发 mutate，引发宿主版本乐观锁撕裂冲突。必须在领域控制器上维护内存布尔字段（`private _busy = false`），在动作同步调用栈第一行立即执行 `if (this._busy) return false; this._busy = true;`，在 JavaScript 主线程同步期瞬间锁死，物理消除微任务并发窗口。详见 [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md) §七。
-- **单页面板拒绝自建事件总线过度工程 (Ponytail 裁决)**：双面插件设置面板若挂载于宿主行配置页（如 `plugins.row.config`），宿主上层本就监听了全局配置变动并在更新时重新下发全新 `props.form`，面板自身没有多调用方共享订阅需求；坚决遵循 Ponytail 极简原则（YAGNI），果断砍掉通用控制器模板中的 `_listeners = new Set()`、`subscribe()`、`useSyncExternalStore` 与 `Generation Counter` 等 50+ 行无用脚手架，控制器保持为极轻量的纯内存领域映射与同步互斥器即可。详见 [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md) §八。
-- **对称具名安装器装配范式**：插件入口 `apply(ctx, config)` 随功能增多时，严禁将多条独立的生命周期逻辑（如动态预设注册、工具运行期守卫、提示词注入、文件变动监听等）以匿名闭包直接内联堆叠在单个 `ctx.effect` 内；必须提炼为对称的具名安装器函数（如 `installPresetMode`、`installToolGuard`），每个安装器入参明确、职责内聚，统一返回标准的清理函数 `() => void` 或 `[trigger, dispose]`。`apply()` 彻底收敛为极薄的装配层编排器，圈复杂度大幅下降，生命周期可逆性一目了然。详见 [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十四。
-- **全链路取消信号穿透无死角**：取消信号不仅要在底层 I/O（如 `provider.list` / `get`）中传递，更必须在上层生命周期抽象（如 `Runtime.listNames(signal?: AbortSignal)`）与目录发布流水线中全链路透传到底层；严禁在上层封装中丢弃信号传递空配置 `{}`，并在所有的异常处理块中显式通过 `isAbortError(err, signal)` 识别重抛，严防外部取消信号被误判为物理文件损坏或目录卡死无法中断。详见 [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十五。
-- **模板嵌套反引号破坏与构建假绿陷阱**：在代码生成器或补丁自愈模块中使用 ES 模板字符串（反引号）生成包含动态表达式的代码时（如嵌套的反引号表达式），内层反引号若未加斜杠转义会提前闭合外层模板字符串，使后续代码沦为裸标识符引发致命编译错误（TS1005/TS1127/TS1434）；必须防范“假绿陷阱（The Phantom Green）”——若测试直接 import 编译产物，源码编译崩溃会被历史产物静默掩盖，门禁流水线第一步必须是全新构建（`npm run build`），遇错立即熔断，断言必须防御产物与源码漂移。详见 [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §十三。
-- **Git Tag 显式 SHA 强绑定与 spawnSync 数组传参防御**：发版打 Tag 时严禁直接通过 Shell 命令行字符串拼接调用（易受 Shell 双引号转义、编码与换行符吞没干扰，且重名 Tag 在未带 `-f` 时会静默失败保持旧指针）；必须使用 Node 原生 `child_process.spawnSync('git', ['tag', '-f', '-a', tagName, '-m', msg, targetSha])` 纯数组传参物理隔离 Shell 解析歧义，显式将 `git rev-parse HEAD` 的绝对哈希传入，并在推 Tag 前后执行双向哈希比对核验。详见 [publish-npm-verification.md](references/publish-npm-verification.md) §四。
-- **多语言说明文档发布白名单防 404 死链**：主文档包含多语言跳转链接（例如在顶部提供多语言切换指向各语言副档如 `README.zh.md`）时，必须将多语言副档显式加入 `package.json.files` 发布白名单中；严禁遗漏副档导致 npm 线上发布包中缺失该文件，使文档顶部的语言跳转链接沦为 404 死链。详见 [packaging.md](references/packaging.md) §五。
-- **猴子补丁会话级深度还原**：插件覆写宿主单例服务工厂（如 `sessionOf`、`get` 等）时，仅在卸载回调中重置该工厂方法并不够（已被分发给外部使用中的活跃会话实例仍持有篡改后的闭包）；必须使用全局唯一的 `Symbol.for('dsh.<plugin>.origMethod')` 在会话实例上固化原始方法（杜绝二次重复包装），并使用 `Set<WeakRef<object>>` 收集活跃实例（零内存泄露）；在 `ctx.effect` 销毁时，设 `active = false`，恢复工厂方法，并遍历解引用逐一还原已分发实例的方法并 `delete Symbol`。详见 [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §一。
-- **声明式样式与插槽监听销毁**：客户端 `<style>` 标签挂载与 `ctx.slots.inject` 监听器严禁裸露在 `apply` 入口；必须分别包在 `ctx.effect(() => { document.head.appendChild(style); return () => style.remove() })` 与 `ctx.effect(() => ctx.slots.inject(...))` 内部，杜绝 HMR 与热重载下的标签堆积与插槽监听器翻倍泄露。详见 [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §二。
-- **非 React 交互浮层深模块化与离线单测**：当交互浮层受限于键盘焦点必须锁定在输入框而无法使用 React Portal 时，严禁手写散落的全局 DOM 变量与命令式突变；必须抽象为独立的 `OverlayController` 深模块，将 DOM 骨架挂载、视口定位计算与事件委托统一内聚；将文本高亮切片（`splitHighlighted`）、多行文本截断预览与视口边界避让算法提炼为零 I/O 纯函数，实现纯 Node 环境下无需伪造 JSDOM 的毫秒级脱机单测（The interface is the test surface）。详见 [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §三。
-- **输入交互外壳 Coordinator 模式与 Hooks 正交解耦**：输入框增强类插件涉及按键拦截、右键粘贴、选区浮动工具栏、会话消息同步等多重关注点时，严禁揉成单一庞大 React 组件（发散式变化坏味道）；主组件仅作为协调器（Coordinator），维护单一的 `liveRef` 避免闭包过期，将其穿透至若干专注的子 Hooks；所有捕获期全局事件监听器的依赖项一律设为 `[]`，彻底消除按键输入过程中的事件解绑重绑抖动与 Fiber 重新调度开销。详见 [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §四。
-- **非必要文档写死版本与度量指标去中心化**：面向最终用户的说明文档（`README`）严禁充斥如 `（vX.Y.Z 新增）` 等历史版本标注，或写死的测试用例具体数字；版本变更全量收敛至 `CHANGELOG.md`，测试保障以自动化门禁脚本为单一真源；消除每次版本发布时对说明文档的散弹式修改（Shotgun Surgery）。详见 [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §五。
-- **元数据资源硬边界**：`package.json` 引用的静态资源（如 `icon`）必须严格受控于宿主硬限制（≤256 KiB，安全水位 ≤100 KiB）；图标采用 256×256 高保真重采样压制，并在门禁中断言物理大小，杜绝宿主引导期元信息崩溃。详见 [packaging.md](references/packaging.md) §七、[host-semantic-gates.md](references/host-semantic-gates.md) §2.9。
-- **构建钩子与输出流管道隔离**：自动化校验 `npm pack --json` 时，必须防范 `prepare`/`prepack` 钩子向 stdout 打印构建日志导致的标准输出污染；采用结构锚点切片提取（`raw.slice(start, end)`）防御，杜绝门禁 JSON 解析假崩溃。详见 [packaging.md](references/packaging.md) §八。
-- **React 18 快照引用稳定性与事件驱动失效**：控制器向 `useSyncExternalStore` 暴露的 `getSnapshot()` 必须返回不可变缓存对象（`_cachedSnapshot`）。若状态未变时每次调用返回新建对象字面量，`Object.is(old, new)` 恒为 false，React 18 会误判外部存储在渲染期间发生改变而无限递归更新，导致主线程 100% 冻结卡死（`Maximum update depth exceeded`）；快照缓存必须采用**事件驱动失效 (Event-Driven Invalidation)**，仅在底层数据源事件广播、作用域重绑或交互状态变动时清空缓存；且 `updateScope(nextScope)` 必须包含 `if (this.scope !== nextScope)` 恒等守卫，严禁在组件渲染周期内无条件调用 `_notify()` 向外部订阅者派发同步更新信号。详见 [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md) §九。
-- **Schemastery 跨端表单序列化与 Schema.transform 禁忌**：严禁在向前端暴露的 volatile 字段上使用 `Schema.transform`。宿主向浏览器同步配置表单 Schema 时使用 `schema.toJSON()` 进行 JSON 传输；`Schema.transform` 内部的 JavaScript 回调函数无法被 JSON 序列化，导致浏览器客户端反序列化（`rehydrate`）后调用 `validate(schema, draft)` 校验时触发 `TypeError: callback is not a function`，使 `ConfigFormController.prototype.decode(view)` 判定校验失败并返回 `undefined`，状态永远停留在 `loading` / `unavailable`，导致前端降级显示“当前宿主未提供本插件的配置通道，开关暂不可用”；易变字段声明保持 `Schema.any().default(...).volatile()`，清洗逻辑下沉至双侧纯函数。详见 [config.md](references/config.md) §十。
-- **客户端插件显式服务依赖声明铁律 (No Implicit Client Context)**：双面插件客户端导出严禁仅暴露裸 `apply(ctx)`，必须同时导出 `export const inject = ['slots', 'locale', ...]` 与 `export default { apply, inject }`。Cordis 微内核在全新隔离实例冷启动时在服务未就绪前立即执行 `apply`，未声明依赖会导致 `ctx.slots` / `ctx.locale` 为 undefined 并抛未捕获 TypeError，使条目的 Fiber 无法初始化（`fiber === undefined`），被宿主 Bootloader 判定为 `failed`（`web boot: 1 entry did not activate`）；在日常 profile 中该缺陷会被其他插件提前唤醒服务的行为隐蔽掩盖（假阳性）。详见 [client-bundle-loading-and-artifact-trace.md](references/client-bundle-loading-and-artifact-trace.md) §五、[dual-face-ui.md](references/dual-face-ui.md)。
-- **隔离实例本地源码联调直连铁律 (Direct Source Junction Rule)**：在隔离 profile 中调试本地未发布的源码时，严禁运行 `pnpm install` 或 `dsh plugin add <本地目录>`。pnpm 依赖解析器会将包深层锁定在 `.pnpm/<name>@<hash>/node_modules/<name>` 虚拟存储池中；导致开发者在本地修改源码并重新构建后，宿主静态服务继续分发虚拟池中的历史快照副本，产生“源码改了、编译过了、控制台零报错，但宿主永远运行旧代码”的严重假象；必须在 profile 的 `package.json` 配置 `dependencies` 与 `bundles` 后，跳过 pnpm install，直接手工建立直通开发工作区根目录的目录联接（Windows `mklink /J`，类 Unix `ln -s`），并通过 `(Get-Item node_modules/<pkg>).Target` 强校验联接目标绝不含 `.pnpm`。详见 [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §一。
-- **特权能力多级物理守卫铁律 (Multi-Tier Tool Guard Rule)**：插件向宿主引入代码执行、敏感数据写入或外部特权 API 时，严禁仅依靠系统提示词软约束，必须在 `agent/created` 中构建双道物理防线：先调用 `tools.restrict({ deny: targets })` 从系统提示词工具目录物理移除（第一道防线，消灭调用意图），再挂载 `tools.guard((exec) => ...)` 执行期动态守卫（第二道防线，阻断模型盲调并返回可读拒绝理由）；且必须具备全局 Master 总控短路（总控关闭全系统无条件拦截）与按预设作用域过滤机制，并通过 `settings/document-updated` 响应式联动。详见 [tools.md](references/tools.md) §九。
-- **Web 界面热安装与发布冷却期静默降级**：用户在运行中实例界面点击「+ 添加插件」输入裸包名时，因 pnpm 默认开启 24 小时发布冷却期（`minimumReleaseAge: 1440`），不满 24 小时的新版本被排除，静默降级安装已过冷却期的旧版（产生“明明发了修复但实测依然复现旧 bug”的严重误诊）；安装指引必须强制带精确版本号（自动登记 `minimumReleaseAgeExclude` 豁免名单），测试环境配置 `minimumReleaseAge: 0`。详见 [install-resolution-traps.md](references/install-resolution-traps.md) §九。
-- **多插件环境纯脚本升级构建脚本隔离 (`--ignore-scripts`)**：复杂 profile 中常混装其他含原生 C++ 绑定的第三方插件；更新纯 JS/TS 插件时 pnpm 默认会检查并重跑工作区所有依赖的生命周期构建脚本，在缺少编译环境的主机上报 `ERR_PNPM_EXECUTOR_LIFECYCLE_SCRIPT_FAILED` 连带阻断更新；纯脚本插件安装/升级必须追加 `--ignore-scripts` 物理隔离，且插件自身严禁滥用 `postinstall` 钩子。详见 [install-resolution-traps.md](references/install-resolution-traps.md) §十。
-
-- **Schemastery 易变字段访问器模式与递归解包铁律 (Volatile Accessor Pattern)**：在 Schemastery 3.18.5+ 中，标记为 `volatile` 的 Schema 字段经 `Config(raw)` 校验后返回的是带有 `[Symbol(cosmokit.volatile.write)]` 与 `get: [Function]` 的只读响应式访问器对象，而非原始标量；单测与业务逻辑严禁直接对解析结果做标量恒等断言（`assert.equal(resolved.field, 'literal')`），必须通过通用的 `unwrapLazy` 多级解包函数（兼顾函数闭包与对象访问器）提取真实值。详见 [config.md](references/config.md) §十一。
-- **CI 纯净容器编译与单测依赖显式声明铁律 (CI Peer Dependency Reflection Rule)**：上游底座包编译产物（如 `lib/index.js`）直接引用的同族依赖（如 `@deepseek-ai/dsh-scope`），在本地因父级或全局缓存往往能静默解析，但在 GitHub Actions 等开启 `legacy-peer-deps=true` 的纯净 CI 容器中不会被 `npm ci` 自动补全。脱机单测或编译期直接引用的包，必须显式在 `package.json.devDependencies` 中登记并锁定在 `package-lock.json` 中，杜绝「本地能跑、云端报 ERR_MODULE_NOT_FOUND」的跨端假象。详见 [ci-release-workflow.md](references/ci-release-workflow.md) §四。
-- **宿主微内核对等依赖生命周期区间铁律 (Host Peer Semver Range Syntax)**：DSH 微内核在加载 Profile 时会对插件 `peerDependencies` 执行严格版本校验。严禁将对等依赖过度收窄至某一特定小版本或 RC（如 `^0.2.1-rc.2`），否则相近的相邻版本宿主（如 `0.2.0-rc.2`）会在启动时物理禁用该插件行（报 `Plugin ... is incompatible with dsh ...`）；必须采用跨越生命周期的标准区间语法（如 `>=0.2.0-rc.2 <0.3.0-0`），兼顾向前对齐与平滑兼容。详见 [ci-release-workflow.md](references/ci-release-workflow.md) §五。
-- **隔离实例官方模板自动派生铁律 (Shipped Profile Auto-Initialization)**：在临时 `DSH_HOME` 下初始化官方自带模板（`web`、`desktop`、`tui`）时，直接运行 `dsh <shipped> --dump-config` 即可自发完成标准初始化；严禁向官方内建模板追加 `--from-default-profile` 参数（宿主直接报错 `profile "..." is shipped and cannot be a custom profile target`）；`--from-default-profile` 仅允许在目标是自定义命名的 profile 时使用。详见 [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §7.1。
-- **自动化隔离验收动态端口与代理豁免铁律 (Ephemeral Port & Loopback Proxy Bypass)**：端到端验收脚本严禁硬编码端口（如 3099/3088，极易因前次残留或系统服务占用报 `listen EADDRINUSE` 崩溃），必须使用 Node `net.createServer().listen(0)` 向操作系统动态申请保底空闲端口；在 Windows 环境下动态导入绝对路径必须经 `pathToFileURL` 转换为 `file://` 协议（杜绝 `ERR_UNSUPPORTED_ESM_URL_SCHEME`）；且探针测试时必须注入 `NO_PROXY=127.0.0.1,localhost`，防范外部代理劫持本地回环端口导致握手超时。详见 [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §7.2、§7.3。
-- **`engines.dsh` 版本门禁与静默跳过防线**：第三方插件版本兼容性优先按 `engines.dsh` 判断；未满足 `peerDependencies` 时宿主不会崩溃而是静默从 Profile 的 `bundles` 栈中剔除该插件并引发级联 patch 丢失（`patch: entry not found`）。插件必须显式声明 `engines.dsh`（如 `">=0.2.0-rc.2 <0.3.0-0"`）并理性配置 `peerDependencies` 覆盖当前与下一代候选版本。详见 [host-semantic-gates.md](references/host-semantic-gates.md) §2.10。
-- **单包工程工作区纯净律**：单包 DSH 插件根目录严禁创建或提交无有效 `packages:` 声明的 `pnpm-workspace.yaml`，否则触发 GitHub Actions `actions/setup-node@v4` 执行 `pnpm store path` 时报 `ERROR packages field missing or empty` 恶性中断构建。详见 [ci-release-workflow.md](references/ci-release-workflow.md) §三.3。
-- **纯净平铺原子批处理 (Pure Flattening Pattern)**：主版本放弃旧版兼容时，坚决从 Schema、运行时与控制器中拔除废弃字段；单项切换严格发射 1 条 op（禁止追加旧表 unsets），批量操作严格发射 N 条 op，将 RPC payload 与 revision 乐观锁冲突降至物理极小值。详见 [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §十四。
-- **模板补丁空数组覆盖律**：从官方模板派生 Profile（`--from-default-profile`）生成的 `cordis.patch.yml` 初始内容为 `[]`，严禁盲目向后追加条目（引发 `YAMLException: end of the stream or a document separator is expected`），必须整体覆写为合法的单顶级序列。详见 [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §一。
-- **零端口无感装配检验**：在启动 GUI 或消耗 Token 之前，优先调用 `dsh --profile <name> --dump-config`，1 秒内完成语法、Schema 校验、volatile 解包与组合树真值回读，0 端口占用、0 Token 消耗。详见 [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §一。
-- **预发布兼容区间有界性（Bounded Pre-release Range Rule）**：在 `package.json` 的 `peerDependencies` 与 `engines.dsh` 中，严禁写死单个带 pre-release 标签的精确版本（如 `"0.2.1-rc.2"`），必须采用带明确起止边界的语义化区间（如 `">=0.2.0-rc.1 <=0.2.1-rc.2"`），既能准确淘汰已废弃历史旧版（如 0.1.x），又能避免宿主前序版本或相邻测试版在 `evaluatePluginCompatibility` 判定中因精确等于失败而跳过挂载。详见 [install-resolution-traps.md](references/install-resolution-traps.md) §十一。
-- **发布包版本不可变性（Package Immutability Rule）**：npm 官方注册表对已发布的包实行物理不可变锁定，严禁同版本覆写。修复 `peerDependencies`、`engines` 或逻辑缺陷时，**必须递增全新的 SemVer 版本号（如 `x.y.z+1`）**，切勿试图通过 force-push tag 覆盖已存在的线上旧版本包（CI 会跳过发布导致用户继续拉取旧包）。发版后必须通过 `npm view <pkg>@<ver> peerDependencies --json --registry=https://registry.npmjs.org` 真实回读元数据。详见 [publish-npm-verification.md](references/publish-npm-verification.md) §八、[install-resolution-traps.md](references/install-resolution-traps.md) §十二。
-- **状态机单一关闭表示（Single-off Contract）**：具有多档运行模式加关闭态（`off`）的状态机，在系统内部对于“关闭态”只认一种法定真值即 `null`。所有从配置、命令、事件、volatile 引用流入的模式值在进入状态机时必须立即归一为 `mode === 'off' ? null : mode`，严禁在状态机内部存储字符串 `'off'`，确保内存状态与磁盘 flag 文件的删除（`storage.clear()`）100% 镜像同态，彻底消除“内存已关闭但磁盘 flag 文件残留”的状态撕裂。详见 [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十六。
-- **Windows PowerShell 原生无 BOM 写入铁律**：在 Windows PowerShell 编写自动化脚本生成或重写 `package.json`、`cordis.patch.yml` 等文件时，严禁使用 `Out-File -Encoding utf8`（会静默注入 3 字节 UTF-8 BOM `\uFEFF`）；Node.js 原生 `JSON.parse` 严格遵循 RFC 8259 规范，遇 BOM 直接抛出 `SyntaxError: Unexpected token '﻿'` 致命崩溃中断宿主引导；必须使用 `[System.IO.File]::WriteAllText($path, $content, [System.Text.UTF8Encoding]::new($false))` 纯净无 BOM 写入。详见 [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §配置文件生成。
-- **DSH Web 一次性 Launch Token 鉴权与 Session Cookie 握手**：`dsh web` 启动时生成一次性随机内存 `launchToken`，并对所有未携带合法签名 Cookie 的原始请求返回 `401 Unauthorized`；自动化测试探针与浏览器脚本严禁直连裸端口，必须捕获启动输出中的 `?token=...` 链接，通过 `303 See Other` 完成鉴权握手并持久化 `dsh-auth-*` Session Cookie，杜绝误判服务坏死。详见 [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §3.5。
-- **会话生命周期插槽挂载分界 (Blank Hero vs Active Session)**：DSH 输入条容器对会话级输入插槽施加 `sessionId === void 0 ? null : renderSlot(...)` 严格门禁；在未创建会话的 `dataPhase: "hero"` 空白起始页上插槽静默不渲染；自动化测试输入增强特性前，必须先发送本地零 Token 指令（如 `/help`）激发宿主分配本地会话使页面跃升进入 `dataPhase: "active"`，方可验证插槽挂载。详见 [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §4.4。
-- **npm 全球读副本扩散时延与连续发布容错**：连续快速发版时，npm 主写集群返回 `[发布成功] Published package` 后，全球 CDN 读副本（`registry.npmjs.org`）存在 1 至 5 分钟的元数据同步扩散时延；自动化验签脚本必须携带防缓存时间戳（`?nocache=`）并设置至少 3 分钟的重试窗口，严禁因暂态 404 冲动重复发布引发 `E409 Staged` 锁死。详见 [publish-npm-verification.md](references/publish-npm-verification.md) §6.3。
-- **命令原子芯片化下的触发放宽通用性**：DSH 0.2.1+ 将认领命令升级为原子内联芯片（`CommandChipNode`），但底层 `detectTrigger` 依然对 `guard.tier === 'claimed'` 硬跳过所有斜杠；无论命令呈现为纯文本还是芯片，行内斜杠判定并在参数区将守卫降级为 `plain` 是恢复后续技能补全的唯一通用接缝。详见 [slash-commands-and-input-triggers.md](references/slash-commands-and-input-triggers.md) §三之三。
-- **上游废弃诊断包彻底解耦与孤儿清障**：上游版本演进中若彻底下架某项运行时机制（如 DSH 0.2.1 彻底移除 `dsh-invariants` 与 `./invariant` 导出），插件必须执行源码删除、构建 entry 剔除、`package.json.exports/peerDependencies` 拔除以及物理编译目录清理（`rm -rf lib/types`）四步彻底清障，杜绝因残留废弃 peer 依赖或孤儿声明导致兼容性拦截或打包污染。详见 [install-resolution-traps.md](references/install-resolution-traps.md) §十二。
-- **写接口缺省即拒绝 (Write-API Reject-on-Missing)**：写类 Remote 方法（保存内容、切换文件、写配置）严禁在函数体内写「缺字段默认空值」分支——自动化探针或旧调用方发空载荷时，缺省分支把空串当合法内容，配合临时文件 + rename 原子写会把目标文件**覆写为 0 字节，零报错且不可逆**；校验必须放在方法第一行、先于一切副作用（读目录、拼路径、开临时文件），字符串字段 `typeof !== 'string'` 即 throw，枚举字段白名单拒绝未知值；真机验收必须包含一条「故意发空载荷 → 返回 `{ok:false}` 且目标文件 md5 不变」的用例证明防御在场。详见 [field-experience-extraction.md](references/field-experience-extraction.md) §一。
-- **自动化探针完整载荷纪律**：探测写类 RPC 前先读宿主方法签名或描述符列全必填字段再构造完整 payload，严禁先发空载荷「试接口」；试接口需求一律走只读方法（describe/读取类 getter）或指向临时新建目标，绝不指向真实用户数据文件。详见 [field-experience-extraction.md](references/field-experience-extraction.md) §1.3。
-- **含 CJK 请求体禁止 shell 内联 (Non-ASCII Payload Encoding)**：Windows shell（PowerShell/git-bash）内联字符串构造含中文的 JSON 请求体会被当前代码页（常见 GBK）转码，宿主按 UTF-8 解析后把中文写成乱码字节、文件大小与 md5 均不符且不可读；含非 ASCII 的请求体一律先以 UTF-8 无 BOM 写 `body.json` 再 `curl --data-binary @body.json`，禁止 `-d '{...中文...}'` 内联形态；判据链三层全过才算通路正确——先 `wc -c` 校验请求体字节数（中文每字 3 字节）、再发请求、再 `cmp`/md5 对比目标文件。详见 [field-experience-extraction.md](references/field-experience-extraction.md) §二。
-- **编辑器写盘链路的磁盘字节真值 (Disk-Bytes Truth for Editor Writes)**：编辑器（textarea + 保存按钮）链路的「前端 toast 已保存」只证明 RPC 信封 ok，不证明磁盘字节正确（编码漂移、字段截断、写错路径都能让 toast 照常显示）；验收用三段一致判据——①向 textarea 注入可识别标记（React 受控组件必须用 `Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el, text)` + 手动 `dispatchEvent(new Event('input',{bubbles:true}))`，直接改 `.value` 不会触发 React 状态）→ ②按完整文案点击保存按钮并等待异步写入稳定（宿主队列 + 镜像折叠）→ ③磁盘取证 `wc -c` 目标文件 = 原字节数 + 标记字节数、`tail -c <n>` 末尾正是标记原文；写盘验收后必须把真实用户文件还原到验收前状态并 `cmp` 校验，绝不把用户正式文件留在被注入标记的状态。详见 [field-experience-extraction.md](references/field-experience-extraction.md) §三。
-- **多 CLI 解析歧义与版本错配红字 (Multi-CLI Resolution Ambiguity)**：同机可能并存 npm 全局 CLI 与桌面版应用自带 CLI，裸命令解析到哪份由 **PATH 顺序**决定与「你想用哪份」无关；用错误版本 CLI 装配 profile 时宿主启动整屏红字 `Plugin ... is incompatible with dsh ...: requirements {...}` 并禁用官方插件——这不是实例坏了，是装配引擎版本 ≠ profile 插件期望版本；处置先 `where dsh`/`Get-Command dsh` 验身份 + `dsh --version` 确认版本，两份并存时一律用绝对路径调目标那份；pnpm 安装的 profile 自带 `node_modules/.bin/dsh.cmd`（与 profile 插件同版本）是版本对齐首选；桌面版 CLI 的 launcher 仅设 `ELECTRON_RUN_AS_NODE` 调应用 asar 内宿主，只依赖自带运行时、与全局 npm 包完全无关。详见 [field-experience-extraction.md](references/field-experience-extraction.md) §四。
-- **全局 npm 包残骸自愈重装 (Global npm Package Debris)**：中断的 `npm install -g` 会留下只有 `node_modules/` 子目录、无 `package.json`/`lib/` 的包目录，`npm ls -g --depth=0` 显示该包版本为空、npm 根目录还可能有 `.pkg-<random>` 临时残留；判定为残骸后无需手工清理，**直接重装同版本**（`npm install -g <pkg>@<ver>`）即自愈恢复目录结构；`$DSH_HOME/profiles/node_modules/` 共享池条目常是指向全局 npm 目录的 junction/symlink，重装后自动指向完整包；升级 profile 启动报 failed to import 时先查两处——共享池 @deepseek-ai 条目指向是否损坏，与 `pnpm-workspace.yaml` 的 `autoInstallPeers` 是否 false（缺 peer）。详见 [field-experience-extraction.md](references/field-experience-extraction.md) §五。
-- **官方机制缺口判定（硬编码常量侦查）**：「官方 UI 看起来该有的能力」先读官方源码确认是**机制缺口**还是**配置项**再决定方案；如官方指令插件的全局文件名是源码硬编码常量、候选文件列表只作用于项目目录——全局读另一文件名这类需求官方机制下做不到，是上游契约缺口而非配置缺失；机制缺口才是插件**接管注入**（在事件钩子里替换/补充官方注入消息）的合法机会面。详见 [field-experience-extraction.md](references/field-experience-extraction.md) §六。
-- **逐层独立策略夹具验证法 (Per-Layer Independent Verification Fixture)**：插件有多个「层」（全局/项目/子目录）且每层独立策略时，验证「层与层互不影响」用**一个夹具一次跑完**：临时工程目录里各层指令文件一份、内容带互不相同的可识别标记，把各层策略同时设成四种不同值（disabled / 极小截断 / 中等截断 / 不截断），一次渲染后断言每个标记的最终状态与各自层策略一一对应（截断层标记消失且字节数精确、disabled 层整层不出现、unlimited 层全文保留）——一次证明四层互不渗透，而不是四个单测各自证明自己。详见 [field-experience-extraction.md](references/field-experience-extraction.md) §七。
-- **带参 RPC 客户端描述符写全 parameters (Parameterized Remote Descriptors)**：零参方法（如 `snapshot()`）客户端描述符可省略 `parameters`；**带参方法不能照抄省略**——客户端网关对每个 descriptor 的每个参数做 strict codec 校验，缺参数抛 `generated Remote <ns>/<method> field "<wire>" has no strict codec`；带参方法描述符形态 `parameters: [{name, wire, source:'json', codec:{mode:'strict', typeSymbol, create: 恒等}}]` + `result: {mode:'strict', typeSymbol, create: 恒等}`（strict 只校验模式字段本身，create 恒等即充分、解码缺省原样透传）；宿主侧签名单对象参数 + 可选末位 signal，业务实参在 wire 上是 `payload.args.<argName>` 嵌套；客户端调用返回 `{ok:true,value} | {ok:false,error}` 信封必须拆包。详见 [field-experience-extraction.md](references/field-experience-extraction.md) §八。
-
-## 场景路由
-
-| 需求或症状 | 先读 |
-| --- | --- |
-| 需要多智能体团队协作开发、隐式根名册管理、点对点非自旋通信与共享任务 DAG 调度 | [agent-teams-architecture.md](references/agent-teams-architecture.md) |
-| 需要启用计划模式进行方案探索、只读执行纪律、用户审批闸门与 /plan off 退出通道 | [plan-mode-and-user-review-gate.md](references/plan-mode-and-user-review-gate.md) |
-| 需要多轮自主长程目标驱动、跨轮延续驱动器 goal-round-driver 与三轮持久阻塞判据 | [goal-driven-system.md](references/goal-driven-system.md) |
-| 升级适配 Session V4 格式、团队通信收件箱映射、Prompt Cache 保全与 SQLite 检索 | [session-format-v4-and-migration.md](references/session-format-v4-and-migration.md) |
-| 需要持续伪终端 PTY 会话常驻、ObservedStateGate 写前强观察门禁与 Win32 ACL 沙箱 | [persistent-shells-and-observation-policy.md](references/persistent-shells-and-observation-policy.md) |
-| 启动报 SyntaxError: Unexpected token '﻿'、package.json 无法解析、Windows UTF-8 BOM 陷阱 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §配置文件生成 |
-| 自动化探针请求 Web 报 401 Unauthorized、launchToken 与 Cookie 握手机制 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §3.5 |
-| 会话输入框插槽在空白首页找不到 DOM 节点、事件未触发、Hero 起始态与 Active 阶段门禁 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §4.4 |
-| 连续发布后 npm view 查不到新版本或报 404、读副本扩散时延与防缓存轮询 | [publish-npm-verification.md](references/publish-npm-verification.md) §6.3 |
-| 认领命令重构为 CommandChipNode 芯片后参数中的斜杠无法唤起技能补全菜单 | [slash-commands-and-input-triggers.md](references/slash-commands-and-input-triggers.md) §三之三 |
-| 上游版本演进移除某运行时服务（如 invariants 诊断机制）、彻底解耦与孤儿声明清理 | [install-resolution-traps.md](references/install-resolution-traps.md) §十二 |
-| 宿主启动报 skipping profile bundle 或 incompatible with dsh（要求某 peerDependency） | [install-resolution-traps.md](references/install-resolution-traps.md) §十一 |
-| 修复了依赖并强推 tag 但新安装依然复现旧报错、npm 包不可变与幽灵发布 | [publish-npm-verification.md](references/publish-npm-verification.md) §八 |
-| 插件模式切换为 off 但磁盘 flag 文件依然残留、跨进程误判已激活、状态机关闭态撕裂 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十六 |
-| 宿主成功启动或 dump 正常，但插件功能完全没加载、patch 报 entry not found、bundle 被静默跳过 | [host-semantic-gates.md](references/host-semantic-gates.md) §2.10 |
-| GitHub Actions 在 setup-node 阶段报错 ERROR packages field missing or empty、CI 未装依赖即中断 | [ci-release-workflow.md](references/ci-release-workflow.md) §三.3 |
-| 单开关操作每次发送 3 条 ops、批量操作 payload 膨胀、旧表 unset 拖垮并发性能与 revision 锁 | [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §十四 |
-| 从官方模板新建 Profile 引导时报 YAMLException: end of the stream or a document separator is expected | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §一 |
-| 隔离实例验收不想启动 Web 占端口或消耗大模型额度、零端口毫秒级底层装配回读 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §一 |
-| Schemastery 3.18.5+ volatile 字段单测报 Expected values to be strictly equal: + { [Symbol]: [Function], get: [Function] } - 'val' | [config.md](references/config.md) §十一 |
-| 本地测试全绿但 GitHub Actions CI 容器单测报 Cannot find package '@deepseek-ai/dsh-scope' 或 ERR_MODULE_NOT_FOUND | [ci-release-workflow.md](references/ci-release-workflow.md) §四 |
-| DSH 宿主启动日志提示 disabling profile plugin row: Plugin ... is incompatible with dsh ... 插件行被禁用 | [ci-release-workflow.md](references/ci-release-workflow.md) §五 |
-| 临时 DSH_HOME 初始化 web profile 报错 profile "web" is shipped and cannot be a custom profile target | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §7.1 |
-| 自动化验收脚本启动 Web 实例报 listen EADDRINUSE: address already in use 端口冲突 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §7.2 |
-| Windows 下自动化脚本动态 import 报 ERR_UNSUPPORTED_ESM_URL_SCHEME 或本地探测连接超时被系统代理劫持 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §7.3 |
-| Web 界面热安装刚发布的补丁包依然复现旧 Bug、pnpm 发布冷却期静默降级 | [install-resolution-traps.md](references/install-resolution-traps.md) §九 |
-| 多插件 Profile 升级纯 JS 插件报不相干的原生依赖构建失败、ERR_PNPM_EXECUTOR_LIFECYCLE_SCRIPT_FAILED | [install-resolution-traps.md](references/install-resolution-traps.md) §十 |
-| 点击插件卡片展开详情界面瞬间崩溃卡死、CPU 100%、useSyncExternalStore 未缓存死循环 | [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md) §九 |
-| 配置面板提示当前宿主未提供本插件的配置通道、状态永久 unavailable、Schema.transform 闭包丢失 | [config.md](references/config.md) §十 |
-| 覆写宿主全局服务工厂导致旧会话永久持有闭包、Symbol+WeakRef 深度可逆还原 | [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §一 |
-| 插件多次热重载导致 `<head>` 内 `<style>` 标签堆积与插槽监听器翻倍泄露 | [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §二 |
-| 键盘焦点需锁定输入框无法用 React Portal、OverlayController 浮层解耦与脱机单测 | [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §三 |
-| 输入增强组件膨胀至数百行、捕获期监听频繁重绑颠簸、Coordinator 与 Hooks 拆分 | [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §四 |
-| 每次发版被迫散弹式修改 README、说明文档写死历史版本与单测数字去中心化 | [deep-lifecycle-overlay-and-coordinator-patterns.md](references/deep-lifecycle-overlay-and-coordinator-patterns.md) §五 |
-| 多文件 JSON 损坏修补重复代码膨胀、通用语法自愈纯函数 repairJsonSyntax | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §十一 |
-| 损坏文件自愈成功但未生成留样备份文件、备份调用时机滞后陷阱 | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §十二 |
-| React 18 useState 异步调度并发穿透、连击导致 revision 乐观锁冲突 | [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md) §七 |
-| 双面单页面板是否需要自建事件总线、useSyncExternalStore 过度工程裁决 | [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md) §八 |
-| apply() 闭包变量膨胀纵横交错、对称具名安装器解耦装配模式 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十四 |
-| 目录收集与清单发布丢失 AbortSignal 上下文、全链路取消信号穿透 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十五 |
-| 模板字符串嵌套反引号引发编译崩溃、测试读旧产物产生虚假安全感 | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §十三 |
-| Git Tag 因 Shell 引号解析截断未绑定最新提交、spawnSync 数组强绑定 | [publish-npm-verification.md](references/publish-npm-verification.md) §四 |
-| 提取会话或上下文 ID 导致模块间循环依赖、resolveSessionTarget 下沉消环 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十二 |
-| Windows 下自动化脚本运行多条命令报 && 不是有效语句分隔符 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十三 |
-| YAML 补丁损坏截断、YAML 解析出 null 空值毒丸、启发式状态机抢救 | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §六 |
-| 插件启动时发现配置有脏数据、自动写回宿主 settings 持久层自愈闭环 | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §七 |
-| 生成带 !!js 动态表达式的配置时反引号提前闭合、TS1005 编译报错或文件被截断 | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §八 |
-| 客户端配置面板打开空白、渲染被替换为 `<div data-slot-error>`、state.user 防污 | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) §九 |
-| 资产/条目循环扫描时被取消、取消异常被当成业务损坏并残留脏错误状态 | [provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) §10.4 |
-| 携带自定义错误原因的 AbortController 取消时异常被静默吞没 | [provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) §10.5 |
-| 构建脚本校验失败但目标目录已被脏产物覆盖、先验后写原子时序 | [deep-refactor-and-governance-hardening.md](references/deep-refactor-and-governance-hardening.md) §一 |
-| TypeScript 开启 noUnusedLocals 报 TS6133、模块消费导入与委托导出物理解耦 | [deep-refactor-and-governance-hardening.md](references/deep-refactor-and-governance-hardening.md) §二 |
-| 本地打 Tag 后又有新 commit、CI 发布旧代码、Tag 指针漂移纠偏序列 | [deep-refactor-and-governance-hardening.md](references/deep-refactor-and-governance-hardening.md) §三 |
-| 冲动抽离单消费方私有逻辑导致接口反噬与性能倒退、浅模块防陷阱准则 | [deep-refactor-and-governance-hardening.md](references/deep-refactor-and-governance-hardening.md) §四 |
-| 本地私有配置文件掉电截断、损坏时抢救提取数据、留样备份与自动自愈重新生成 | [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) |
-| 拦截器状态变动比对与标记回写时序外泄、重试管道重复追加通知、原子跃迁事务 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十 |
-| 多环境配置持久化双轨撕裂、消灭旁路直接写盘、单一 ConfigSink 接缝范式 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §十一 |
-| node:vm 脱机单测报 not reference-equal 假失败、跨 Realm 原型链隔离拍平 | [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md) §六 |
-| 会话内动态切档、插件自身模式切换与大模型 Prompt Cache 零破坏 | [session-prompt-cache-and-catalog-update.md](references/session-prompt-cache-and-catalog-update.md) §六 |
-| agent/pre-step 轮次拦截胶水代码膨胀、TurnCoordinator 深模块收敛与 6 大不变量 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §八 |
-| 状态模块硬编码 node:fs 导致测试污染磁盘、StateStorageAdapter 纯内存虚拟化 | [architecture-refactor-experience.md](references/architecture-refactor-experience.md) §九 |
-| CI 安装报 ERR_PNPM_UNSUPPORTED_ENGINE、PowerShell CLI 管道符 | 语法截断 | [ci-release-workflow.md](references/ci-release-workflow.md) §三 |
-| 双面客户端控制器深模块重构、`useSyncExternalStore` 接入、纯 Node 脱机状态机单测 | [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md) |
-| 列表批量重置意外抹掉语言/主题偏好、正交隔离准则 | [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §十 |
-| 手动改坏 cordis.patch.yml 报 invalid config 崩溃、配置损坏自愈提取与自动重生 | [config.md](references/config.md) §九 |
-| 字典型配置提取命中 constructor 属性、原型链假阳性、Object.create(null) 防御 | [config.md](references/config.md) §9.2 |
-| 前端组件挂载时自动写入导致 revision 冲突与乐观锁状态撕裂、挂载零副作用 | [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §11.3 |
-| Tag 指针漂移导致 CI 发布旧代码、发版前三步核验与标准纠偏序列 | [publish-npm-verification.md](references/publish-npm-verification.md) §三 |
-| 全局改配置是否影响已有会话、动态条目更新与 LLM Prompt Cache 保全 | [session-prompt-cache-and-catalog-update.md](references/session-prompt-cache-and-catalog-update.md) |
-| Windows 沙箱下管道 EPERM 报错、node --check 崩溃、纯内存语法校验 | [sandbox-process-and-pipe-traps.md](references/sandbox-process-and-pipe-traps.md) |
-| 批量修改配置/开关报保存失败、部分成功部分失败、并发 mutate 乐观锁撕裂 | [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §九 |
-| 宿主缺省值导致缓存穿透、每次请求全量重复扫描 describe | [provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) §九 |
-| 开发期 HMR 修改 CSS 样式不生效、刷新页面才生效 | [web-ui-slots-and-styling.md](references/web-ui-slots-and-styling.md) §十 |
-| npm 发布后线上多语言 README 点击报 404 死链 | [packaging.md](references/packaging.md) §五 |
-| 服务注入、Service、PENDING、缺失依赖 | [services.md](references/services.md)、[plugin-anatomy.md](references/plugin-anatomy.md) |
-| 监听器、定时器、异步任务、重载或卸载 | [events.md](references/events.md)、[plugin-anatomy.md](references/plugin-anatomy.md) |
-| 动态目录、Provider、缓存、失效、重名 | [skill-provider.md](references/skill-provider.md)、[provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) |
-| 设置面板、Web 插槽、Host/Client、UI 不显示 | [three-roles.md](references/three-roles.md)、[web-ui-slots-and-styling.md](references/web-ui-slots-and-styling.md)、[client-ui-placement-and-verification.md](references/client-ui-placement-and-verification.md) |
-| 设置页 UI 怎么写（官方 SettingsForm / 草稿 / 冲突栅栏） | [official-settings-form-pattern.md](references/official-settings-form-pattern.md) |
-| 开关/单选不要保存按钮、改动自动生效 | [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §八（操作即写） |
-| 输入框上方浮层、双击手势、焦点留输入框、中文输入法组字 | [input-overlay-and-keyboard-gestures.md](references/input-overlay-and-keyboard-gestures.md)、[web-ui-slots-and-styling.md](references/web-ui-slots-and-styling.md) |
-| 手势关闭后宿主浮层关不掉 / 高亮越界环绕 / 视觉顺序与数据顺序相反 | [input-overlay-and-keyboard-gestures.md](references/input-overlay-and-keyboard-gestures.md)（让位分支、clamp、单套下标） |
-| 客户端没加载、注册 id 报错、改了代码不生效 | [client-bundle-loading-and-artifact-trace.md](references/client-bundle-loading-and-artifact-trace.md)、[silent-failure-and-gate-design.md](references/silent-failure-and-gate-design.md) |
-| 不开浏览器回读配置/状态真值、写自动化验收 | [api-truth-read-back-without-browser.md](references/api-truth-read-back-without-browser.md)、[debugging-and-troubleshooting.md](references/debugging-and-troubleshooting.md) |
-| patch、Bundle、peer 依赖、打包、发布 | [config.md](references/config.md)、[packaging.md](references/packaging.md)、[install-resolution-traps.md](references/install-resolution-traps.md) |
-| 面板点一下卡死 / 诊断段永久「不可用」/ 读不到命名空间 | [runtime-truth-and-external-contracts.md](references/runtime-truth-and-external-contracts.md)（信封未解包、命名空间未挂载）、[official-settings-form-pattern.md](references/official-settings-form-pattern.md)（注入面形状） |
-| 卡片显示包名、中英界面标题不一致 | [settings-and-plugin-ui.md](references/settings-and-plugin-ui.md)（meta 段与面板键分工、中英同族） |
-| schema 形态门禁从不红 / volatile 嵌套才在宿主炸 | [config.md](references/config.md)（嵌套位置限制、引用表形状）、[silent-failure-and-gate-design.md](references/silent-failure-and-gate-design.md)（破坏实测） |
-| 非负整数配置字段（`integer()` 不存在、用 `z.natural()`） | [config.md](references/config.md) §7.8 |
-| 插件改 scoped 名、改名后多处对不上 | [packaging.md](references/packaging.md)（scoped 化六件套）、[config.md](references/config.md)（patch name 引号） |
-| 插件启动或安装报包元信息错误、icon exceeds 256 KiB、图标过大宿主加载崩溃 | [packaging.md](references/packaging.md) §七、[host-semantic-gates.md](references/host-semantic-gates.md) §2.9 |
-| 自动化验包报 Unexpected token [信息]、prepare 钩子日志污染 npm pack --json | [packaging.md](references/packaging.md) §八 |
-| 搭 CI 流水线、tag 发版、npm 发布失败 | [ci-release-workflow.md](references/ci-release-workflow.md)、[publish-npm-verification.md](references/publish-npm-verification.md) |
-| 没有报错但功能不生效 | [silent-failure-and-gate-design.md](references/silent-failure-and-gate-design.md)、[debugging-and-troubleshooting.md](references/debugging-and-troubleshooting.md) |
-| 点击按钮/开关毫无反应、表单静默失败、热重载后表单 disposed 假死 | [silent-failure-and-gate-design.md](references/silent-failure-and-gate-design.md)、[official-settings-form-pattern.md](references/official-settings-form-pattern.md) |
-| 热重载/升级后报 scandir ENOENT、旧 pnpm 哈希路径丢失 | [install-resolution-traps.md](references/install-resolution-traps.md)、[debugging-and-troubleshooting.md](references/debugging-and-troubleshooting.md) |
-| volatile 字段拒写、联合字段设计、宿主端拿到引用包装需解包 | [config.md](references/config.md)、[settings-and-plugin-ui.md](references/settings-and-plugin-ui.md) |
-| 卡片版本与面板版本不一致、客户端版本常量脱节漂移 | [silent-failure-and-gate-design.md](references/silent-failure-and-gate-design.md)、[client-bundle-loading-and-artifact-trace.md](references/client-bundle-loading-and-artifact-trace.md) |
-| npm 发布后暂态 404/时延、E409 staged 冲突、线上产物 SHA256 验签 | [publish-npm-verification.md](references/publish-npm-verification.md)、[ci-release-workflow.md](references/ci-release-workflow.md) |
-| tsc 报「找不到 react 声明 / JSX namespace」、`@types` 顶层缺失 | [debugging-and-troubleshooting.md](references/debugging-and-troubleshooting.md)（开头环境四坑） |
-| 固定端口联调「改了没生效」、describe 回读是旧 schema | [api-truth-read-back-without-browser.md](references/api-truth-read-back-without-browser.md)（旧进程核对）、[debugging-and-troubleshooting.md](references/debugging-and-troubleshooting.md) |
-| 跨模块变更、能力删除、兼容迁移 | [cross-cutting-engineering-practices.md](references/cross-cutting-engineering-practices.md) |
-| 具体 API 或版本结论无法确认 | 先查现有参考，再核对目标运行时和 [official-upstream-and-docs.md](references/official-upstream-and-docs.md) |
-| 找不到本机源码、桌面版解包、上游克隆 | [source-verification-and-caches.md](references/source-verification-and-caches.md) |
-| 插件写完了要验收、测安装卸载、跑浏览器验证 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md)、[browser-automation-acceptance.md](references/browser-automation-acceptance.md) |
-| 症状看起来对但修完就好了，怀疑归错因；复现时好时坏；前置条件没满足就开跑 | [reproduction-experiment-design.md](references/reproduction-experiment-design.md)（症状与状态分别取证、冷热态前置、对照组） |
-| 验收脚本一直绿但测的不是它；断言靠文本匹配或「按类型取第一个」 | [reproduction-experiment-design.md](references/reproduction-experiment-design.md)（锚点纪律、断言可失败） |
-| 前导命令后打斜杠没补全；要判断是状态门禁还是解析失败 | [slash-commands-and-input-triggers.md](references/slash-commands-and-input-triggers.md)（守卫档位）、[reproduction-experiment-design.md](references/reproduction-experiment-design.md) |
-| 插件自带配置界面、Settings 命名空间、ConfigForms 生命周期 | [plugin-config-card-architecture.md](references/plugin-config-card-architecture.md)、[plugin-config-ui-decision.md](references/plugin-config-ui-decision.md) |
-| **以下五类只在真机触发，静态断言原理上测不到** | [host-semantic-gates.md](references/host-semantic-gates.md)（先读这份清单再排期） |
-| 新增/废弃/迁移配置字段，升级后用户配置丢失，写入被拒 | [config-field-lifecycle.md](references/config-field-lifecycle.md) |
-| 迁移与回退兼容逻辑、归一化分支、幂等 | [config-field-migration-selfcheck.md](references/config-field-migration-selfcheck.md) |
-| 静态门禁全绿但真机零作用，不知道哪些必须真机测 | [host-semantic-gates.md](references/host-semantic-gates.md) |
-| 配置卡写入零生效、每点必报保存失败、整批被拒 | [host-semantic-gates.md](references/host-semantic-gates.md)、[config-field-lifecycle.md](references/config-field-lifecycle.md) |
-| 热重载后旧页面写操作静默失效、控件可点但不生效 | [host-semantic-gates.md](references/host-semantic-gates.md)、[official-settings-form-pattern.md](references/official-settings-form-pattern.md) |
-| 重复注入或卸载后仍有样式与监听残留 | [host-semantic-gates.md](references/host-semantic-gates.md)、[isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) |
-| 同层重名裁决顺序依赖、只做正向注册测不出 | [host-semantic-gates.md](references/host-semantic-gates.md)、[skill-provider.md](references/skill-provider.md) |
-| 缓存失效后宿主目录没刷新，或界面已变而注册表未变 | [host-semantic-gates.md](references/host-semantic-gates.md)、[provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) |
-| 改了客户端代码界面没变、版本号与界面不同步 | [host-semantic-gates.md](references/host-semantic-gates.md)、[client-ui-placement-and-verification.md](references/client-ui-placement-and-verification.md) |
-| 同一面板在多处重复出现、DOM 计数不是 1 | [host-semantic-gates.md](references/host-semantic-gates.md)、[client-ui-placement-and-verification.md](references/client-ui-placement-and-verification.md) |
-| 配置文档只读态下控件可点但写不进去 | [host-semantic-gates.md](references/host-semantic-gates.md)、[official-settings-form-pattern.md](references/official-settings-form-pattern.md) |
-| 热装/卸载后卡片未出现、刷新过早假死、Chokidar 2s 防抖期等待、Windows EPERM 锁 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) |
-| 裸 add 命令解析到远古旧版本、pnpm 冷却期版本回退陷阱 | [install-resolution-traps.md](references/install-resolution-traps.md) |
-| 界面显示「数据不可用/请确认宿主版本」、宿主零报错、命名空间永不出现 | [runtime-truth-and-external-contracts.md](references/runtime-truth-and-external-contracts.md)（跨端命名空间需显式 $mount） |
-| 改了配置项界面停在旧值、切换语言/模式后仍是构建期结果 | [runtime-truth-and-external-contracts.md](references/runtime-truth-and-external-contracts.md)（运行时推导值不得构建期内嵌） |
-| 受控控件键盘不可达、指示器滑出轨道、「配过与没配过」不可区分 | [runtime-truth-and-external-contracts.md](references/runtime-truth-and-external-contracts.md)（值必须落在选项集合内、Schema 默认值吃掉三态） |
-| 某段选项选过一次就消失、再也选不回来 | [runtime-truth-and-external-contracts.md](references/runtime-truth-and-external-contracts.md)（合法配置态常驻 vs 未配置标记条件追加，两者外观相同语义相反） |
-| 同一个字段模型侧要英文、人类侧要按配置本地化，宿主改不动 | [shared-contract-capability-boundaries.md](references/shared-contract-capability-boundaries.md)（先判投影与缓存，再选覆写路径） |
-| 想让模型/菜单拿到不同描述或不同精度，先判可行还是上游不支持 | [shared-contract-capability-boundaries.md](references/shared-contract-capability-boundaries.md)、[skill-provider.md](references/skill-provider.md) |
-| 打算猴补官方对象、担心升级后静默失效 | [shared-contract-capability-boundaries.md](references/shared-contract-capability-boundaries.md)（三条失效形态与对应门禁）、[host-semantic-gates.md](references/host-semantic-gates.md) |
-| 想少显示几条上游条目，动了可见性标志后主功能也坏了 | [shared-contract-capability-boundaries.md](references/shared-contract-capability-boundaries.md)（同一标志是否被多通路共用） |
-| 包自带补丁 insert 格式规范、全新安装零配置自动渲染、界面写入自动持久化回写 | [plugin-config-card-architecture.md](references/plugin-config-card-architecture.md) |
-| 三态/多态配置字段在客户端缺项折叠、未配置跟随失效 | [client-i18n-pitfalls.md](references/client-i18n-pitfalls.md) 铁律七 |
-| 宿主切换界面语言后插件缓存陈旧、模型目录不刷新 | [provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) §五 |
-| 异步扫描多任务并发重入、Map 相互清空报假重名或丢技能 | [provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) §六 |
-| 呈现维度（如语言）切换造成高频无谓读盘、未解耦物理变动 | [provider-catalog-invalidation.md](references/provider-catalog-invalidation.md) §七 |
-| 集合/字典型字段惰性迁移时，单项操作抹除旧表其余历史数据 | [config-field-lifecycle.md](references/config-field-lifecycle.md) §3.2.1 |
-| 本地 pnpm pack 重装调试时报 Already up to date、产物不更新 | [install-resolution-traps.md](references/install-resolution-traps.md) §8.4 |
-| 纯净隔离新实例冷启动卡死在启动遮罩、报 web boot: 1 entry did not activate / failed | [client-bundle-loading-and-artifact-trace.md](references/client-bundle-loading-and-artifact-trace.md) §五、[dual-face-ui.md](references/dual-face-ui.md) |
-| 本地插件改了源码重新构建后新实例依然运行旧代码、pnpm 虚拟存储池快照陷阱 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) §一 |
-| 现代高质感插件设置面板设计规范（状态展板、卡片分段单选、主控芯片、即时搜索与批量控制） | [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §十二 |
-| 特权工具/敏感外部能力双道物理守卫、全局总控短路与专属预设按需隔离 | [tools.md](references/tools.md) §九 |
-| 技能/功能开关多轴心智负担简化为一元化单开关、持久层 3-ops 原子批处理与向后兼容契约 | [official-settings-form-pattern.md](references/official-settings-form-pattern.md) §十三 |
-
-已有专题参考仍按 [references/README.md](references/README.md) 索引；若通用参考与目标版本源码冲突，以源码和运行时为准。
+| 开发或排查场景 | 核心指引与机制参考 |
+| :--- | :--- |
+| 插件骨架搭建 / 形态选型 / 入口导出 | [plugin-anatomy.md](references/plugin-anatomy.md) · [desktop-vs-cli.md](references/desktop-vs-cli.md) |
+| 服务注册 / 依赖注入 / 单复数契约 | [services.md](references/services.md) · [cordis-core.md](references/cordis-core.md) |
+| 生命周期钩子 / 猴子补丁 / 卸载清理 | [lifecycle.md](references/lifecycle.md) · [deep-refactoring-governance.md](references/deep-refactoring-governance.md) |
+| 前端 UI 插槽 / 状态管理 / 样式隔离 | [web-ui-slots-and-styling.md](references/web-ui-slots-and-styling.md) · [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md) |
+| 跨进程通信 (RPC) / 前后端消息分发 | [remote-rpc.md](references/remote-rpc.md) · [three-roles.md](references/three-roles.md) |
+| 工具函数 / Slash Commands / 终端集成 | [tools.md](references/tools.md) · [slash-commands.md](references/slash-commands.md) · [persistent-shells-and-observation-policy.md](references/persistent-shells-and-observation-policy.md) |
+| 配置 Schema / 动态表单 / 原子写盘 | [config.md](references/config.md) · [official-settings-form-pattern.md](references/official-settings-form-pattern.md) · [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) |
+| 插件打包 / 依赖解析 / 产物分发 | [packaging.md](references/packaging.md) · [install-resolution-traps.md](references/install-resolution-traps.md) · [release-verification.md](references/release-verification.md) |
+| 多智能体协作 / 任务规划与审核 | [agent-teams-architecture.md](references/agent-teams-architecture.md) · [plan-mode-and-user-review-gate.md](references/plan-mode-and-user-review-gate.md) · [goal-driven-system.md](references/goal-driven-system.md) |
+| 故障排查 / 挂起调试 / 静默失效定位 | [debugging.md](references/debugging.md) · [silent-failures.md](references/silent-failures.md) · [reproduction-experiment-design.md](references/reproduction-experiment-design.md) |
+| 交付验收 / 隔离环境实测 / 浏览器自动化 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) · [browser-automation.md](references/browser-automation.md) |
 
 ## 最小验收闭环
 
-- Host：入口可加载、必需依赖可用、注册数量正确、错误和取消语义可观察。
-- 生命周期：失效后得到新状态；卸载后无监听、写入、广播或旧异步结果；重复激活不叠加资源。
-- Browser：模块确实加载，插槽语义匹配，组件只消费 props，写操作后状态重新读取。
-- 交付：构建产物可加载，tarball 文件完整，临时干净环境能安装并启动，发布后通过权威四件套核验（Tag、Release、npm dist-tags，以及真实 tarball 解包 SHA256 逐文件数字对齐）。
-- 语义门禁：宿主写入闸门、注册表仲裁、缓存实时性、产物时序、生命周期残留、插槽注册、只读态逐条有真机判据。清单见 [host-semantic-gates.md](references/host-semantic-gates.md)，每条配一条破坏实验。
-- 配置演进：字段新增（是否需要保留、是否三态）、废弃（两个标注都不动）、迁移（写新字段与清旧字段同批）三件事各有判据；迁移逻辑自带语义转换表穷举与幂等自检。
-- 外部契约：跨端命名空间已显式挂载、运行时推导值走运行时通道、受控控件的值落在选项集合内、文档里的路径与层数与源码一致。清单见 runtime-truth-and-external-contracts。
-- 隔离实例：只装基础插件与目标插件，冷装、热装、热更新、卸载四态各过一遍；浏览器里每项控件点过并回读真值；测试模型由用户选定。
+- **宿主状态**：进程无僵尸挂起，退出码合规，标准错误流无未捕获异常。
+- **生命周期**：多次热重载与卸载后，内存无泄漏，未遗留全局事件监听器或悬挂定时器。
+- **配置一致**：配置修改落盘文件与界面状态实时同步，无效输入自动回退安全默认值。
+- **环境隔离**：在全新的独立 profile 目录中从零安装，验证首次引导、运行交互与持久化无断层。
 
-## Anti-Patterns
+## 高危反模式 (Anti-Patterns)
 
-- 凭记忆猜服务名、字段名、插槽名或事件返回值。
-- 把带有「跟随默认」语义的三态字段在客户端读取时折叠成兜底字面量，让前端跟随逻辑永久成为死代码。
-- 集合/字典型字段惰性迁移时只把当前操作项写入新表就全量 unset 旧表，导致历史表中其余生效项被连带意外抹除复活。
-- 异步多 I/O 扫描器在函数开头裸调 `clear()` 且无并发重入屏障，让后进入的任务清空前一个正在填充的 Map 造成技能丢失。
-- 宿主全局配置（如界面语言）变更依赖自身插件的 volatile 广播，不知道该事件只在所属插件 Fiber 传播而漏接 `app-boot/config-reload`。
-- 把「最终输出为空」直接当成「功能有缺陷」，不先证明中间状态真的发生过——归错因的修复同样能让症状消失，假结论于是被写进记忆库。
-- 在冷态（目录或注册表未 ready）下跑完整个验收就下结论，并把结论当可复现的缺陷记录。
-- 用「按类型取第一个匹配」或界面文本当断言锚点；同类元素多于一种时，断言稳定测错对象且一直绿。
-- 把 `ctx.get()` 当作必需注入的替代品。
-- 只清理 watcher/定时器，却放任已启动的 Promise 继续写入。
-- 把失效通知和刷新实现互相调用，形成递归或重复广播。
-- 只看 DOM、截图、配置解析退出码或本地安装成功提示。
-- 为单个调用方创建公开 adapter，或为已有深 module 再拆一层转发。
-- 只读完本技能库就动手，把正文当 API 契约而不去核对真实源码。
-- 在自己日常 profile 上验证通过就宣称功能可用，没开隔离新实例、没测热装冷装卸载。
-- 在表单异步交互中仅捕获异常而未在 UI 对应区域显式渲染失败状态，造成假死无响应的静默失败。
-- 插件热重载后不刷新页面，直接在持有已废弃（disposed）旧表单实例的前端闭包中测试异步写入。
-- 误以为热安装必须由用户手动往 profile 补丁追加顶层条目，忽略了纯 `insert:` overlay 的自生挂载机制与宿主自动持久化回写闭环。
-- 假设跨端 RPC 的命名空间「服务端暴露了就自动通了」，不读网关客户端那份编译期写死的贡献清单。
-- 把随用户可改配置变化的推导值在构建期算好内嵌进客户端产物，让切换配置后界面停在旧值。
-- 为了表达「未配置」而把受控控件的 `value` 设成不在选项集合里的值——下标越界会让全部段键盘不可达。
-- 在 CLI 安装或修改配置后，未等待宿主文件监听器防抖期（Chokidar `awaitWriteFinish` 2s）便立即判定热重载失效并误判必须重启宿主。
-- 废弃配置字段时删掉它的 schema 声明，或为「不再写入」去掉 volatile 标注。
-- 把「写新字段」与「清旧字段」拆成多次提交，或在迁移批里混入未通过 volatile 校验的路径——前者在并发下留下半迁移态，后者让整批零写入。
-- 迁移逻辑的测试样例与实现分支来自同一个直觉，于是测试只证明代码跑过，不证明读的是对的那张表。
-- 用接口的成功返回值当成功判据。返回 false 与返回 true 都不告诉你失败发生在哪一层；判据必须是可观察的状态转移。
-- 只写「不报错就不算错」的正向断言。漏掉一个测试场景这件事破坏实测抓不到，只能靠先写下来的语义转换表。
-- 用「按类型取第一个匹配」当测试锚点。同类元素多于一种时，断言会稳定测错对象并且一直绿，破坏实测也只证明了别的控件是对的。
-- 把「未配置」这类状态标记段与合法配置态混为一谈，照抄相邻控件的条件追加写法——用户选过一次后该状态永久不可达。
-- 凭直觉认为「把双语字段挂进 metadata 就能给人类侧留通道」，不去读投影函数与跨端结果 schema 的字段白名单——字段可能早在摘要那一步就没被拷走，或者根本过不了线缆。
-- 拿一个改不动的上游字段去做「按调用方差异化」的需求，写完方案才发现投影与缓存那一层已经把信息抹掉了；判定程序见 shared-contract-capability-boundaries.md。
-- 为了让上游少显示自己的条目去改可见性标志，没先确认该标志是否被上游多个通路共用，结果连带砍掉主功能。
-- 选中运行时改写上游对象之后不把失效形态与升级核对清单写进项目记忆库，让它变成没人复查的暗债。
-- 批量配置变更采用 `Promise.all(items.map(form.mutate))` 发起并发写入，在同一微秒内竞争宿主单调递增的 revision 锁，导致后序调用被版本冲突拦截、UI 状态严重撕裂与级联失败。
-- 在门禁或构建脚本中使用跨进程 `spawnSync('node --check')` 校验语法，在 Windows 沙箱受限环境下遭遇命名管道 EPERM 拦截并因未判空调用 `.trim()` 引发致命的 TypeError 崩溃。
-- 以 `if (this.cache !== undefined)` 作为宿主缺省值探测的缓存守卫，在默认未配置环境下守卫恒为 false，导致后续每一次调用都全量重复反射扫描。
-- 在目录/文件变动探测的 catch 块中盲目返回 true，吞没 `signal.throwIfAborted()` 抛出的 `AbortError`，使已取消的任务反被误判为文件变更并强行触发全量重扫。
-- 客户端样式注入使用纯 `if (!document.querySelector(...))` 守卫，导致开发期 HMR 热重载时因已有标签未被清理，新修改的 CSS 规则无法热生效覆盖。
-- 在 `package.json` 的 `files` 发布白名单中遗漏多语言说明文档（如 `README.zh.md`），导致 npm 线上发布包中缺失该文件，文档顶部的语言跳转链接沦为 404 死链。
-- 试图在插件层覆写或篡改已持久化的会话历史事件，破坏会话事件流的 Append-only 契约，摧毁大模型服务端原本逐字匹配的 Prompt Cache 历史前缀。
-- 在 React 组件内部将多个 `useState` 状态更新器深传给散落的提交函数中，形成高耦合浅模块（Shallow Module），导致测试必须强依赖启动真实的 Chromium/Playwright 进程，无法建立毫秒级的脱机状态机单元测试。
-- 列表工具条的「恢复默认」在清理条目字典时，私自向独立的全局标量字段派发 `unset`，违反最小惊讶原则，意外抹杀用户显式配置的全局偏好设置。
-- 重新发版前未核对本地与远程 tag 的提交指针（`git rev-parse <tag>` vs `HEAD`），导致本地残留旧 tag 并触发 CI 流水线发布未经修复的历史旧产物。
-- 在双面客户端中使用 React `useState(busy)` 守卫异步操作，忽略了 React 18 批处理调度窗口，使快速连续点击穿透守卫并携带相同旧 revision 触发宿主乐观锁撕裂。
-- 在单页宿主注入面板中生搬硬套控制器全量模板，为不需要多处订阅的简单面板引入自建事件总线与 `useSyncExternalStore`，平白制造 50+ 行死代码与复杂度债务。
-- 在 `apply()` 中将多条独立生命周期逻辑以匿名闭包直接堆叠在单个 `ctx.effect` 内，数十个闭包变量纵横交错，导致注销链条脆弱且无法独立单元测试。
-- 在上层运行时封装中调用底层 Provider 接口时传递空配置 `{}` 丢弃 `AbortSignal`，使取消信号在顶层发布与目录收集链路上发生断路。
-- 在代码生成模块中使用外层模板字符串包裹包含内层未转义反引号的动态模板，造成模板字符串提前闭合，引发致命语法崩溃。
-- 测试直接 import 上一次构建留下的 `lib/` 产物且未配置前置 clean build，使源码语法破坏被旧产物静默掩盖，形成“假绿”虚假安全感。
-- 在自动化发版脚本中使用拼接 Shell 命令字符串执行 `git tag`，因双引号转义解析异常导致 Tag 未能覆盖绑定到最新发版提交。
-- 提供了包含多语言跳转链接的主说明文档，却未将副语言文档加入 `package.json.files`，导致 npm 线上发布包中缺失该文档产生 404 死链。
-- 在声明插件 Config 时对易被用户手动编辑的字典或枚举字段使用严苛强校验 Schema，导致底层配置文件一旦出现脏数据、类型不符或非标别名时 Loader 直接抛出 invalid config 致命崩溃使插件激活完全失败。
-- 容灾提取键值字典时直接使用普通对象字面量 `{}`，导致外部包含原型属性名时触发 `constructor` 等原型链继承假阳性与原型污染隐患。
-- 为了实现所谓的“自动修复损坏配置”，在前端组件挂载（useEffect）或控制器构造函数中自发调用 `scope.mutate`，在 React 严格模式和热重载下微秒级并发消耗宿主版本号 revision，引发乐观锁冲突与严重的状态撕裂。
-- 将合法的向后兼容历史废弃字段（Legacy fields）误判为破坏性配置损坏，在挂载时擅自抹杀清理，破坏「操作即迁移、单开关原子继承」的向后兼容契约。
-- 在写盘持久化时直接调用 `writeFileSync` 原地覆写文件，导致进程在写入中途被操作系统杀死或系统掉电时留下 0 字节或半截断破损坏文件。
-- 读取物理配置文件时仅使用简单的 `try { JSON.parse() } catch { return {} }`，在遇到截断损坏或手改括号缺失时粗暴丢弃用户的全部历史有效配置。
-- 在拦截器或中间件中将状态变动比对与发射标记回写拆散为两步独立调用，导致同轮发生内部重试流水线时漏标已发射状态并反复追加冗余通知消息。
-- 在纯 Node 环境下使用 `node:vm` 脱机运行客户端控制器时，直接使用严格深度断言比较跨 Realm 输出的数组或对象，遭遇 V8 原型链隔离报错误判为业务逻辑缺陷。
-- 在多资产/多条目循环遍历中使用无差别 catch，导致外部取消被误判为条目解析损坏并计入脏状态，甚至在末尾条目取消时误报为成功。
-- 在自愈读取 catch 块中仅检查 `err.name === 'AbortError'`，导致携带具体错误信息的自定义 Abort reason 被当作常规错误静默吞没。
-- 构建脚本先执行文件复制覆写再比对元数据一致性，导致比对失败时目标分发目录已被写入脏产物。
-- 在顶层无差别 import 未在本地直接消费的符号，迫使团队在 tsconfig 中妥协关闭 noUnusedLocals 导致死代码静态拦截失效。
-- 在修改完发版文档或提交最后修正前提前打 Tag，未核对 `git rev-parse HEAD` 与 Tag 指针一致性便推送到远程触发 CI 发布历史旧代码。
-- 违背 YAGNI 原则将单消费方的私有逻辑过度抽象为浅类（Shallow Module），带来入参膨胀并破坏短路求值性能。
-- 将损坏现场留样备份调用滞后写在第一阶语法修补之后，导致因尾部截断缺失闭合括号被第一阶自愈成功提前 return，原始破坏现场从未被留样备份从而彻底丧失事故可追溯性。
-- 在提示词装配引擎与轮次拦截协作者之间相互反向导入异构上下文提取探针，在 ESM 模块体系下引发致命的双向循环依赖（Circular Dependency）与未初始化变量死锁。
-- 在 Windows PowerShell 或受限自动化执行器下使用 `&&` 串联多条连续 Git/CLI 命令，遭遇语法解析器报错 `InvalidEndOfLine` 导致自动化流水线意外崩溃中断；应统一使用标准分号 `;` 分隔。
-- 猴补宿主单例工厂（如 `sessionOf`）时仅还原工厂方法自身，未通过 Symbol 与 WeakRef 级联还原各活动实例的原方法，导致插件热重载或禁用后旧闭包继续劫持输入。
-- 客户端样式注入与 `slots.inject` 裸露在 `apply` 顶层，丢弃返回的 Disposer，导致 HMR 期间重复堆积标签与内存监听泄露。
-- 交互浮层为了避免失去焦点而手写全局 DOM 变量与命令式突变，未将切片与视口定位提炼为纯算法深模块，导致测试必须依赖重型浏览器。
-- 在高频变动状态（如 `draft`）的输入框组件中混杂多个正交特性，导致捕获期全局事件监听器频繁解绑重绑引发事件颠簸。
-- 在面向用户的说明文档（`README`）中滥用 `（vX.Y.Z 新增）` 历史标签或写死单测通过数量，破坏文档长青性并引入散弹式维护债务。
-- 客户端插件仅导出 `apply` 却遗漏 `inject: ['slots', 'locale']`，导致在纯净隔离新实例冷启动时因前端服务未就绪抛未捕获 TypeError 被宿主标记为 `failed`（`web boot: 1 entry did not activate`）。
-- 在隔离新实例调试本地插件时直接运行 `pnpm install` 或 `dsh plugin add`，导致依赖被深锁入 `.pnpm` 虚拟快照池，引发“源码修改重构建后宿主继续分发旧代码”的严重假象。
-- 插件设置面板直接堆叠简陋的原生单选框与粗糙表格，条目繁多时缺少即时搜索过滤与原子批量控制工具条。
-- 特权工具仅依赖系统提示词口头约束，未在 `agent/created` 中构建“静态目录物理剥离 (`tools.restrict`) + 运行期动态拦截 (`tools.guard`)”双道物理防线。
-- `peerDependencies` 仅锁定单一窄幅 rc 版本，导致在稍低宿主上被静默从 Profile 的 `bundles` 栈中剔除并引发 `patch: entry not found` 级联失效；未声明 `engines.dsh` 错失官方一等公民门禁。
-- 在单包插件根目录遗留空的 `pnpm-workspace.yaml`，导致 GitHub Actions 缓存探测执行 `pnpm store path` 时抛 `ERROR packages field missing or empty` 阻断 CI。
-- 大版本已决定不兼容旧版，却仍在前端控制器中保留 `legacyCarry` 继承逻辑与旧字段 `unset` 追加，导致单次操作发出 3 条 ops、膨胀 RPC 并加剧 `revision` 乐观锁冲突。
-- 向官方模板生成的 `cordis.patch.yml` 末尾盲目追加条目，与原有的空数组 `[]` 产生顶层 YAML 语法冲突（`YAMLException`）导致宿主引导失败。
-- 隔离实例验收一上来就启动完整 Web 服务占用端口或消耗大模型额度，不知道使用 `dsh --profile <name> --dump-config` 进行零端口、零 Token 的底层装配毫秒级快速检验。
-- 在未先通过 read 或 glob 进行权威物理观察前直接调用 write 或 edit，触发 FS_UNOBSERVED_WRITE_DENIAL 策略拦截并导致写盘失败。
-- 遇到单次错误或外部依赖未就绪便轻率调用 update_goal 标记 blocked，违背「同一阻断条件必须在连续 3 轮以上尝试多种路径无法突破方可标记」的铁律。
-- 修改共享任务看板时不传递或伪造 expected_revision，破坏 CAS 乐观锁并发保护，引发版本漂移与多成员任务状态相互践踏覆盖。
-- 在计划模式（Plan Mode）处于激活态且未获用户审批前，违背探索期只读纪律，擅自调用写盘或具有破坏副作用的终端命令。
-- 仅凭 list_agents 中成员状态处于 inactive 就盲目断言其负责的任务已完成，忽略了该状态仅代表当前轮次空闲、任务是否完工必须以共享看板 completed 与产物核验为真值。
-- 遇到 FS_STALE_VERSION 文件版本冲突时直接粗暴重试重写，未先调用 read 回读最新盘面内容并执行增量变动重基（rebase）。
+- [错误] 凭历史文档或记忆硬编码 API 字段与内部方法名，不查证真实安装包源码。
+- [错误] 在共享的日常开发 profile 中直接调试安装，污染全局配置导致验收假绿。
+- [错误] 劫持宿主原型方法而不保存原始引用，卸载时留下永久性全局行为污染。
+- [错误] 在事件回调或异步流中吞并取消信号（AbortSignal），导致长时间任务失控无法中止。
+- [错误] 在前端 React/DOM 树中直接引用 Host 端专有环境接口，触发跨端运行时崩溃。
+- [错误] 假设服务总是同步就绪，在 `apply` 阶段直接调用尚未注入完毕的依赖方法。
+- [错误] 配置项直接覆写磁盘而不校验合法性，导致配置损坏无法自愈。
+- [错误] 为一次性简单逻辑堆砌多层抽象与工厂封装，破坏代码可读性与维护性。
+- [错误] 在通用文档与规范中写死特定小版本号，导致版本迭代后产生误导性知识漂移。
+
+---
+*注：全库所有详细专题见 [references/README.md](references/README.md)。任何描述与目标运行时的源码冲突时，一律以真实源码为准。*

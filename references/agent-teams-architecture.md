@@ -112,13 +112,13 @@ export interface TeamMember {
 ```
 [Agent-A (Lead)]                                         [Agent-B (Teammate)]
        |                                                         |
-       | --- 1. tools.send_message({ agent_id, message }) ------>| (投递入队，A 立即返回)
+       | --- 1. tools.send_message({ target, message }) ------>| (投递入队，A 立即返回)
        |                                                         | 执行推理 / 状态变更
-       | --- 2. tools.wait_agent({ target_agent_id }) ---------->| (挂起监听 TeamActivity)
+       | --- 2. tools.wait_agent({ timeout_ms?: number }) ---------->| (挂起监听 TeamActivity（内部唤醒管理器）)
        |                                                         |
        |                                                         | 触发状态/任务变更
        |                                                         | emit('team/activity')
-       |<=== 3. 唤醒并返回 TeamActivity Payload ===================+
+       |<=== 3. 唤醒并返回 TeamActivity（内部唤醒管理器） Payload ===================+
 ```
 
 ### 3.1 点对点异步收发 (`send_message`)
@@ -127,7 +127,7 @@ export interface TeamMember {
 ```typescript
 // 调用示例: Team Lead 向编码员派发上下文说明
 await tools.send_message({
-  agent_id: "agent-coder-01",
+  target: "agent-coder-01",
   message: "模块 core/auth 已解构完毕，请阅读看板任务 task-102 并开始执行测试用例编写。"
 });
 ```
@@ -139,15 +139,15 @@ await tools.send_message({
 
 ```typescript
 await tools.interrupt_agent({
-  agent_id: "agent-coder-01"
+  target: "agent-coder-01"
 });
 ```
 
-### 3.3 基于 `TeamActivity` 的事件驱动等待 (`wait_agent`)
+### 3.3 基于 `TeamActivity（内部唤醒管理器）` 的事件驱动等待 (`wait_agent`)
 为杜绝 `while (true) { sleep(1000); }` 这类高危耗能模式，DSH 提供基于宿主活动事件流的 `wait_agent` 契约：
 
 ```typescript
-export type TeamActivityKind = 
+export type TeamActivity（内部唤醒管理器）Kind = 
   | 'message_received'
   | 'status_changed'
   | 'task_created'
@@ -155,20 +155,16 @@ export type TeamActivityKind =
   | 'task_completed'
   | 'task_blocked';
 
-export interface TeamActivity {
+export interface TeamActivity（内部唤醒管理器） {
   activityId: string;
   sourceAgentId: string;
-  kind: TeamActivityKind;
+  kind: TeamActivity（内部唤醒管理器）Kind;
   payload: Record<string, unknown>;
   timestamp: number;
 }
 
 // 契约用法: 挂起当前轮次，直到目标 Agent 产生状态变更或处理完成
-const activity = await tools.wait_agent({
-  target_agent_id: "agent-coder-01",
-  timeout_ms: 120000, // 设防超时，防止永久悬挂
-  filter_kinds: ['status_changed', 'task_completed']
-});
+const activity = await tools.wait_agent({ timeout_ms?: number });
 
 if (activity.kind === 'task_completed') {
   // 消费任务产出并推进后续拓扑
@@ -386,16 +382,12 @@ export async function runArchitectureTeamWorkflow(): Promise<void> {
   });
 
   await tools.send_message({
-    agent_id: "agent-architect",
+    target: "agent-architect",
     message: `请开始执行任务: ${taskArch.task.id}，完成后通过 team_task_update 标记 complete。`
   });
 
   // 3. 事件驱动等待架构师完成，杜绝轮询
-  const activity = await tools.wait_agent({
-    target_agent_id: "agent-architect",
-    filter_kinds: ["task_completed"],
-    timeout_ms: 180000
-  });
+  const activity = await tools.wait_agent({ timeout_ms?: number });
 
   // 4. 看板 DAG 自动解算后，检查下游任务状态
   const implTaskStatus = await tools.team_task_get({ task_id: taskImpl.task.id });
@@ -408,7 +400,7 @@ export async function runArchitectureTeamWorkflow(): Promise<void> {
       assignee: "agent-coder"
     });
     await tools.send_message({
-      agent_id: "agent-coder",
+      target: "agent-coder",
       message: "前置契约已就绪，请认领并开始实现业务逻辑。"
     });
   }

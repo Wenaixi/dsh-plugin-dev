@@ -175,8 +175,8 @@ Windows 上源码文件常为 CRLF。`old_string` 用 `\n` 分隔的精确匹配
 
 ```text
 vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
-packages/settings/settings  <-  @deepseek-ai/dsh-settings@0.2.1-rc.2
-packages/skill/skill  <-  @deepseek-ai/dsh-skill@0.2.1-rc.2
+packages/settings/settings  <-  @deepseek-ai/dsh-settings@<version>
+packages/skill/skill  <-  @deepseek-ai/dsh-skill@<version>
 ```
 
 ---

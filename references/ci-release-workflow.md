@@ -55,7 +55,7 @@ git push origin v1.2.3 --force          # 远端 tag 强制更新
 上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径；版本号取自各包 package.json 的 version 字段。
 
 ```text
-apps/cli  <-  @deepseek-ai/dsh@0.2.1-rc.2
+apps/cli  <-  @deepseek-ai/dsh@<version>
 ```
 
 ---

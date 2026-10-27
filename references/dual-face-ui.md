@@ -52,8 +52,8 @@
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-packages/client/modules  <-  @deepseek-ai/dsh-client-modules@0.2.1-rc.2
-packages/client/ui-primitives  <-  @deepseek-ai/dsh-client-ui-primitives@0.2.1-rc.2
-packages/client/ui-renderer  <-  @deepseek-ai/dsh-client-ui-renderer@0.2.1-rc.2
-packages/client/ui-slots  <-  @deepseek-ai/dsh-client-ui-slots@0.2.1-rc.2
+packages/client/modules  <-  @deepseek-ai/dsh-client-modules@<version>
+packages/client/ui-primitives  <-  @deepseek-ai/dsh-client-ui-primitives@<version>
+packages/client/ui-renderer  <-  @deepseek-ai/dsh-client-ui-renderer@<version>
+packages/client/ui-slots  <-  @deepseek-ai/dsh-client-ui-slots@<version>
 ```

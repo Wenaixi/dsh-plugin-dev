@@ -132,16 +132,16 @@ export async function apply(ctx) {
 
 ```text
 vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
-packages/jobs/jobs  <-  @deepseek-ai/dsh-jobs@0.2.1-rc.2
-packages/jobs/jobs-local  <-  @deepseek-ai/dsh-jobs-local@0.2.1-rc.2
-packages/schedule/schedule  <-  @deepseek-ai/dsh-schedule@0.2.1-rc.2
-packages/session/session-checkpoint-policy  <-  @deepseek-ai/dsh-session-checkpoint-policy@0.2.1-rc.2
-packages/session-query/session-query  <-  @deepseek-ai/dsh-session-query@0.2.1-rc.2
-packages/session-query/session-query-sqlite  <-  @deepseek-ai/dsh-session-query-sqlite@0.2.1-rc.2
-packages/storage/storage  <-  @deepseek-ai/dsh-storage@0.2.1-rc.2
-packages/storage/storage-domain  <-  @deepseek-ai/dsh-storage-domain@0.2.1-rc.2
-packages/storage/storage-json  <-  @deepseek-ai/dsh-storage-json@0.2.1-rc.2
-packages/terminal/terminal  <-  @deepseek-ai/dsh-terminal@0.2.1-rc.2
-packages/terminal/terminal-bash  <-  @deepseek-ai/dsh-terminal-bash@0.2.1-rc.2
-packages/jobs/tool-jobs  <-  @deepseek-ai/dsh-tool-jobs@0.2.1-rc.2
+packages/jobs/jobs  <-  @deepseek-ai/dsh-jobs@<version>
+packages/jobs/jobs-local  <-  @deepseek-ai/dsh-jobs-local@<version>
+packages/schedule/schedule  <-  @deepseek-ai/dsh-schedule@<version>
+packages/session/session-checkpoint-policy  <-  @deepseek-ai/dsh-session-checkpoint-policy@<version>
+packages/session-query/session-query  <-  @deepseek-ai/dsh-session-query@<version>
+packages/session-query/session-query-sqlite  <-  @deepseek-ai/dsh-session-query-sqlite@<version>
+packages/storage/storage  <-  @deepseek-ai/dsh-storage@<version>
+packages/storage/storage-domain  <-  @deepseek-ai/dsh-storage-domain@<version>
+packages/storage/storage-json  <-  @deepseek-ai/dsh-storage-json@<version>
+packages/terminal/terminal  <-  @deepseek-ai/dsh-terminal@<version>
+packages/terminal/terminal-bash  <-  @deepseek-ai/dsh-terminal-bash@<version>
+packages/jobs/tool-jobs  <-  @deepseek-ai/dsh-tool-jobs@<version>
 ```

@@ -447,12 +447,12 @@ await import("D:\\my-workspace\\lib\\index.js");
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-apps/cli  <-  @deepseek-ai/dsh@0.2.1-rc.2
-packages/bundle/base  <-  @deepseek-ai/dsh-base@0.2.1-rc.2
-packages/client/hmr  <-  @deepseek-ai/dsh-client-hmr@0.2.1-rc.2
-packages/client/modules  <-  @deepseek-ai/dsh-client-modules@0.2.1-rc.2
-packages/boot/hmr  <-  @deepseek-ai/dsh-hmr@0.2.1-rc.2
-packages/host/webserver  <-  @deepseek-ai/dsh-host-webserver@0.2.1-rc.2
-packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@0.2.1-rc.2
-packages/bundle/web-app  <-  @deepseek-ai/dsh-web-app@0.2.1-rc.2
+apps/cli  <-  @deepseek-ai/dsh@<version>
+packages/bundle/base  <-  @deepseek-ai/dsh-base@<version>
+packages/client/hmr  <-  @deepseek-ai/dsh-client-hmr@<version>
+packages/client/modules  <-  @deepseek-ai/dsh-client-modules@<version>
+packages/boot/hmr  <-  @deepseek-ai/dsh-hmr@<version>
+packages/host/webserver  <-  @deepseek-ai/dsh-host-webserver@<version>
+packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@<version>
+packages/bundle/web-app  <-  @deepseek-ai/dsh-web-app@<version>
 ```

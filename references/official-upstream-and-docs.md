@@ -175,12 +175,12 @@ DSH 迭代频繁，出现与本库描述不符的行为时，按此顺序处理�
 
 ```text
 vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
-apps/cli  <-  @deepseek-ai/dsh@0.2.1-rc.2
-packages/core/agent  <-  @deepseek-ai/dsh-agent@0.2.1-rc.2
-packages/core/agent-loop  <-  @deepseek-ai/dsh-agent-loop@0.2.1-rc.2
-packages/credentials/credentials  <-  @deepseek-ai/dsh-credentials@0.2.1-rc.2
-packages/llm/llm  <-  @deepseek-ai/dsh-llm@0.2.1-rc.2
-packages/core/session  <-  @deepseek-ai/dsh-session@0.2.1-rc.2
-packages/core/system-prompt  <-  @deepseek-ai/dsh-system-prompt@0.2.1-rc.2
-packages/core/tools  <-  @deepseek-ai/dsh-tools@0.2.1-rc.2
+apps/cli  <-  @deepseek-ai/dsh@<version>
+packages/core/agent  <-  @deepseek-ai/dsh-agent@<version>
+packages/core/agent-loop  <-  @deepseek-ai/dsh-agent-loop@<version>
+packages/credentials/credentials  <-  @deepseek-ai/dsh-credentials@<version>
+packages/llm/llm  <-  @deepseek-ai/dsh-llm@<version>
+packages/core/session  <-  @deepseek-ai/dsh-session@<version>
+packages/core/system-prompt  <-  @deepseek-ai/dsh-system-prompt@<version>
+packages/core/tools  <-  @deepseek-ai/dsh-tools@<version>
 ```

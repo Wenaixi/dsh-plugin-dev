@@ -100,15 +100,15 @@ type ObservedStateMap = WeakMap<AgentSession, Map<NormalizedPath, ObservedState>
 
 ```text
 vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
-packages/acp/acp  <-  @deepseek-ai/dsh-acp@0.2.1-rc.2
-packages/bundle/acp-app  <-  @deepseek-ai/dsh-acp-app@0.2.1-rc.2
-packages/experimental/agent-team  <-  @deepseek-ai/dsh-experimental-agent-team@0.2.1-rc.2
-packages/experimental/tool-agent-team  <-  @deepseek-ai/dsh-experimental-tool-agent-team@0.2.1-rc.2
-packages/fs/fs-local  <-  @deepseek-ai/dsh-fs-local@0.2.1-rc.2
-packages/fs/fs-observation-policy  <-  @deepseek-ai/dsh-fs-observation-policy@0.2.1-rc.2
-packages/subagent/subagent  <-  @deepseek-ai/dsh-subagent@0.2.1-rc.2
-packages/subagent/subagent-fork-in-process  <-  @deepseek-ai/dsh-subagent-fork-in-process@0.2.1-rc.2
-packages/subagent/subagent-spawn-in-process  <-  @deepseek-ai/dsh-subagent-spawn-in-process@0.2.1-rc.2
-packages/subagent/tool-subagent  <-  @deepseek-ai/dsh-tool-subagent@0.2.1-rc.2
-packages/subagent/tool-subagent-control  <-  @deepseek-ai/dsh-tool-subagent-control@0.2.1-rc.2
+packages/acp/acp  <-  @deepseek-ai/dsh-acp@<version>
+packages/bundle/acp-app  <-  @deepseek-ai/dsh-acp-app@<version>
+packages/experimental/agent-team  <-  @deepseek-ai/dsh-experimental-agent-team@<version>
+packages/experimental/tool-agent-team  <-  @deepseek-ai/dsh-experimental-tool-agent-team@<version>
+packages/fs/fs-local  <-  @deepseek-ai/dsh-fs-local@<version>
+packages/fs/fs-observation-policy  <-  @deepseek-ai/dsh-fs-observation-policy@<version>
+packages/subagent/subagent  <-  @deepseek-ai/dsh-subagent@<version>
+packages/subagent/subagent-fork-in-process  <-  @deepseek-ai/dsh-subagent-fork-in-process@<version>
+packages/subagent/subagent-spawn-in-process  <-  @deepseek-ai/dsh-subagent-spawn-in-process@<version>
+packages/subagent/tool-subagent  <-  @deepseek-ai/dsh-tool-subagent@<version>
+packages/subagent/tool-subagent-control  <-  @deepseek-ai/dsh-tool-subagent-control@<version>
 ```

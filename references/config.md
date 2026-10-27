@@ -798,13 +798,13 @@ export function unwrapLazy<T>(raw: unknown, defaultValue: T): T {
 ```text
 vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
 vendor/loader  <-  @deepseek-ai/cordis-plugin-loader@1.0.6
-apps/cli  <-  @deepseek-ai/dsh@0.2.1-rc.2
-packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.1-rc.2
-packages/bundle/base  <-  @deepseek-ai/dsh-base@0.2.1-rc.2
-packages/boot/config-editor  <-  @deepseek-ai/dsh-config-editor@0.2.1-rc.2
-packages/experimental/voice-input-bundle  <-  @deepseek-ai/dsh-experimental-voice-input-bundle@0.2.1-rc.2
-packages/mcp/mcp-client  <-  @deepseek-ai/dsh-mcp-client@0.2.1-rc.2
-packages/settings/settings  <-  @deepseek-ai/dsh-settings@0.2.1-rc.2
-packages/bundle/web-app  <-  @deepseek-ai/dsh-web-app@0.2.1-rc.2
+apps/cli  <-  @deepseek-ai/dsh@<version>
+packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@<version>
+packages/bundle/base  <-  @deepseek-ai/dsh-base@<version>
+packages/boot/config-editor  <-  @deepseek-ai/dsh-config-editor@<version>
+packages/experimental/voice-input-bundle  <-  @deepseek-ai/dsh-experimental-voice-input-bundle@<version>
+packages/mcp/mcp-client  <-  @deepseek-ai/dsh-mcp-client@<version>
+packages/settings/settings  <-  @deepseek-ai/dsh-settings@<version>
+packages/bundle/web-app  <-  @deepseek-ai/dsh-web-app@<version>
 schema 库             <-  schemastery（lib/index.mjs 的 validateVolatileSchema / toJSON / resolve）
 ```

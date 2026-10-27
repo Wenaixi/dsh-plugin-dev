@@ -29,6 +29,6 @@
 
 ```text
 vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
-packages/client/modules  <-  @deepseek-ai/dsh-client-modules@0.2.1-rc.2
-packages/extensions/cordis-client-runner  <-  @deepseek-ai/dsh-cordis-client-runner@0.2.1-rc.2
+packages/client/modules  <-  @deepseek-ai/dsh-client-modules@<version>
+packages/extensions/cordis-client-runner  <-  @deepseek-ai/dsh-cordis-client-runner@<version>
 ```

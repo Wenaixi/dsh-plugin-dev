@@ -125,10 +125,10 @@ Linux 平台采用探测制后备链：`PLATFORM_CHAINS.linux = ["bwrap", "landl
 
 ```text
 vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
-packages/sandbox/sandbox  <-  @deepseek-ai/dsh-sandbox@0.2.1-rc.2
-packages/sandbox/sandbox-local  <-  @deepseek-ai/dsh-sandbox-local@0.2.1-rc.2
-packages/sandbox/sandbox-windows-acl  <-  @deepseek-ai/dsh-sandbox-windows-acl@0.2.1-rc.2
-packages/fs/fs-observation-policy  <-  @deepseek-ai/dsh-fs-observation-policy@0.2.1-rc.2
-packages/compaction/compaction-image-offload  <-  @deepseek-ai/dsh-compaction-image-offload@0.2.1-rc.2
-packages/util/http-proxy  <-  @deepseek-ai/dsh-http-proxy@0.2.1-rc.2
+packages/sandbox/sandbox  <-  @deepseek-ai/dsh-sandbox@<version>
+packages/sandbox/sandbox-local  <-  @deepseek-ai/dsh-sandbox-local@<version>
+packages/sandbox/sandbox-windows-acl  <-  @deepseek-ai/dsh-sandbox-windows-acl@<version>
+packages/fs/fs-observation-policy  <-  @deepseek-ai/dsh-fs-observation-policy@<version>
+packages/compaction/compaction-image-offload  <-  @deepseek-ai/dsh-compaction-image-offload@<version>
+packages/util/http-proxy  <-  @deepseek-ai/dsh-http-proxy@<version>
 ```

@@ -279,6 +279,6 @@ if (reviewResult.approved) {
 ## 相关 DSH 源码
 
 ```text
-packages/plan/plan-mode  <-  @deepseek-ai/dsh-plan-mode@0.2.1-rc.2
-packages/client/ui-plan  <-  @deepseek-ai/dsh-client-ui-plan@0.2.1-rc.2
+packages/plan/plan-mode  <-  @deepseek-ai/dsh-plan-mode@<version>
+packages/client/ui-plan  <-  @deepseek-ai/dsh-client-ui-plan@<version>
 ```

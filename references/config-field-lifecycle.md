@@ -241,9 +241,9 @@ function switchOps(names, op, legacyCarry) {
 ## 相关 DSH 源码
 
 ```text
-packages/settings/settings   <-  @deepseek-ai/dsh-settings@0.2.1-rc.2
+packages/settings/settings   <-  @deepseek-ai/dsh-settings@<version>
   lib/index.js（write 的 volatile 路径校验、乐观并发栅栏、configEditor.edit 原子落盘）
-packages/boot/config-editor <-  @deepseek-ai/dsh-config-editor@0.2.1-rc.2
+packages/boot/config-editor <-  @deepseek-ai/dsh-config-editor@<version>
   lib/index.js（带文件锁的配置补丁写入）
 ```
 

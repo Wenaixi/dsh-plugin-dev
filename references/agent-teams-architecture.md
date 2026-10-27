@@ -420,7 +420,7 @@ export async function runArchitectureTeamWorkflow(): Promise<void> {
 ## 相关 DSH 源码
 
 ```text
-packages/experimental/agent-team       <-  @deepseek-ai/dsh-experimental-agent-team@0.2.1-rc.2
-packages/experimental/tool-agent-team  <-  @deepseek-ai/dsh-experimental-tool-agent-team@0.2.1-rc.2
-packages/experimental/client-ui-agent-team  <-  @deepseek-ai/dsh-experimental-client-ui-agent-team@0.2.1-rc.2
+packages/experimental/agent-team       <-  @deepseek-ai/dsh-experimental-agent-team@<version>
+packages/experimental/tool-agent-team  <-  @deepseek-ai/dsh-experimental-tool-agent-team@<version>
+packages/experimental/client-ui-agent-team  <-  @deepseek-ai/dsh-experimental-client-ui-agent-team@<version>
 ```

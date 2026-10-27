@@ -173,11 +173,11 @@ export function apply(ctx) {
 
 ```text
 vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
-packages/core/session  <-  @deepseek-ai/dsh-session@0.2.1-rc.2
-packages/session/session-persistence  <-  @deepseek-ai/dsh-session-persistence@0.2.1-rc.2
-packages/goal/goal  <-  @deepseek-ai/dsh-goal@0.2.1-rc.2
-packages/plan/plan-mode  <-  @deepseek-ai/dsh-plan-mode@0.2.1-rc.2
-packages/fs/fs  <-  @deepseek-ai/dsh-fs@0.2.1-rc.2
-packages/fs/fs-observation-policy  <-  @deepseek-ai/dsh-fs-observation-policy@0.2.1-rc.2
-packages/experimental/agent-team  <-  @deepseek-ai/dsh-experimental-agent-team@0.2.1-rc.2
+packages/core/session  <-  @deepseek-ai/dsh-session@<version>
+packages/session/session-persistence  <-  @deepseek-ai/dsh-session-persistence@<version>
+packages/goal/goal  <-  @deepseek-ai/dsh-goal@<version>
+packages/plan/plan-mode  <-  @deepseek-ai/dsh-plan-mode@<version>
+packages/fs/fs  <-  @deepseek-ai/dsh-fs@<version>
+packages/fs/fs-observation-policy  <-  @deepseek-ai/dsh-fs-observation-policy@<version>
+packages/experimental/agent-team  <-  @deepseek-ai/dsh-experimental-agent-team@<version>
 ```

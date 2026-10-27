@@ -319,5 +319,5 @@ CI 通常校验 `tag == package.json.version`，不一致直接失败。发版�
 
 ```text
 vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
-packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.1-rc.2
+packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@<version>
 ```

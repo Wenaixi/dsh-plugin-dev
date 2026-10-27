@@ -570,13 +570,13 @@ const ok = await this.form.mutate(
 ## 相关 DSH 源码
 
 ```text
-packages/client/ui-primitives  <-  @deepseek-ai/dsh-client-ui-primitives@0.2.1-rc.2
+packages/client/ui-primitives  <-  @deepseek-ai/dsh-client-ui-primitives@<version>
   src/settings-form/SettingsForm.tsx / form-model.ts / fields.tsx
-packages/client/ui-settings   <-  @deepseek-ai/dsh-client-ui-settings@0.2.1-rc.2
+packages/client/ui-settings   <-  @deepseek-ai/dsh-client-ui-settings@<version>
   lib/types/client/config-form*.d.ts（ConfigForm / ConfigFormSnapshot）
-packages/client/ui-renderer  <-  @deepseek-ai/dsh-client-ui-renderer@0.2.1-rc.2
+packages/client/ui-renderer  <-  @deepseek-ai/dsh-client-ui-renderer@<version>
   lib/client.js（bindInjectSources：hooks 键转 use<Name>、bindSnapshotSelector：选择器签名）
-packages/client/ui-slots    <-  @deepseek-ai/dsh-client-ui-slots@0.2.1-rc.2
+packages/client/ui-slots    <-  @deepseek-ai/dsh-client-ui-slots@<version>
   lib/index.js（standardHookPropName：use<Name> 命名规则）
 packages/client/ui-settings-subagent  <-  官方 bool/枚举控制器范本（subagent-model-selection-card-controller）
 packages/client/ui-settings-shell     <-  官方 SettingsFormModel 用法范本

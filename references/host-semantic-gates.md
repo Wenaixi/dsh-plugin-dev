@@ -207,9 +207,9 @@
 ## 相关 DSH 源码
 
 ```text
-packages/settings/settings       <-  @deepseek-ai/dsh-settings@0.2.1-rc.2（写入闸门）
-packages/client/modules         <-  @deepseek-ai/dsh-client-modules@0.2.1-rc.2（产物缓存与修订号）
-packages/boot/plugin-manager    <-  @deepseek-ai/dsh-plugin-manager@0.2.1-rc.2（应用状态与热替换）
+packages/settings/settings       <-  @deepseek-ai/dsh-settings@<version>（写入闸门）
+packages/client/modules         <-  @deepseek-ai/dsh-client-modules@<version>（产物缓存与修订号）
+packages/boot/plugin-manager    <-  @deepseek-ai/dsh-plugin-manager@<version>（应用状态与热替换）
 ```
 
 配套阅读：

@@ -332,11 +332,11 @@ npm pack --dry-run --json    # 逐条断言 locale/、icon、lib/ 都在 files �
 
 ```text
 vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
-packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.1-rc.2
-packages/util/home-paths  <-  @deepseek-ai/dsh-home-paths@0.2.1-rc.2
-packages/host/webserver  <-  @deepseek-ai/dsh-host-webserver@0.2.1-rc.2
-packages/llm/llm  <-  @deepseek-ai/dsh-llm@0.2.1-rc.2
-packages/mcp/mcp-client  <-  @deepseek-ai/dsh-mcp-client@0.2.1-rc.2
-packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@0.2.1-rc.2
-packages/skill/skill  <-  @deepseek-ai/dsh-skill@0.2.1-rc.2
+packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@<version>
+packages/util/home-paths  <-  @deepseek-ai/dsh-home-paths@<version>
+packages/host/webserver  <-  @deepseek-ai/dsh-host-webserver@<version>
+packages/llm/llm  <-  @deepseek-ai/dsh-llm@<version>
+packages/mcp/mcp-client  <-  @deepseek-ai/dsh-mcp-client@<version>
+packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@<version>
+packages/skill/skill  <-  @deepseek-ai/dsh-skill@<version>
 ```

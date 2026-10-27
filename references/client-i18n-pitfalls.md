@@ -152,7 +152,7 @@ function readLanguage(value) {
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-packages/client/locale  <-  @deepseek-ai/dsh-client-locale@0.2.1-rc.2
-packages/client/ui-plugin-manager  <-  @deepseek-ai/dsh-client-ui-plugin-manager@0.2.1-rc.2
-packages/schedule/schedule  <-  @deepseek-ai/dsh-schedule@0.2.1-rc.2
+packages/client/locale  <-  @deepseek-ai/dsh-client-locale@<version>
+packages/client/ui-plugin-manager  <-  @deepseek-ai/dsh-client-ui-plugin-manager@<version>
+packages/schedule/schedule  <-  @deepseek-ai/dsh-schedule@<version>
 ```

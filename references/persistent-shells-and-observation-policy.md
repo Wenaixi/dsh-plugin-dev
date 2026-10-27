@@ -271,8 +271,8 @@ DSH 将自愈诊断逻辑封装为系统内置技能 `diagnose-windows-sandbox-a
 ## 相关 DSH 源码
 
 ```text
-packages/shell/tool-pwsh-persistent   <-  @deepseek-ai/dsh-tool-pwsh-persistent@0.2.1-rc.2
-packages/shell/tool-bash-persistent   <-  @deepseek-ai/dsh-tool-bash-persistent@0.2.1-rc.2
-packages/fs/fs-observation-policy     <-  @deepseek-ai/dsh-fs-observation-policy@0.2.1-rc.2
-packages/sandbox/sandbox-windows-acl  <-  @deepseek-ai/dsh-sandbox-windows-acl@0.2.1-rc.2
+packages/shell/tool-pwsh-persistent   <-  @deepseek-ai/dsh-tool-pwsh-persistent@<version>
+packages/shell/tool-bash-persistent   <-  @deepseek-ai/dsh-tool-bash-persistent@<version>
+packages/fs/fs-observation-policy     <-  @deepseek-ai/dsh-fs-observation-policy@<version>
+packages/sandbox/sandbox-windows-acl  <-  @deepseek-ai/dsh-sandbox-windows-acl@<version>
 ```

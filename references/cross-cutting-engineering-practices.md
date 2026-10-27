@@ -238,6 +238,6 @@ Host 承担生命周期、服务、权限、文件和持久化；Browser 承担�
 
 ```text
 vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
-packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.1-rc.2
-packages/util/home-paths  <-  @deepseek-ai/dsh-home-paths@0.2.1-rc.2
+packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@<version>
+packages/util/home-paths  <-  @deepseek-ai/dsh-home-paths@<version>
 ```

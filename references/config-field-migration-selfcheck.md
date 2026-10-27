@@ -161,7 +161,7 @@ legacyFields.forEach(field => assert(field in schemaKeys, `${field} 不在 schem
 ## 相关 DSH 源码
 
 ```text
-packages/settings/settings   <-  @deepseek-ai/dsh-settings@0.2.1-rc.2（写入批次与 volatile 校验）
+packages/settings/settings   <-  @deepseek-ai/dsh-settings@<version>（写入批次与 volatile 校验）
 ```
 
 配套阅读：

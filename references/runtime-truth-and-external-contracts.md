@@ -263,13 +263,13 @@ if (!changelog.includes('## [' + pkg.version + ']')) ok = false;
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-packages/api/gateway        <-  @deepseek-ai/dsh-api-gateway@0.2.1-rc.2     （命名空间贡献清单与 codec 校验）
-packages/typert/protocol    <-  @deepseek-ai/dsh-typert-protocol@0.2.1-rc.2   （Remote 描述符契约）
-packages/api/remotes        <-  @deepseek-ai/dsh-api-remotes@0.2.1-rc.2        （浏览器侧命名空间贡献清单）
-packages/client/ui-renderer <- @deepseek-ai/dsh-client-ui-renderer@0.2.1-rc.2（注入面绑定与钩子选择器）
-packages/client/ui-primitives <- @deepseek-ai/dsh-client-ui-primitives@0.2.1-rc.2（受控控件求值方式）
-packages/skill/tool-skill    <-  @deepseek-ai/dsh-tool-skill@0.2.1-rc.2        （描述长度上限配置项）
-packages/boot/plugin-manager <- @deepseek-ai/dsh-plugin-manager@0.2.1-rc.2  （安装 / 卸载 / 补丁写操作覆盖面）
-packages/boot/app-boot       <-  @deepseek-ai/dsh-app-boot@0.2.1-rc.2         （补丁条目解析与未知条目处理）
-apps/cli                     <-  @deepseek-ai/dsh@0.2.1-rc.2                  （profile 目录上下文与配置重载通道）
+packages/api/gateway        <-  @deepseek-ai/dsh-api-gateway@<version>     （命名空间贡献清单与 codec 校验）
+packages/typert/protocol    <-  @deepseek-ai/dsh-typert-protocol@<version>   （Remote 描述符契约）
+packages/api/remotes        <-  @deepseek-ai/dsh-api-remotes@<version>        （浏览器侧命名空间贡献清单）
+packages/client/ui-renderer <- @deepseek-ai/dsh-client-ui-renderer@<version>（注入面绑定与钩子选择器）
+packages/client/ui-primitives <- @deepseek-ai/dsh-client-ui-primitives@<version>（受控控件求值方式）
+packages/skill/tool-skill    <-  @deepseek-ai/dsh-tool-skill@<version>        （描述长度上限配置项）
+packages/boot/plugin-manager <- @deepseek-ai/dsh-plugin-manager@<version>  （安装 / 卸载 / 补丁写操作覆盖面）
+packages/boot/app-boot       <-  @deepseek-ai/dsh-app-boot@<version>         （补丁条目解析与未知条目处理）
+apps/cli                     <-  @deepseek-ai/dsh@<version>                  （profile 目录上下文与配置重载通道）
 ```

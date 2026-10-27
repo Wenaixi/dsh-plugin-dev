@@ -289,8 +289,8 @@ if (args.action === "blocked" && authority.kind === "goal-round") {
 ## 相关 DSH 源码
 
 ```text
-packages/goal/goal               <-  @deepseek-ai/dsh-goal@0.2.1-rc.2
-packages/goal/goal-round-driver  <-  @deepseek-ai/dsh-goal-round-driver@0.2.1-rc.2
-packages/shell/tool-goal         <-  @deepseek-ai/dsh-tool-goal@0.2.1-rc.2
-packages/client/ui-goal          <-  @deepseek-ai/dsh-client-ui-goal@0.2.1-rc.2
+packages/goal/goal               <-  @deepseek-ai/dsh-goal@<version>
+packages/goal/goal-round-driver  <-  @deepseek-ai/dsh-goal-round-driver@<version>
+packages/shell/tool-goal         <-  @deepseek-ai/dsh-tool-goal@<version>
+packages/client/ui-goal          <-  @deepseek-ai/dsh-client-ui-goal@<version>
 ```

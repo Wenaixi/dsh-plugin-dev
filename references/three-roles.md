@@ -243,9 +243,9 @@ Cardinality 选错会导致重复渲染或完全不渲染；调试实时插槽�
 
 ```text
 vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
-apps/cli  <-  @deepseek-ai/dsh@0.2.1-rc.2
-packages/client/modules  <-  @deepseek-ai/dsh-client-modules@0.2.1-rc.2
-packages/client/ui-settings  <-  @deepseek-ai/dsh-client-ui-settings@0.2.1-rc.2
-packages/subprocess/subprocess  <-  @deepseek-ai/dsh-subprocess@0.2.1-rc.2
-packages/subprocess/subprocess-local  <-  @deepseek-ai/dsh-subprocess-local@0.2.1-rc.2
+apps/cli  <-  @deepseek-ai/dsh@<version>
+packages/client/modules  <-  @deepseek-ai/dsh-client-modules@<version>
+packages/client/ui-settings  <-  @deepseek-ai/dsh-client-ui-settings@<version>
+packages/subprocess/subprocess  <-  @deepseek-ai/dsh-subprocess@<version>
+packages/subprocess/subprocess-local  <-  @deepseek-ai/dsh-subprocess-local@<version>
 ```

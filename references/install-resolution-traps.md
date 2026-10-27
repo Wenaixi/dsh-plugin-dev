@@ -539,7 +539,7 @@ function evaluatePluginCompatibility(manifest, exemptions = {}, runtimeVersion =
 - **崩溃机理**：当宿主升级到 `0.2.1-rc.2` 时，`semver.satisfies("0.2.1-rc.2", "0.2.1-rc.2", { includePrerelease: true })` 恒为 `false`！
 - **连锁反应**：宿主收集到 `peers["@deepseek-ai/dsh-client-locale"] = "0.2.1-rc.2"`，由于插件未获得豁免（`!compatibility.exempted`），直接触发 `ManagementFailure("incompatible-version")`，导致插件即使代码 100% 运行正常，也会被宿主硬性拒载！
 
-### 11.3 官方推荐 engines.dsh 仲裁机制（DSH 0.2.1+）
+### 11.3 官方推荐 engines.dsh 仲裁机制（DSH）
 
 在 DSH 0.2.1 系列及官方插件索引规范中，宿主正式引入并优先支持 `package.json.engines.dsh` 字段：
 - 生成器与包管理中心**优先读取 `engines.dsh`** 并去除首尾空白；
@@ -629,11 +629,11 @@ function evaluatePluginCompatibility(manifest, exemptions = {}, runtimeVersion =
 
 ```text
 vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
-packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.1-rc.2
-packages/bundle/base  <-  @deepseek-ai/dsh-base@0.2.1-rc.2
-packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@0.2.1-rc.2
-packages/client/modules  <-  @deepseek-ai/dsh-client-modules@0.2.1-rc.2
-packages/skill/skill  <-  @deepseek-ai/dsh-skill@0.2.1-rc.2
-packages/bundle/web-app  <-  @deepseek-ai/dsh-web-app@0.2.1-rc.2
+packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@<version>
+packages/bundle/base  <-  @deepseek-ai/dsh-base@<version>
+packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@<version>
+packages/client/modules  <-  @deepseek-ai/dsh-client-modules@<version>
+packages/skill/skill  <-  @deepseek-ai/dsh-skill@<version>
+packages/bundle/web-app  <-  @deepseek-ai/dsh-web-app@<version>
 apps/plugin-market-generator  <-  @deepseek-ai/dsh-plugin-market-generator
 ```

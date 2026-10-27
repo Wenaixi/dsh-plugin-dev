@@ -282,12 +282,12 @@ interface TokenUsage {
 
 ```text
 vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
-packages/llm/llm  <-  @deepseek-ai/dsh-llm@0.2.1-rc.2
-packages/llm/llm-deepseek-account  <-  @deepseek-ai/dsh-llm-deepseek-account@0.2.1-rc.2
-packages/llm/llm-deepseek-api-key  <-  @deepseek-ai/dsh-llm-deepseek-api-key@0.2.1-rc.2
-packages/llm/llm-pi-ai  <-  @deepseek-ai/dsh-llm-pi-ai@0.2.1-rc.2
-packages/llm/llm-retry  <-  @deepseek-ai/dsh-llm-retry@0.2.1-rc.2
-packages/session/session-title-first-prompt-llm  <-  @deepseek-ai/dsh-session-title-first-prompt-llm@0.2.1-rc.2
-packages/session/session-title-llm  <-  @deepseek-ai/dsh-session-title-llm@0.2.1-rc.2
+packages/llm/llm  <-  @deepseek-ai/dsh-llm@<version>
+packages/llm/llm-deepseek-account  <-  @deepseek-ai/dsh-llm-deepseek-account@<version>
+packages/llm/llm-deepseek-api-key  <-  @deepseek-ai/dsh-llm-deepseek-api-key@<version>
+packages/llm/llm-pi-ai  <-  @deepseek-ai/dsh-llm-pi-ai@<version>
+packages/llm/llm-retry  <-  @deepseek-ai/dsh-llm-retry@<version>
+packages/session/session-title-first-prompt-llm  <-  @deepseek-ai/dsh-session-title-first-prompt-llm@<version>
+packages/session/session-title-llm  <-  @deepseek-ai/dsh-session-title-llm@<version>
 vendor/schemastery  <-  @deepseek-ai/schemastery@3.18.4
 ```

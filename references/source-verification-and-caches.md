@@ -218,7 +218,7 @@ DSH 的用户数据根是跨平台统一的——源码里只有 `homedir()/.dsh
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-apps/cli  <-  @deepseek-ai/dsh@0.2.1-rc.2
-packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.1-rc.2
-packages/util/home-paths  <-  @deepseek-ai/dsh-home-paths@0.2.1-rc.2
+apps/cli  <-  @deepseek-ai/dsh@<version>
+packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@<version>
+packages/util/home-paths  <-  @deepseek-ai/dsh-home-paths@<version>
 ```

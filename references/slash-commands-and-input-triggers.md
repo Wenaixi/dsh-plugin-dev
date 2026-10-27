@@ -118,7 +118,7 @@ export function apply(ctx) {
 
 ---
 
-## 三之三、DSH 0.2.1+ 命令原子芯片化 (CommandChipNode) 架构演进与触发放宽持久性
+## 三之三、DSH 命令原子芯片化 (CommandChipNode) 架构演进与触发放宽持久性
 
 ### 1. 架构演进：从字面文本装饰到原子 DecoratorNode
 
@@ -167,10 +167,10 @@ for (let i = caret - 1; i >= 0; i--) {
 
 ```text
 vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
-packages/client/shortcuts  <-  @deepseek-ai/dsh-client-shortcuts@0.2.1-rc.2
-packages/client/ui-commands  <-  @deepseek-ai/dsh-client-ui-commands@0.2.1-rc.2
-packages/client/ui-input-trigger  <-  @deepseek-ai/dsh-client-ui-input-trigger@0.2.1-rc.2
-packages/client/ui-shortcuts  <-  @deepseek-ai/dsh-client-ui-shortcuts@0.2.1-rc.2
-packages/interaction/commands  <-  @deepseek-ai/dsh-commands@0.2.1-rc.2
-packages/client/ui-conversation  <-  @deepseek-ai/dsh-client-ui-conversation@0.2.1-rc.2
+packages/client/shortcuts  <-  @deepseek-ai/dsh-client-shortcuts@<version>
+packages/client/ui-commands  <-  @deepseek-ai/dsh-client-ui-commands@<version>
+packages/client/ui-input-trigger  <-  @deepseek-ai/dsh-client-ui-input-trigger@<version>
+packages/client/ui-shortcuts  <-  @deepseek-ai/dsh-client-ui-shortcuts@<version>
+packages/interaction/commands  <-  @deepseek-ai/dsh-commands@<version>
+packages/client/ui-conversation  <-  @deepseek-ai/dsh-client-ui-conversation@<version>
 ```

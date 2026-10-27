@@ -100,10 +100,10 @@ dsh --profile headless --json "分析提交历史" > events.ndjson
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-packages/bundle/base  <-  @deepseek-ai/dsh-base@0.2.1-rc.2
-packages/bundle/headless  <-  @deepseek-ai/dsh-headless@0.2.1-rc.2
-packages/webhook/webhook  <-  @deepseek-ai/dsh-webhook@0.2.1-rc.2
-packages/webhook/webhook-github  <-  @deepseek-ai/dsh-webhook-github@0.2.1-rc.2
-packages/workflow/workflow  <-  @deepseek-ai/dsh-workflow@0.2.1-rc.2
-packages/workflow/workflow-ptc  <-  @deepseek-ai/dsh-workflow-ptc@0.2.1-rc.2
+packages/bundle/base  <-  @deepseek-ai/dsh-base@<version>
+packages/bundle/headless  <-  @deepseek-ai/dsh-headless@<version>
+packages/webhook/webhook  <-  @deepseek-ai/dsh-webhook@<version>
+packages/webhook/webhook-github  <-  @deepseek-ai/dsh-webhook-github@<version>
+packages/workflow/workflow  <-  @deepseek-ai/dsh-workflow@<version>
+packages/workflow/workflow-ptc  <-  @deepseek-ai/dsh-workflow-ptc@<version>
 ```

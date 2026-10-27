@@ -228,6 +228,6 @@ export default { apply, PanelController, inject }
 ## 相关 DSH 源码
 
 ```text
-packages/client/modules  <-  @deepseek-ai/dsh-client-modules@0.2.1-rc.2
+packages/client/modules  <-  @deepseek-ai/dsh-client-modules@<version>
   lib/index.js（load 注册语义、comboUrl/comboSearch、artifactRevision、locatePkgJson/nearestPackage）
 ```

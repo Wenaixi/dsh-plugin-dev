@@ -356,6 +356,6 @@ for (const item of items) {
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-packages/skill/skill  <-  @deepseek-ai/dsh-skill@0.2.1-rc.2
-packages/skill/skill-filesystem  <-  @deepseek-ai/dsh-skill-filesystem@0.2.1-rc.2
+packages/skill/skill  <-  @deepseek-ai/dsh-skill@<version>
+packages/skill/skill-filesystem  <-  @deepseek-ai/dsh-skill-filesystem@<version>
 ```

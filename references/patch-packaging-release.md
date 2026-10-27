@@ -30,7 +30,7 @@
 
 ```text
 vendor/loader  <-  @deepseek-ai/cordis-plugin-loader@1.0.6
-packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@0.2.1-rc.2
-packages/bundle/base  <-  @deepseek-ai/dsh-base@0.2.1-rc.2
-packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@0.2.1-rc.2
+packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@<version>
+packages/bundle/base  <-  @deepseek-ai/dsh-base@<version>
+packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@<version>
 ```

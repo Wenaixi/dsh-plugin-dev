@@ -92,10 +92,10 @@ DSH 提供了强大的多模态附件存储抽象：`@deepseek-ai/dsh-attachment
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-packages/attachment/attachment-local  <-  @deepseek-ai/dsh-attachment-local@0.2.1-rc.2
-packages/client/ui-deliverables  <-  @deepseek-ai/dsh-client-ui-deliverables@0.2.1-rc.2
-packages/compaction/compaction-tool-result-pruner  <-  @deepseek-ai/dsh-compaction-tool-result-pruner@0.2.1-rc.2
-packages/interaction/tool-ask-user  <-  @deepseek-ai/dsh-tool-ask-user@0.2.1-rc.2
-packages/deliverables/tool-present  <-  @deepseek-ai/dsh-tool-present@0.2.1-rc.2
-packages/interaction/user-questions  <-  @deepseek-ai/dsh-user-questions@0.2.1-rc.2
+packages/attachment/attachment-local  <-  @deepseek-ai/dsh-attachment-local@<version>
+packages/client/ui-deliverables  <-  @deepseek-ai/dsh-client-ui-deliverables@<version>
+packages/compaction/compaction-tool-result-pruner  <-  @deepseek-ai/dsh-compaction-tool-result-pruner@<version>
+packages/interaction/tool-ask-user  <-  @deepseek-ai/dsh-tool-ask-user@<version>
+packages/deliverables/tool-present  <-  @deepseek-ai/dsh-tool-present@<version>
+packages/interaction/user-questions  <-  @deepseek-ai/dsh-user-questions@<version>
 ```

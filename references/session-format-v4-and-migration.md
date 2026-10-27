@@ -258,7 +258,7 @@ function afterCheckpoint(ctx, session, next) {
 ## 相关 DSH 源码
 
 ```text
-packages/session/session-format-v3-to-v4  <-  @deepseek-ai/dsh-session-format-v3-to-v4@0.2.1-rc.2
-packages/session/session-checkpoint-policy  <-  @deepseek-ai/dsh-session-checkpoint-policy@0.2.1-rc.2
-packages/session/session-query-sqlite     <-  @deepseek-ai/dsh-session-query-sqlite@0.2.1-rc.2
+packages/session/session-format-v3-to-v4  <-  @deepseek-ai/dsh-session-format-v3-to-v4@<version>
+packages/session/session-checkpoint-policy  <-  @deepseek-ai/dsh-session-checkpoint-policy@<version>
+packages/session/session-query-sqlite     <-  @deepseek-ai/dsh-session-query-sqlite@<version>
 ```

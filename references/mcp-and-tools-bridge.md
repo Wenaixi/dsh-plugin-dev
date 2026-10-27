@@ -165,9 +165,9 @@ export function apply(ctx) {
 
 ```text
 vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
-packages/mcp/mcp-client  <-  @deepseek-ai/dsh-mcp-client@0.2.1-rc.2
-packages/guard/timeout-policy  <-  @deepseek-ai/dsh-tool-call-timeout-policy@0.2.1-rc.2
-packages/terminal/terminal  <-  @deepseek-ai/dsh-terminal@0.2.1-rc.2
-packages/terminal/terminal-bash  <-  @deepseek-ai/dsh-terminal-bash@0.2.1-rc.2
-packages/experimental/tool-agent-team  <-  @deepseek-ai/dsh-experimental-tool-agent-team@0.2.1-rc.2
+packages/mcp/mcp-client  <-  @deepseek-ai/dsh-mcp-client@<version>
+packages/guard/timeout-policy  <-  @deepseek-ai/dsh-tool-call-timeout-policy@<version>
+packages/terminal/terminal  <-  @deepseek-ai/dsh-terminal@<version>
+packages/terminal/terminal-bash  <-  @deepseek-ai/dsh-terminal-bash@<version>
+packages/experimental/tool-agent-team  <-  @deepseek-ai/dsh-experimental-tool-agent-team@<version>
 ```

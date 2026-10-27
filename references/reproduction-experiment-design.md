@@ -165,7 +165,7 @@
 本文是实验方法论，不绑定具体包的实现。状态标记取自输入触发器，前置条件典型取自命令目录的懒加载：
 
 ```text
-packages/client/ui-input-trigger  <-  @deepseek-ai/dsh-client-ui-input-trigger@0.2.1-rc.2
-packages/client/ui-commands       <-  @deepseek-ai/dsh-client-ui-commands@0.2.1-rc.2
-packages/client/ui-conversation   <-  @deepseek-ai/dsh-client-ui-conversation@0.2.1-rc.2
+packages/client/ui-input-trigger  <-  @deepseek-ai/dsh-client-ui-input-trigger@<version>
+packages/client/ui-commands       <-  @deepseek-ai/dsh-client-ui-commands@<version>
+packages/client/ui-conversation   <-  @deepseek-ai/dsh-client-ui-conversation@<version>
 ```

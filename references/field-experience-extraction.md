@@ -136,6 +136,124 @@ if (typeof payload?.content !== 'string') {
 
 ---
 
+---
+
+## 九、切换/选择语义的只读性与惰性创建防御 (Read-Only Switching & Lazy-Creation Defense)
+
+### 9.1 事故机理：切换操作自动创建占位导致脏数据
+
+在具备多文件编辑、多模板选择、或全局备选文件的插件 UI 中，若在用户点击切换（Switch）时检测到目标文件不存在，就试图"顺手克隆一个模板"或"新建一个 0 字节占位文件"，会引发严重副作用：
+- 用户仅仅为了在前端查看、对比或好奇点了一下某个标签，磁盘上就立即生成了未受用户确认的垃圾文件；
+- 破坏了"目标文件原本不存在"的原生环境特征，导致依赖"目标存在性判断"的外部宿主行为发生偏离；
+- 违背了"只读操作绝不产生磁盘副作用"的基本工程底线。
+
+### 9.2 通用架构契约：选择纯只读，创建全惰性
+
+1. **选择接口严格只读（Switch is Pure Read-Only）**：
+   - 切换文件/项的 RPC（如 `switchTarget({ target })`）严禁包含任何创建、拷贝或覆写磁盘的逻辑；
+   - 目标文件存在时：读取实际内容与大小，返回 `{ ok: true, exists: true, content: '...', bytes: N, target }`；
+   - 目标文件不存在时：绝不抛出 404 挂起前端，而是优雅返回 `{ ok: true, exists: false, content: '', bytes: 0, target }`。
+2. **前端受控渲染空白（Draft on Empty）**：
+   - 客户端 Store 接收到 `exists: false` 响应后，将编辑器草稿内容受控置为空字符串 `""`，并将当前活跃标签钉在用户选中的 `target` 上；
+   - 此时磁盘无任何写入，若用户关闭页面或切走，磁盘依然保持原始纯净状态。
+3. **保存接口惰性新建（Lazy Creation on Save）**：
+   - 只有当用户输入了内容并明确点击"保存"（Save）按钮时，才由保存接口（`saveContent({ target, content })`）执行真正的落盘；
+   - 保存接口底层采用**临时文件 + `renameSync` 原子写**（若目标文件原本不存在，`rename` 同样天然完成新文件的创建，无需额外的 `touch` 或预处理步骤）。
+4. **保存后原位刷新（In-Place Refresh）**：
+   - 保存成功后，前端立即重新调用当前目标标识的查询（`switchTarget({ target: currentTarget })`），把状态无缝更新为 `exists: true` 与实际字节数，标签维持在当前项，避免交互视图发生跳动。
+
+---
+
+## 十、DSH 运行环境与运行时路径层级陷阱 (DSH Runtime Path Hierarchy Traps)
+
+### 10.1 事故机理：粗暴覆盖环境变量导致 Profile 寻找链断裂
+
+在开发需要访问宿主根目录或全局配置的插件时，自动化脚本或测试常试图通过临时设定 `DSH_HOME=/path/to/temp` 来模拟隔离沙箱。但在真实 DSH 宿主架构中：
+- 环境变量解析时机受宿主引导器（如 `app-boot`、`home-paths`）的初始化时序约束；
+- 部分核心子系统在加载 profile 时依赖约定的固定目录结构（如 `~/.dsh/profiles/<profile-name>`）；
+- 若仅仅在外部强行修改全局环境变量，往往导致宿主找不到当前启动所需的 profile 目录，整机报 "Profile not found" 退出。
+
+### 10.2 通用解耦原则：Service 构造注入 > 依赖全局环境
+
+1. **构造器显式保留路径覆盖参数**：
+   ```ts
+   export class CustomStorageService extends TypertRemoteService {
+     private customHomeDir?: string;
+     constructor(ctx: Context, customHomeDir?: string) {
+       super(ctx, 'custom-storage');
+       this.customHomeDir = customHomeDir;
+     }
+
+     protected resolveWorkingDir(): string {
+       return this.customHomeDir?.trim() || getSystemDshHome();
+     }
+   }
+   ```
+   - 生产环境通过 `ctx.plugin(CustomStorageService)` 挂载，默认走标准环境解析；
+   - 自动化单测与沙箱验收时，直接 `new CustomStorageService(new Context(), tempSandboxDir)` 传入隔离沙箱路径；
+   - 完全不污染当前进程或全局操作系统的环境变量，从根源规避时序竞态与路径断裂。
+2. **全流程端到端验证依附真实 Profile 目录**：
+   - Profile 级别的全真验收必须在真实的 Profile 仓库（如 `$DSH_HOME/profiles/<test-profile>`）中进行；
+   - 用 `dependencies` 与软链接（Junction / Symlink）把被测插件链接到该 Profile 的 `node_modules`，验证宿主在默认环境下的完整装配流。
+
+---
+
+## 十一、客户端 ModuleLoader 异步 Store 状态闭环 (Client Store Closed-Loop)
+
+### 11.1 事故机理：全局拉取打乱局部交互意图
+
+在包含多标签选择或分层配置的前端面板中，保存某个分项配置后，若直接调用全局的 `load()` 重新获取初始数据：
+- 全局查询接口往往按宿主默认的优先级返回首项（例如永远返回默认选项 A）；
+- 用户明明正在编辑并保存了子项 B，保存成功后界面却由于全局拉取突然弹回选项 A，草稿被冲掉，造成严重的交互撕裂。
+
+### 11.2 状态闭环范式
+
+在客户端构建（如 `scripts/build-client.mjs`）生成的模块工厂中，异步状态 Store 必须显式维护当前交互目标：
+```js
+var save = function (filename, text) {
+  var ns = endpoint("saveContent");
+  if (ns === null) return Promise.resolve(false);
+  return Promise.resolve(ns.saveContent({ filename: filename, content: text }))
+    .then(function (response) {
+      var value = unwrap(response);
+      if (value === undefined || value.ok !== true) return false;
+      // 关键：保存成功后显式刷新当前保存项，绝不直接退回无参全局 load()
+      return switchTo(filename);
+    })
+    .catch(function () { return false; });
+};
+```
+- **状态钉住（Target Pinning）**：操作哪项，回调就刷新哪项；
+- **单向数据流与解包**：通过 `unwrap(response)` 严格判定信封 `{ok: true, value}`，遇错进入安全错误态，绝不对未定义载荷盲目解构。
+
+---
+
+## 十二、装配树真实性断言与命名空间回读法则 (Assembly Tree Truth & Namespace Read-Back)
+
+### 12.1 为什么"写进了 package.json"不等于"插件已激活"
+
+在 DSH 插件开发中，仅在 profile 的 `package.json` 的 `dependencies` 和 `bundles` 中填入了插件包名，**绝对不代表插件已被宿主容器加载生效**：
+- 入口未按规范导出 `Config` Schema（会导致宿主丢弃整个插件 settings 注册）；
+- 宿主与插件 peerDependencies 版本不兼容；
+- 异步依赖服务缺失导致插件挂起未完成装配。
+
+### 12.2 不可伪造的双重真值判据
+
+1. **冷装配置装配树断言（CLI 物理级）**：
+   - 运行 `dsh.cmd --profile <profile> --dump-config`；
+   - 必须能在输出文本中检索到明确的插件段落：
+     ```yaml
+     # == <plugin-name>
+     - id: <plugin-name>
+       name: <plugin-name>
+     ```
+   - 若输出中未出现该注释头与条目，证明插件在引导阶段已被宿主静默剔除。
+2. **命名空间计数回读（API 协议级）**：
+   - 访问宿主配置端点（如 `settings/describe`）；
+   - 装配插件前总命名空间数为 `N`，装配并激活后必须精确增加为 `N + 1`（且返回的清单中包含该插件的 namespace）；
+   - 从 bundles 移除后热重载或冷启动回读，命名空间数必须精确回退至 `N`。
+   - 这种物理数目的对比是验证插件真正激活与完全卸载的最高置信度凭据。
+
 ## 相关 DSH 源码
 
 上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。

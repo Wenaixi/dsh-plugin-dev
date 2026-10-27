@@ -18,7 +18,7 @@
 
 ---
 
-本项目是开发、审查、调试与验收 DeepSeek Harness（DSH）插件与生态扩展的参考知识库（Agent Skill）。**本项目自身也属于线索级材料**：任何 API、服务挂载名、配置字段和版本行为，都必须再回到目标环境的真实源码与运行时核对后才可使用。证据优先级为运行时行为 > 发布物实现与 JSDoc > 包内 README > 文档站散文 > 本技能库正文。
+本项目是开发、审查、调试与验收 DeepSeek Harness（DSH）插件与生态扩展的参考知识库（Agent Skill）。**本项目自身也属于线索级材料**：默认支持最新 DSH 版本；多版本源码可前往官方开源仓库 [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) 获取对应 Release 分支或 Tag。任何 API、服务挂载名、配置字段和版本行为，都必须再回到目标环境的真实源码与运行时核对后才可使用。证据优先级为运行时行为 > 发布物实现与 JSDoc > 包内 README > 文档站散文 > 本技能库正文。
 
 DSH 是基于 Cordis 微内核构建的高可扩展 Agent Harness。在 DSH 架构中，**一切皆为插件 (Everything is a Plugin)**：会话日志、工具注册表、系统提示词装配、模型适配器、UI 界面以及执行循环驱动器均作为平等、可插拔的插件运行。
 

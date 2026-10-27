@@ -48,6 +48,17 @@ DSH 的 Typert 协议对远程暴露的方法签名有严格约束，由网关�
 
 ---
 
+## 二之二、Host 事件受控转发机制 (Forwarded Events Allowlist)
+
+根据 `dsh-api-remotes` 源码级契约，Host 端的内部 Cordis 事件**绝非无限制全量向浏览器端广播**，而是受控于严格的静态白名单（`API_REMOTE_FORWARDED_EVENTS`）：
+1. **白名单准入规则**：前端 `ctx.remote.$on` 能够合法消费的事件集合严格受限于此列表，例如：
+   - 核心会话流：`api-session/activity`、`api-session/added`、`api-session/error`、`api-session/removed`、`api-session/status`；
+   - 指令与目标：`commands/change`、`goal/activation-changed`；
+   - 审批与认证：`approval/request`（以 `waterfall` 模式流转）、`credentials/record-updated`；
+2. **资源作用域隔离 (`resources`)**：对于涉及特定会话或敏感实体的事件，分发层通过 `resources: { session: (id) => id }` 提取资源标识，只有持有该资源访问权限的客户端 Peer 才能收到广播，阻断跨会话数据侧漏。
+
+---
+
 ## 三、端到端完整实现范例
 
 下面以一个“前端点击按钮查询宿主系统状态”的完整双面插件为例：

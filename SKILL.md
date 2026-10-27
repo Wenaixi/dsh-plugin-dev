@@ -9,11 +9,8 @@ description: DeepSeek Harness (DSH) 插件开发通用指南。覆盖插件形�
 
 ## 第一道门：读源码，不读就不能写
 
-插件开发默认支持 DSH 最新版本。若需适配或兼容特定历史与未来版本，可前往官方开源仓库 [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) 获取对应 Release Tag 或分支源码。
-任何代码编写前必须按以下三层顺序查证真实实现，严禁凭记忆猜测：
-1. **本机已安装源码**：优先检索运行环境中的目标包（`lib/types/*.d.ts` 查契约，`lib/index.js` 查实现）；
-2. **桌面版运行时解包**：若无源码，解包本地桌面运行时分析真实包体；
-3. **官方仓库检出**：前往 [deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) 检出目标版本的源码。
+默认支持最新 DSH 版本；多版本源码检出见 [deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)。
+任何代码编写前必须按三层顺序查证真实实现（本机已安装源码 -> 本地桌面版运行时解包 -> 官方开源仓库检出），严禁凭记忆猜测。
 **可失败检验**：写下代码前，必须能指出所依赖接口出自目标包的哪个文件与具体导出。版本声明优先使用 `engines.dsh` 声明兼容区间。详见 [references/source-verification-and-caches.md](references/source-verification-and-caches.md)。
 
 ## 开工五步法

@@ -120,8 +120,6 @@ Invoke-WebRequest -Uri "http://127.0.0.1:$PORT/api/settings/describe" -Method Po
 ## 相关 DSH 源码
 
 ```text
-packages/client/connection  <-  @deepseek-ai/dsh-client-connection@<version>
-  lib/types/browser-auth.d.ts（launch token -> dsh-auth cookie）
-packages/boot/api-settings-controller  <-  @deepseek-ai/dsh-api-settings-controller@<version>
-  lib/index.js（describe/mutate/update 方法与 SettingsNamespaceView）
+packages/client/connection            <-  @deepseek-ai/dsh-client-connection@<version>
+packages/boot/api-settings-controller <-  @deepseek-ai/dsh-api-settings-controller@<version>
 ```

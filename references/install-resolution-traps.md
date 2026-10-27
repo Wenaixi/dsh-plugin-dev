@@ -635,5 +635,5 @@ packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@<version>
 packages/client/modules  <-  @deepseek-ai/dsh-client-modules@<version>
 packages/skill/skill  <-  @deepseek-ai/dsh-skill@<version>
 packages/bundle/web-app  <-  @deepseek-ai/dsh-web-app@<version>
-apps/plugin-market-generator  <-  @deepseek-ai/dsh-plugin-market-generator
+apps/plugin-market-generator  <-  @deepseek-ai/dsh-plugin-market-generator@<version>
 ```

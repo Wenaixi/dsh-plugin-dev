@@ -123,13 +123,13 @@
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-packages/skill/skill               <-  @deepseek-ai/dsh-skill@<version>（注册表：投影函数与缓存键）
-packages/skill/tool-skill         <-  @deepseek-ai/dsh-tool-skill@<version>（模型侧目录消费者）
-packages/api/session-controller   <-  @deepseek-ai/dsh-api-session-controller@<version>（人类侧目录服务）
-packages/api/remotes              <-  @deepseek-ai/dsh-api-remotes@<version>（结果 schema 白名单）
-packages/api/gateway              <-  @deepseek-ai/dsh-api-gateway@<version>（命名空间挂载与命名空间服务）
-packages/client/ui-skill          <-  @deepseek-ai/dsh-client-ui-skill@<version>（斜杠菜单消费者）
-packages/client/ui-input-trigger  <-  @deepseek-ai/dsh-client-ui-input-trigger@<version>（触发源注册表与分组渲染）
+packages/skill/skill              <-  @deepseek-ai/dsh-skill@<version>
+packages/skill/tool-skill         <-  @deepseek-ai/dsh-tool-skill@<version>
+packages/api/session-controller  <-  @deepseek-ai/dsh-api-session-controller@<version>
+packages/api/remotes             <-  @deepseek-ai/dsh-api-remotes@<version>
+packages/api/gateway             <-  @deepseek-ai/dsh-api-gateway@<version>
+packages/client/ui-skill         <-  @deepseek-ai/dsh-client-ui-skill@<version>
+packages/client/ui-input-trigger <-  @deepseek-ai/dsh-client-ui-input-trigger@<version>
 ```
 
 配套阅读：

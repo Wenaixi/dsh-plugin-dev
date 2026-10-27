@@ -806,5 +806,5 @@ packages/experimental/voice-input-bundle  <-  @deepseek-ai/dsh-experimental-voic
 packages/mcp/mcp-client  <-  @deepseek-ai/dsh-mcp-client@<version>
 packages/settings/settings  <-  @deepseek-ai/dsh-settings@<version>
 packages/bundle/web-app  <-  @deepseek-ai/dsh-web-app@<version>
-schema 库             <-  schemastery（lib/index.mjs 的 validateVolatileSchema / toJSON / resolve）
+vendor/schemastery                    <-  @deepseek-ai/schemastery@<version>
 ```

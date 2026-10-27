@@ -59,8 +59,6 @@ DSH 插件详情页没有独立路由（URL 始终是 `/?token=...`），导航�
 ## 相关 DSH 源码
 
 ```text
-packages/client/ui-plugin-manager  <-  @deepseek-ai/dsh-client-ui-plugin-manager@<version>
-  （插件中心/详情页的按钮 aria-label 形态）
-packages/boot/api-settings-controller  <-  @deepseek-ai/dsh-api-settings-controller@<version>
-  （settings/describe 命名空间真值字段）
+packages/client/ui-plugin-manager     <-  @deepseek-ai/dsh-client-ui-plugin-manager@<version>
+packages/boot/api-settings-controller <-  @deepseek-ai/dsh-api-settings-controller@<version>
 ```

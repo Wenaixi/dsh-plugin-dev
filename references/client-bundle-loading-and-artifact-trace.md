@@ -25,9 +25,7 @@
 把包从 `my-plugin` 改成 `@scope/my-plugin`（scoped 化）时，构建脚本里写死的 `id` 没同步改。浏览器控制台/启动遮罩报：
 
 ```text
-web boot: 1 entry did not activate
-could not load "<包名>": ...&rev=...: already executed without registering "<包名>";
-plugins/??<包名>/client.js&rev=...: loaded without registering "<包名>" via __ModuleLoader__.load
+packages/client/modules  <-  @deepseek-ai/dsh-client-modules@<version>
 ```
 
 **两条线索缺一不可**：`already executed without registering`（组合批次跑完了但没注册）与 `loaded without registering ... via __ModuleLoader__.load`（单体 URL 也白加载）。任何一条出现都说明**注册 id ≠ 加载器期望的 id**。
@@ -229,5 +227,4 @@ export default { apply, PanelController, inject }
 
 ```text
 packages/client/modules  <-  @deepseek-ai/dsh-client-modules@<version>
-  lib/index.js（load 注册语义、comboUrl/comboSearch、artifactRevision、locatePkgJson/nearestPackage）
 ```

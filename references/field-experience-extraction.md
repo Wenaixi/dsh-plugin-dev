@@ -260,9 +260,9 @@ var save = function (filename, text) {
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-packages/typert/protocol  <-  @deepseek-ai/dsh-typert-protocol
-packages/api/gateway  <-  @deepseek-ai/dsh-api-gateway
-packages/bundle/base  <-  @deepseek-ai/dsh-base  （agent-instructions 全局文件常量）
-packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot  （evaluatePluginCompatibility）
-vendor/cordis  <-  @deepseek-ai/cordis
+packages/typert/protocol  <-  @deepseek-ai/dsh-typert-protocol@<version>
+packages/api/gateway      <-  @deepseek-ai/dsh-api-gateway@<version>
+packages/bundle/base      <-  @deepseek-ai/dsh-base@<version>
+packages/boot/app-boot    <-  @deepseek-ai/dsh-app-boot@<version>
+vendor/cordis             <-  @deepseek-ai/cordis@<version>
 ```

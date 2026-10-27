@@ -70,8 +70,9 @@
 宿主建议菜单这类浮层往往是「外壳 + 列表」两层结构，且外壳在异步加载期间先出现：
 
 ```text
-外壳：带 data 属性标记（渲染函数显式输出），负责定位与层级
-列表：role="listbox"，只有拿到候选项后才挂载，加载期可能只有骨架行
+packages/client/dsh-client-ui-conversation <-  @deepseek-ai/dsh-client-ui-conversation@<version>
+packages/client/dsh-client-ui-primitives   <-  @deepseek-ai/dsh-client-ui-primitives@<version>
+packages/client/dsh-client-store           <-  @deepseek-ai/dsh-client-store@<version>
 ```
 
 **给位判定必须命中外壳而不是列表**。只查列表选择器，会在「外壳已渲染、列表还没挂载」的
@@ -132,10 +133,8 @@ peer 声明的官方包可能引用另一个官方包的**类型**（如某 hook
 
 ## 相关 DSH 源码
 
-上游仓库 `deepseek-ai/deepseek-harness` 内的相对路径。版本号取自各包 `package.json` 的 `version` 字段，仓库位置取自 `repository.directory` 字段，均不靠推测。本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
-
 ```text
-packages/client/dsh-client-ui-conversation   <-  输入框挂件插槽（conversation.input.right）、useInput/inputActions
-packages/client/dsh-client-ui-primitives     <-  Menu / MenuSurface（focus 搬移行为）、Switch、主题 token
-packages/client/dsh-client-store             <-  SnapshotSelectorHook 类型（hook 类型常来自这里）
+packages/client/ui-conversation  <-  @deepseek-ai/dsh-client-ui-conversation@<version>
+packages/client/ui-primitives    <-  @deepseek-ai/dsh-client-ui-primitives@<version>
+packages/client/store            <-  @deepseek-ai/dsh-client-store@<version>
 ```

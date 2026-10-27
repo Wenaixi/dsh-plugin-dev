@@ -148,10 +148,9 @@
 只断言成功不够——永远绿的断言和没有断言一样糟。每条判据配一条破坏实验：
 
 ```text
-人为让闸门拒写        -> 应观察到整批零写入
-人为去掉 volatile 标注 -> 应观察到写入被拒
-人为让注册重复执行     -> 应观察到重复资源
-人为改坏产物缓存标识   -> 应观察到界面未更新
+packages/settings/settings    <-  @deepseek-ai/dsh-settings@<version>
+packages/client/modules       <-  @deepseek-ai/dsh-client-modules@<version>
+packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@<version>
 ```
 
 破坏实验做完必须还原并重跑全绿，否则你不知道是判据有效还是本来就红。
@@ -207,9 +206,9 @@
 ## 相关 DSH 源码
 
 ```text
-packages/settings/settings       <-  @deepseek-ai/dsh-settings@<version>（写入闸门）
-packages/client/modules         <-  @deepseek-ai/dsh-client-modules@<version>（产物缓存与修订号）
-packages/boot/plugin-manager    <-  @deepseek-ai/dsh-plugin-manager@<version>（应用状态与热替换）
+packages/settings/settings    <-  @deepseek-ai/dsh-settings@<version>
+packages/client/modules       <-  @deepseek-ai/dsh-client-modules@<version>
+packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@<version>
 ```
 
 配套阅读：

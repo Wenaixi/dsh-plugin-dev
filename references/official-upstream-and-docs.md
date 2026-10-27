@@ -174,7 +174,7 @@ DSH 迭代频繁，出现与本库描述不符的行为时，按此顺序处理�
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
+vendor/cordis  <-  @deepseek-ai/cordis@<version>
 apps/cli  <-  @deepseek-ai/dsh@<version>
 packages/core/agent  <-  @deepseek-ai/dsh-agent@<version>
 packages/core/agent-loop  <-  @deepseek-ai/dsh-agent-loop@<version>

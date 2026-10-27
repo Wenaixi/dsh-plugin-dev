@@ -329,7 +329,7 @@ function apply(ctx) {
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
+vendor/cordis  <-  @deepseek-ai/cordis@<version>
 packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@<version>
 packages/client/ui-agent-preset  <-  @deepseek-ai/dsh-client-ui-agent-preset@<version>
 packages/client/ui-plugin-manager  <-  @deepseek-ai/dsh-client-ui-plugin-manager@<version>

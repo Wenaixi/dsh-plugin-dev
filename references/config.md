@@ -714,7 +714,7 @@ export const Config = Schema.object({
 
 ### 11.1 机制演进与对象包装现象
 
-在最新版 `@deepseek-ai/schemastery@~3.18.5`（随 DSH 0.2.1-rc.2 引入）中，标记为 `volatile` 的 Schema 字段在运行时数据流中发生了重大契约演进：
+在最新版 `@deepseek-ai/schemastery@~3.18.5`（随 DSH <version> 引入）中，标记为 `volatile` 的 Schema 字段在运行时数据流中发生了重大契约演进：
 - 经过 `Config(rawInput)` 校验并赋予默认值后，易变字段在返回的对象中**不再以纯字面量（Primitive Scalar）直接呈现**；
 - 而是被封装为内部带有只读响应式访问器与底层标记符号的对象：
   ```javascript
@@ -796,8 +796,8 @@ export function unwrapLazy<T>(raw: unknown, defaultValue: T): T {
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
-vendor/loader  <-  @deepseek-ai/cordis-plugin-loader@1.0.6
+vendor/cordis  <-  @deepseek-ai/cordis@<version>
+vendor/loader  <-  @deepseek-ai/cordis-plugin-loader@<version>
 apps/cli  <-  @deepseek-ai/dsh@<version>
 packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@<version>
 packages/bundle/base  <-  @deepseek-ai/dsh-base@<version>

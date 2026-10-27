@@ -1,6 +1,14 @@
 # DSH 沙箱底层隔离 (Windows ACL / Landlock)、文件观察策略与出站网络代理权威指南
 ---
 
+## 零、宿主沙箱上下文门面 (Sandbox Context Façade)
+
+根据 `dsh-cordis-host-runner` 运行时源码，插件在 Host 端执行 `apply(ctx)` 时接收的并非未受限的真实 Context，而是宿主构建的**沙箱上下文门面（Sandbox Context Façade）**：
+- **白名单服务暴露**：仅透出生命周期安全原语（如 `ctx.on`、`ctx.effect`）与插件在 `inject` 中显式声明的合法服务，阻断内部对象、私有运行时与未声明服务泄漏；
+- **VM-Realm Schema 隔离与重建**：插件在 VM 隔离环境中定义的 Schema、参数对象与返回值，在穿透回宿主时由底层自动进行归一化校验与重构，物理阻断跨 Realm 原型链逃逸与原型污染攻击。
+
+---
+
 ## 一、沙箱底层物理隔离原理 (Windows ACL 与 Linux Landlock)
 
 DSH 提供了三种标准的沙箱模式（`read-only`、`workspace-write`、`danger-full-access`）。DSH 没有启动笨重的 Docker 容器或轻量虚拟机，而是在宿主进程内直接调用操作系统内核安全原语，实现亚毫秒级启动与严格的写权限物理隔离。
@@ -124,7 +132,7 @@ Linux 平台采用探测制后备链：`PLATFORM_CHAINS.linux = ["bwrap", "landl
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
+vendor/cordis  <-  @deepseek-ai/cordis@<version>
 packages/sandbox/sandbox  <-  @deepseek-ai/dsh-sandbox@<version>
 packages/sandbox/sandbox-local  <-  @deepseek-ai/dsh-sandbox-local@<version>
 packages/sandbox/sandbox-windows-acl  <-  @deepseek-ai/dsh-sandbox-windows-acl@<version>

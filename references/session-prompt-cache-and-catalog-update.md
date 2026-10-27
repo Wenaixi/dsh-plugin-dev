@@ -126,7 +126,7 @@ DSH 官方在每轮对话发起前，通过瀑布流事件对全量动态条目�
 ## 相关 DSH 源码
 
 ```
-packages/agent/src/session.ts           <- @deepseek-ai/dsh-agent@0.4.3
-packages/agent/src/prompt.ts            <- @deepseek-ai/dsh-agent@0.4.3
-packages/agent/src/pipeline.ts          <- @deepseek-ai/dsh-agent@0.4.3
+packages/agent/src/session.ts           <- @deepseek-ai/dsh-agent@<version>
+packages/agent/src/prompt.ts            <- @deepseek-ai/dsh-agent@<version>
+packages/agent/src/pipeline.ts          <- @deepseek-ai/dsh-agent@<version>
 ```

@@ -180,7 +180,7 @@ git push origin v1.2.3 --force
 ## 相关 DSH 源码
 
 ```
-packages/core/src/plugin.ts             <- @deepseek-ai/dsh-core@0.4.3
-packages/core/src/registry.ts           <- @deepseek-ai/dsh-core@0.4.3
-packages/core/src/settings.ts           <- @deepseek-ai/dsh-core@0.4.3
+packages/core/src/plugin.ts             <- @deepseek-ai/dsh-core@<version>
+packages/core/src/registry.ts           <- @deepseek-ai/dsh-core@<version>
+packages/core/src/settings.ts           <- @deepseek-ai/dsh-core@<version>
 ```

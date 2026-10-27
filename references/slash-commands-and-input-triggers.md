@@ -124,7 +124,7 @@ export function apply(ctx) {
 
 在 DSH 早期版本中，已认领命令保留为行首字面文本，通过 TextNode transform 添加样式；这在输入图片、复杂粘贴或 IME 组字时容易因节点拆分合并循环导致 Lexical 更新异常。
 
-在 DSH 0.2.1-rc.2 架构中，官方将行首认领命令重构为原子的内联芯片节点：
+在 DSH <version> 架构中，官方将行首认领命令重构为原子的内联芯片节点：
 - **`CommandChipNode`**：继承自 Lexical 的 `DecoratorNode`，作为行首原子 inline 芯片呈现；
 - **两步删除手势**：从折叠光标出发，第一次方向删除把 chip 标记为选中（`data-selected`），第二次删除才整体移除它，避免逐字退格时破坏命令名；
 - **非 Occurrence 隔离**：命令 chip 仅携带 submit 闭包与 token 文本，不作为模型内容进入 `occurrences`。
@@ -166,7 +166,7 @@ for (let i = caret - 1; i >= 0; i--) {
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
+vendor/cordis  <-  @deepseek-ai/cordis@<version>
 packages/client/shortcuts  <-  @deepseek-ai/dsh-client-shortcuts@<version>
 packages/client/ui-commands  <-  @deepseek-ai/dsh-client-ui-commands@<version>
 packages/client/ui-input-trigger  <-  @deepseek-ai/dsh-client-ui-input-trigger@<version>

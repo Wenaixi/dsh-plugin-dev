@@ -29,7 +29,7 @@
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-vendor/loader  <-  @deepseek-ai/cordis-plugin-loader@1.0.6
+vendor/loader  <-  @deepseek-ai/cordis-plugin-loader@<version>
 packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@<version>
 packages/bundle/base  <-  @deepseek-ai/dsh-base@<version>
 packages/boot/plugin-manager  <-  @deepseek-ai/dsh-plugin-manager@<version>

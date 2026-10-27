@@ -129,6 +129,8 @@ ctx.tools.guard((exec) => {
 - `timeoutMs`：正有限整数，设置工具调用的超时毫秒数；
 - `isConcurrencySafe`：布尔值，标识工具是否支持多任务安全并发执行；
 - `deferLoading`：布尔值，是否在宿主初始化时推迟工具的动态加载；
+- `projectContent(exec, result)`：内容流投影钩子，在会话事件持久化前对输出进行按需变换；
+- `finalizeContent(exec, result)`：权限受限的内容收尾钩子，在工具执行终态进行安全审查与脱敏；
 - `presentCall(args)` / `presentResult(args, result)`：用户界面调用态与结果态自定义呈现钩子。
 
 ```js

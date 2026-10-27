@@ -707,7 +707,7 @@ function ConfigPanel(props) {
 ## 相关 DSH 源码
 
 ```
-packages/client/src/index.ts            <- @deepseek-ai/dsh-client@0.4.3
-packages/client/src/plugins/index.ts    <- @deepseek-ai/dsh-client@0.4.3
-packages/core/src/vm.ts                 <- @deepseek-ai/dsh-core@0.4.3
+packages/client/src/index.ts            <- @deepseek-ai/dsh-client@<version>
+packages/client/src/plugins/index.ts    <- @deepseek-ai/dsh-client@<version>
+packages/core/src/vm.ts                 <- @deepseek-ai/dsh-core@<version>
 ```

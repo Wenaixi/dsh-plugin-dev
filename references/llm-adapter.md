@@ -281,7 +281,7 @@ interface TokenUsage {
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
+vendor/cordis  <-  @deepseek-ai/cordis@<version>
 packages/llm/llm  <-  @deepseek-ai/dsh-llm@<version>
 packages/llm/llm-deepseek-account  <-  @deepseek-ai/dsh-llm-deepseek-account@<version>
 packages/llm/llm-deepseek-api-key  <-  @deepseek-ai/dsh-llm-deepseek-api-key@<version>
@@ -289,5 +289,5 @@ packages/llm/llm-pi-ai  <-  @deepseek-ai/dsh-llm-pi-ai@<version>
 packages/llm/llm-retry  <-  @deepseek-ai/dsh-llm-retry@<version>
 packages/session/session-title-first-prompt-llm  <-  @deepseek-ai/dsh-session-title-first-prompt-llm@<version>
 packages/session/session-title-llm  <-  @deepseek-ai/dsh-session-title-llm@<version>
-vendor/schemastery  <-  @deepseek-ai/schemastery@3.18.4
+vendor/schemastery  <-  @deepseek-ai/schemastery@<version>
 ```

@@ -131,7 +131,7 @@ export async function apply(ctx) {
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
+vendor/cordis  <-  @deepseek-ai/cordis@<version>
 packages/jobs/jobs  <-  @deepseek-ai/dsh-jobs@<version>
 packages/jobs/jobs-local  <-  @deepseek-ai/dsh-jobs-local@<version>
 packages/schedule/schedule  <-  @deepseek-ai/dsh-schedule@<version>

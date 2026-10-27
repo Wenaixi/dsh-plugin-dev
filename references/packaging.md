@@ -32,9 +32,9 @@ my-feature-plugin/
 
 #### 多版本兼容与 engines.dsh 优先判定律
 根据 DSH 最新运行时判定源码（`dsh-app-boot/evaluatePluginCompatibility`）：
-1. **优先判定 `engines.dsh`**：插件在 `package.json` 中声明 `engines.dsh`（如 `">=0.2.0 <0.3.0"`）时，宿主将其作为唯一判定标准，此时忽略同族 peerDependencies。
+1. **优先判定 `engines.dsh`**：插件在 `package.json` 中声明 `engines.dsh`（如 `">=0.2.0 <0.3.0"`）时，宿主将其作为唯一判定标准，忽略同族 peerDependencies。**关键边界**：`engines.dsh` 严格拒绝 `workspace:` 前缀语法。
 2. **源码真源获取**：默认支持最新版本；多版本源码检出详见 [source-verification-and-caches.md](./source-verification-and-caches.md)。
-3. **后备 peer 校验**：仅当未声明 `engines.dsh` 时，宿主逐一校验所有 `@deepseek-ai/dsh` 及 `@deepseek-ai/dsh-*` 的 peer 依赖范围。
+3. **后备 peer 校验**：仅当未声明 `engines.dsh` 时，宿主逐一校验所有 `@deepseek-ai/dsh` 及 `@deepseek-ai/dsh-*` 的 peer 依赖范围。在此模式下，`workspace:^`、`workspace:~` 与 `workspace:*` 会由宿主自动展开为当前运行时版本。
 
 ```json
 {
@@ -334,7 +334,7 @@ const packManifest = JSON.parse(raw.slice(jsonStart, jsonEnd));
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
+vendor/cordis  <-  @deepseek-ai/cordis@<version>
 apps/cli  <-  @deepseek-ai/dsh@<version>
 packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@<version>
 packages/bundle/base  <-  @deepseek-ai/dsh-base@<version>

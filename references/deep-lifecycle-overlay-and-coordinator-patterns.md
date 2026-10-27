@@ -247,7 +247,7 @@ export class OverlayController<T> {
 ## 相关 DSH 源码
 
 ```
-packages/core/src/context.ts            <- @deepseek-ai/dsh-core@0.4.3
-packages/core/src/lifecycle.ts          <- @deepseek-ai/dsh-core@0.4.3
-packages/client/src/overlay.ts          <- @deepseek-ai/dsh-client@0.4.3
+packages/core/src/context.ts            <- @deepseek-ai/dsh-core@<version>
+packages/core/src/lifecycle.ts          <- @deepseek-ai/dsh-core@<version>
+packages/client/src/overlay.ts          <- @deepseek-ai/dsh-client@<version>
 ```

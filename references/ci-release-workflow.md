@@ -121,13 +121,13 @@ apps/cli  <-  @deepseek-ai/dsh@<version>
   {
     "peerDependencies": {
       "@deepseek-ai/cordis": ">=4.0.4 <5.0.0",
-      "@deepseek-ai/dsh-skill": ">=0.2.1-rc.2 <0.3.0-0",
+      "@deepseek-ai/dsh-skill": ">=<version> <0.3.0-0",
       "@deepseek-ai/schemastery": ">=3.18.4 <4.0.0"
     },
     "devDependencies": {
       "@deepseek-ai/cordis": "^4.0.5",
-      "@deepseek-ai/dsh-skill": "^0.2.1-rc.2",
-      "@deepseek-ai/dsh-scope": "^0.2.1-rc.2",
+      "@deepseek-ai/dsh-skill": "^<version>",
+      "@deepseek-ai/dsh-scope": "^<version>",
       "@deepseek-ai/schemastery": "^3.18.5"
     }
   }
@@ -147,7 +147,7 @@ DSH 微内核在引导 profile（`prepareProfile` / `loadProfileDirectory`）时
 
 一旦插件声明的 `peerDependencies` 下限高于当前运行的宿主版本，宿主加载器会在启动阶段**无情执行静默或警告级物理禁用**：
 ```text
-dsh: disabling profile plugin row "<rowId>": Plugin <name>@<version> is incompatible with dsh 0.2.1-rc.2: peerDependencies {"@deepseek-ai/dsh-skill":"^0.2.1-rc.2"}.
+dsh: disabling profile plugin row "<rowId>": Plugin <name>@<version> is incompatible with dsh <version>: peerDependencies {"@deepseek-ai/dsh-skill":"^<version>"}.
 Running it may cause crashes or data loss. Update the plugin or install a plugin version compatible with this dsh runtime.
 ```
 此时宿主虽然可能继续启动，但插件行被物理标记为 disabled，服务不注册、界面不挂载，表现为极其隐蔽的功能完全失效。
@@ -155,19 +155,19 @@ Running it may cause crashes or data loss. Update the plugin or install a plugin
 ### 5.2 最佳声明实践：生命周期跨度版本区间 (Range Syntax)
 
 为了让插件既能充分享受最新小版本引入的修复和新能力，又不会在相近小版本（如 RC 迭代期）被宿主直接当作不兼容而禁用：
-- **反模式（过度收窄）**：`"@deepseek-ai/dsh-skill": "^0.2.1-rc.2"`（在 0.2.1-rc.2 宿主上直接被物理禁用）；
+- **反模式（过度收窄）**：`"@deepseek-ai/dsh-skill": "^<version>"`（在 <version> 宿主上直接被物理禁用）；
 - **反模式（远古宽松包袱）**：`"@deepseek-ai/dsh-skill": ">=0.0.1-rc.1 <0.3.0-0"`（允许远古老版本，迫使代码充斥降级垫片）；
 - **标准范式（生命周期区间）**：
   ```json
   {
     "peerDependencies": {
       "@deepseek-ai/cordis": ">=4.0.4 <5.0.0",
-      "@deepseek-ai/dsh-skill": ">=0.2.1-rc.2 <0.3.0-0",
+      "@deepseek-ai/dsh-skill": ">=<version> <0.3.0-0",
       "@deepseek-ai/schemastery": ">=3.18.4 <4.0.0"
     }
   }
   ```
 - **设计判据**：
   1. 彻底斩断远古已废弃的大版本包袱（如 0.0.x / 0.1.x）；
-  2. 下限设为当前核心架构定型时的基准 RC 版本（如 `0.2.1-rc.2`）；
+  2. 下限设为当前核心架构定型时的基准 RC 版本（如 `<version>`）；
   3. 上限严格卡死在下一次重大架构重构前（如 `<0.3.0-0`），平滑承接宿主小版本补丁更新。

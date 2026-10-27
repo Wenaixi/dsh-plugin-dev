@@ -37,7 +37,7 @@
 - `dirty` 为假、`invalid` 为真、或 `saving` 中，**自动禁用 Save 按钮**；
 - 卸载（unmount）时自动调用 `onDiscard`——「离开即丢弃草稿」不用你写。
 
-源码位置（0.2.1-rc.2）：`packages/client/ui-primitives/src/settings-form/SettingsForm.tsx`。`SettingsFormShell` 类型在同目录 `form-model.ts`。
+源码位置（<version>）：`packages/client/ui-primitives/src/settings-form/SettingsForm.tsx`。`SettingsFormShell` 类型在同目录 `form-model.ts`。
 
 **文案键别自创**：unavailable / readOnly / saveFailed / save / saving 的对仗句式官方插件（settings-shell、settings-subagent）已固定，直接抄它们的字典措辞，不要发明自己的变体。
 

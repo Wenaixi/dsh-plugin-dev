@@ -99,7 +99,7 @@ type ObservedStateMap = WeakMap<AgentSession, Map<NormalizedPath, ObservedState>
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
+vendor/cordis  <-  @deepseek-ai/cordis@<version>
 packages/acp/acp  <-  @deepseek-ai/dsh-acp@<version>
 packages/bundle/acp-app  <-  @deepseek-ai/dsh-acp-app@<version>
 packages/experimental/agent-team  <-  @deepseek-ai/dsh-experimental-agent-team@<version>

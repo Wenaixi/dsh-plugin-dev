@@ -224,12 +224,12 @@ DSH 把每种能力切分为抽象契约（seam），实现以不同包名注册
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
+vendor/cordis  <-  @deepseek-ai/cordis@<version>
 packages/core/agent  <-  @deepseek-ai/dsh-agent@<version>
 packages/core/agent-loop  <-  @deepseek-ai/dsh-agent-loop@<version>
 packages/bundle/base  <-  @deepseek-ai/dsh-base@<version>
 packages/core/scope  <-  @deepseek-ai/dsh-scope@<version>
 packages/bundle/sdk-minimal  <-  @deepseek-ai/dsh-sdk-minimal@<version>
 packages/core/tools  <-  @deepseek-ai/dsh-tools@<version>
-vendor/schemastery  <-  @deepseek-ai/schemastery@3.18.4
+vendor/schemastery  <-  @deepseek-ai/schemastery@<version>
 ```

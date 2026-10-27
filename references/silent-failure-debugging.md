@@ -28,7 +28,7 @@
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
+vendor/cordis  <-  @deepseek-ai/cordis@<version>
 packages/client/modules  <-  @deepseek-ai/dsh-client-modules@<version>
 packages/extensions/cordis-client-runner  <-  @deepseek-ai/dsh-cordis-client-runner@<version>
 ```

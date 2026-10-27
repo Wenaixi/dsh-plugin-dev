@@ -96,7 +96,7 @@ function checkJavaScriptSyntax(filePath) {
 ## 相关 DSH 源码
 
 ```
-packages/sandbox/src/process.ts         <- @deepseek-ai/dsh-sandbox@0.4.3
-packages/sandbox/src/pipes.ts           <- @deepseek-ai/dsh-sandbox@0.4.3
-packages/ptc-runtime-node/src/runner.ts <- @deepseek-ai/dsh-ptc-runtime-node@0.4.3
+packages/sandbox/src/process.ts         <- @deepseek-ai/dsh-sandbox@<version>
+packages/sandbox/src/pipes.ts           <- @deepseek-ai/dsh-sandbox@<version>
+packages/ptc-runtime-node/src/runner.ts <- @deepseek-ai/dsh-ptc-runtime-node@<version>
 ```

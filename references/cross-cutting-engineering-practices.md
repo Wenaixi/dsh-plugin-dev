@@ -237,7 +237,7 @@ Host 承担生命周期、服务、权限、文件和持久化；Browser 承担�
 本机核对位置与跨平台定位方式见 [source-verification-and-caches.md](./source-verification-and-caches.md)；版本升级后必须重新读源码核对本清单。
 
 ```text
-vendor/cordis  <-  @deepseek-ai/cordis@4.0.5
+vendor/cordis  <-  @deepseek-ai/cordis@<version>
 packages/boot/app-boot  <-  @deepseek-ai/dsh-app-boot@<version>
 packages/util/home-paths  <-  @deepseek-ai/dsh-home-paths@<version>
 ```

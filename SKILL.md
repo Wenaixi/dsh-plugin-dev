@@ -31,7 +31,7 @@ description: DeepSeek Harness (DSH) 插件开发通用指南。覆盖插件形�
 4. **跨端物理隔离**：严禁在 Browser 端直接调用 Node 原生模块；严禁将 Host Context 泄露给前端组件。详见 [references/three-roles.md](references/three-roles.md)。
 5. **事件流严格可观测**：不假设事件派发时序，关键流程必须具备取消信号感知与传递能力。详见 [references/events.md](references/events.md)。
 6. **配置渐进兼容与自愈**：Schema 演进严禁引入破坏性必填字段，配置读写必须具备结构自愈与校验能力。详见 [references/config.md](references/config.md)。
-7. **先状态后症状**：排查故障前必须先核验进程树、端口占用、真实写盘路径与加载状态。详见 [references/debugging.md](references/debugging.md)。
+7. **先状态后症状**：排查故障前必须先核验进程树、端口占用、真实写盘路径与加载状态。详见 [references/debugging-and-troubleshooting.md](references/debugging-and-troubleshooting.md)。
 8. **原子化与幂等操作**：状态修改采用先备份后原子替换，写入后立即回读验证落盘真值。详见 [references/storage-terminals-and-checkpoints.md](references/storage-terminals-and-checkpoints.md)。
 9. **深模块设计 (Deep Module)**：对外暴露最简洁的接口，把复杂的平台差异和多版本兼容隐藏在内部。详见 [references/architecture-refactor-experience.md](references/architecture-refactor-experience.md)。
 10. **简洁优先 (YAGNI)**：拒绝未被要求的抽象和层级，标准库与平台原生能力优先，消除冗余样板。
@@ -40,17 +40,17 @@ description: DeepSeek Harness (DSH) 插件开发通用指南。覆盖插件形�
 
 | 开发或排查场景 | 核心指引与机制参考 |
 | :--- | :--- |
-| 插件骨架搭建 / 形态选型 / 入口导出 | [plugin-anatomy.md](references/plugin-anatomy.md) · [desktop-vs-cli.md](references/desktop-vs-cli.md) |
-| 服务注册 / 依赖注入 / 单复数契约 | [services.md](references/services.md) · [cordis-core.md](references/cordis-core.md) |
-| 生命周期钩子 / 猴子补丁 / 卸载清理 | [lifecycle.md](references/lifecycle.md) · [deep-refactoring-governance.md](references/deep-refactoring-governance.md) |
+| 插件骨架搭建 / 形态选型 / 入口导出 | [plugin-anatomy.md](references/plugin-anatomy.md) · [desktop-vs-cli.md](references/desktop-vs-cli-runtime.md) |
+| 服务注册 / 依赖注入 / 单复数契约 | [services.md](references/services.md) · [cordis-core.md](references/cordis-context-internals.md) |
+| 生命周期钩子 / 猴子补丁 / 卸载清理 | [lifecycle.md](references/lifecycle.md) · [deep-refactoring-governance.md](references/deep-refactor-and-governance-hardening.md) |
 | 前端 UI 插槽 / 状态管理 / 样式隔离 | [web-ui-slots-and-styling.md](references/web-ui-slots-and-styling.md) · [client-controller-architecture-and-headless-testing.md](references/client-controller-architecture-and-headless-testing.md) |
-| 跨进程通信 (RPC) / 前后端消息分发 | [remote-rpc.md](references/remote-rpc.md) · [three-roles.md](references/three-roles.md) |
-| 工具函数 / Slash Commands / 终端集成 | [tools.md](references/tools.md) · [slash-commands.md](references/slash-commands.md) · [persistent-shells-and-observation-policy.md](references/persistent-shells-and-observation-policy.md) |
+| 跨进程通信 (RPC) / 前后端消息分发 | [remote-rpc.md](references/remote-rpc-guide.md) · [three-roles.md](references/three-roles.md) |
+| 工具函数 / Slash Commands / 终端集成 | [tools.md](references/tools.md) · [slash-commands.md](references/slash-commands-and-input-triggers.md) · [persistent-shells-and-observation-policy.md](references/persistent-shells-and-observation-policy.md) |
 | 配置 Schema / 动态表单 / 原子写盘 | [config.md](references/config.md) · [official-settings-form-pattern.md](references/official-settings-form-pattern.md) · [config-resilience-and-atomic-self-healing.md](references/config-resilience-and-atomic-self-healing.md) |
-| 插件打包 / 依赖解析 / 产物分发 | [packaging.md](references/packaging.md) · [install-resolution-traps.md](references/install-resolution-traps.md) · [release-verification.md](references/release-verification.md) |
+| 插件打包 / 依赖解析 / 产物分发 | [packaging.md](references/packaging.md) · [install-resolution-traps.md](references/install-resolution-traps.md) · [release-verification.md](references/publish-npm-verification.md) |
 | 多智能体协作 / 任务规划与审核 | [agent-teams-architecture.md](references/agent-teams-architecture.md) · [plan-mode-and-user-review-gate.md](references/plan-mode-and-user-review-gate.md) · [goal-driven-system.md](references/goal-driven-system.md) |
-| 故障排查 / 挂起调试 / 静默失效定位 | [debugging.md](references/debugging.md) · [silent-failures.md](references/silent-failures.md) · [reproduction-experiment-design.md](references/reproduction-experiment-design.md) |
-| 交付验收 / 隔离环境实测 / 浏览器自动化 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) · [browser-automation.md](references/browser-automation.md) |
+| 故障排查 / 挂起调试 / 静默失效定位 | [debugging.md](references/debugging-and-troubleshooting.md) · [silent-failures.md](references/silent-failure-debugging.md) · [reproduction-experiment-design.md](references/reproduction-experiment-design.md) |
+| 交付验收 / 隔离环境实测 / 浏览器自动化 | [isolated-instance-acceptance.md](references/isolated-instance-acceptance.md) · [browser-automation.md](references/browser-automation-acceptance.md) |
 
 ## 最小验收闭环
 

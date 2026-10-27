@@ -90,7 +90,7 @@
 - [silent-failure-debugging.md](./silent-failure-debugging.md)：零报错异常定位、调用链路断点与边界判定。
 - [silent-failure-and-gate-design.md](./silent-failure-and-gate-design.md)：静默失败防御性设计、断言门禁与自动上报机制。
 - [reproduction-experiment-design.md](./reproduction-experiment-design.md)：故障复现实验设计、单一变量对照与事故提炼四段式。
-- [field-experience-extraction.md](./field-experience-extraction.md)：深挖实战通用经验、输入防御、歧义处理与策略夹具。
+- [field-experience-extraction.md](./field-experience-extraction.md)：实战通用经验深挖、写接口防御、只读选择语义与惰性创建、路径层级陷阱、客户端状态闭环与装配真值判据。
 
 ### 九、打包、分发与验收交付
 - [packaging.md](./packaging.md)：插件规范打包、目录布局约束与最小发布集。

@@ -11,6 +11,10 @@
   - 重构 `references/README.md`，将原特定版本核心指南升级为通用核心架构指南，精简索引结构，消除硬编码版本号。
   - 建立自动化版本 Token 门禁，确保主入口文档长期保持版本中立。
 
+## [0.2.1-rc.4] - 2025-02-28
+### 验证 (Verification)
+- 经真机深度核验系统全局 CLI 环境 `@deepseek-ai/dsh@0.2.1-rc.4` 及其全套 304 个子包，确认 `dsh-app-boot`、`dsh-plugin-manager`、`dsh-cordis-host-runner` 与 `dsh-tools` 架构一致性，通用技能库无缝兼容。
+
 ## [0.2.1-rc.2] - 2025-02-28
 ### 验证 (Verification)
 - 经真机深度核验通过上游官方运行基线 `@deepseek-ai/dsh-desktop-runtime@0.2.1-rc.2` 与微内核 `@deepseek-ai/cordis@4.0.5`。

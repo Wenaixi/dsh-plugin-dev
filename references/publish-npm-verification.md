@@ -298,48 +298,28 @@ spawnSync('git', ['push', 'origin', `v${version}`, '--force'], { encoding: 'utf8
 ### 8.2 底层运行机理深度剖析 (The Ghost Release Mechanism)
 
 该故障的核心根因是 **npm 官方注册表的物理不可变性（Package Immutability）** 与 **自动化流水线幂等跳过机制** 产生的暗态冲突：
-
-```text
-[开发者操作]
-修改源码/配置 -> 本地重打 Tag v1.2.0 -> git push -f 强推 Tag
-      │
-      ▼
-[GitHub Actions CI 流水线]
-检出最新 commit -> 重新执行 build 与 verify（全绿）
-      │
-      ▼
-[Publish 步骤的幂等性守卫]
-执行：if npm view @scope/pkg versions | grep "1.2.0"; then
-        echo "Version 1.2.0 already published, skipping"
-        exit 0
-      fi
-      │
-      ├─►【短路分支】：npm 官方源上已存在 1.2.0 ──► 静默跳过 npm publish！
-      │
-      ▼
-[结果与现场状态]
-- GitHub 上的 Tag v1.2.0 指向了最新 Commit（表象！）；
-- GitHub Release 显示最新文档（表象！）；
-- CI 流水线显示通过（表象！）；
-- npm 官方源里的 1.2.0 tarball 永远是第一次发布的那份包含错误元数据的旧包！
-- 真实用户从 npm 下载的永远是旧的“幽灵产物”！
-```
-
-1. **npm 官方 Registry 物理不可变铁律**：
-   npm 官方仓库强制实施单向版本归档（WORM，Write Once Read Many）安全策略。一个包的特定版本一旦成功发布，**其物理 tarball 与元数据就是永久锁死的**，npm 服务器直接以 `E403 Forbidden: You cannot publish over the previously published versions` 拦截任何同版本的重新上传。
-2. **CI 流程的静默防冲突设计**：
-   健全的发布流水线（如 `.github/workflows/publish.yml`）为了防范重复推送 Tag 导致流水线红灯，通常内置了版本存在性检查。当发现目标版本已在线上存在时，直接静默退出（exit 0），营造出“发布成功”的假象。
-
 ---
 
-### 8.3 规范处置与工程防雷铁律
+## 四、生产 Profile 升级落地与模块解析真值四部曲 (Production Profile Upgrade Verification)
 
-1. **铁律：只要包已上架 npm，任何修复必须递增 SemVer 版本号**：
-   绝对禁止依赖 `git push -f <tag>` 试图“更新已上线的 npm 包”。只要前序版本已在 npm 官方源生成，哪怕只修改了一个字符的 `peerDependencies`，**也必须通过递增补丁版本号（如 `1.2.0 -> 1.2.1`）生成全新的物理 tarball**。
-2. **发布后必须直接向全球根源回读已发布元数据**：
-   发版成功的唯一可信判据是向全球官方根源回读已发布的物理元数据：
+将刚刚发布的 npm 插件包升级安装到真实的生产 Profile（如 `$DSH_HOME/profiles/<target-profile>`）时，不能仅凭 `package.json` 的字段修改就假定插件已生效。
+
+### 4.1 四步闭环验证法
+
+1. **官方源显式定向升级**：
+   在目标 profile 目录下运行：
    ```bash
-   npm view @scope/pkg@<新版本号> peerDependencies --registry=https://registry.npmjs.org --json
-   npm view @scope/pkg@<新版本号> engines --registry=https://registry.npmjs.org --json
+   pnpm add <pkg>@<target-version> --registry=https://registry.npmjs.org
    ```
-   只有从 npm 官方注册表物理回读出符合预期的依赖与引擎声明，才能证明线上分发物真正携带了最新修复。
+   - 显式指定官方 registry，绕过镜像缓存导致的"找不到新版本"假阴性；
+   - 触发 pnpm 锁文件解析与虚拟存储池（`.pnpm/`）更新。
+2. **原生模块编译链路守护**：
+   升级过程中，观察输出日志中的 postinstall 原生构建脚本（如 native addon 编译、spawn-helper 拷贝等）必须全部输出 `Done`，确认未因编译工具链缺失导致半安装损坏。
+3. **真实模块解析器回读**：
+   在 profile 根目录下直接调起 Node 模块解析器回读真实加载到的 manifest：
+   ```bash
+   node -p "require('<pkg>/package.json').version"
+   ```
+   - **真值判据**：回读输出必须与刚刚发布的版本号严格一致。若仍回读出旧版本，说明存在多副本依赖冲突或全局依赖池软链未解绑。
+4. **宿主装配树物理断言**：
+   运行 `dsh.cmd --profile <target-profile> --dump-config`，断言输出中明确存在 `# == <pkg>` 段落，证明新版本已成功注入 Cordis 容器并生效。

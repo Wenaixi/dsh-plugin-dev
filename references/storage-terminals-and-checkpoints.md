@@ -114,10 +114,10 @@ export async function apply(ctx) {
 ## 五、挂钟定时 (ctx.schedule) 与后台任务 (ctx.jobs)
 
 ### 1. ctx.schedule（@deepseek-ai/dsh-schedule）
-- 模型侧通过工具 `schedule_create` / `schedule_list` / `schedule_delete` / `schedule_update` 操作，业务插件消费同一服务；
+- 模型侧通过工具 `schedule_create` / `schedule_list` / `schedule_view` / `schedule_edit` 操作；业务插件消费同一 `ctx.schedule` 服务。模型工具只接受 RRULE 与 `target`，原生/Remote 管理 API 仍支持 After/At/Every/Daily/Weekly/Cron timing；
 - 规则持久化在 storage domain `"schedule"`（表 `tasks`，`defineDomain` 声明，加载即校验）；
 - 投递依赖 `session/flush` 确认：任务创建/编辑即时落盘于 schedule 的 storage domain（`table("tasks").put`）；仅**投递与送达回执**在 `ctx.sessions.flush()` 确认后才提交；
-- 固定频率规则（every）最小间隔 60 秒（`MIN_EVERY_INTERVAL_SECONDS`）。
+- 固定频率 `every` 的 60 秒最小间隔（`MIN_EVERY_INTERVAL_SECONDS`）仍约束原生/Remote timing。
 
 ### 2. ctx.jobs（@deepseek-ai/dsh-jobs + dsh-jobs-local）
 - `dsh-jobs` 是抽象注册表接缝（抽象类 `JobRegistry`，直接构造抛错），实现包为 `dsh-jobs-local`；注册名 `jobs`；

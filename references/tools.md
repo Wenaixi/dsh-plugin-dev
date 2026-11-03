@@ -43,7 +43,7 @@
          └─ 工具定义中的 execute(args, exec) 执行核心逻辑，返回类型化规范输出
    ↓
 [阶段 8] FS Gate 文件写网关（非调度器环节，属 dsh-tool-fs 工具内部）
-         └─ 针对 tool-fs 可写操作，在写/改磁盘前触发 fs/write-intent、fs/edit-intent 拦截，随后 emit fs/observed
+         └─ 针对 tool-fs 可写操作，在写/改磁盘前触发 fs/write-intent、fs/edit-intent waterfall，随后 emit fs/observed。注意：该 waterfall 默认没有监听者（`fs-observation-policy` 行当前默认 `disabled: true`），只有显式启用观察策略时才产生未读/版本漂移拦截
    ↓
 [阶段 9] 工具自有内部事件派发
          └─ 工具派发专属领域事件（如 todo/write、fs/observed、tool/ptc-dispatch-start）
@@ -98,7 +98,7 @@ ctx.tools.guard((exec) => {
 | `run_code` | `@deepseek-ai/dsh-tools` | PTC 单入口沙箱，执行 TypeScript 代码以调用环境中的其他能力 |
 | `bash` | `@deepseek-ai/dsh-tool-bash` | 非交互式 Bash 命令执行 |
 | `pwsh` | `@deepseek-ai/dsh-tool-pwsh` | 非交互式 PowerShell 命令执行 |
-| `read`, `read_image`, `edit`, `write` | `@deepseek-ai/dsh-tool-fs` | 文本文件读取、图像多模态读取、文本精准替换、全量写入 |
+| `read`, `read_image`, `edit`, `write`, `apply_patch` | `@deepseek-ai/dsh-tool-fs` | 文本文件读取、图像多模态读取、文本精准替换、全量写入与 Codex 风格补丁；`apply_patch` 由 `config.applyPatch` 控制，默认关闭 |
 | `glob`, `grep` | `@deepseek-ai/dsh-tool-fs-search` | 路径模式匹配与基于 ripgrep 的文件内容正则检索 |
 | `skill` | `@deepseek-ai/dsh-tool-skill` | 按名加载技能并渲染 `<skill_content>`（rank 体系属 `dsh-skill`/`dsh-skill-filesystem`：档位 100/200/250/300/400/500/600，rank 小者胜，与本工具无关） |
 | `subagent`, `subagent_fork` | `@deepseek-ai/dsh-tool-subagent` | 委派子代理：同一插件按 `config.toolName` 实例化多个工具（默认 `toolName=subagent`；典型装配 `subagent`=provider `spawn` 与 `subagent_fork`=provider `fork`，可再装配 disabled 实例） |
@@ -110,7 +110,7 @@ ctx.tools.guard((exec) => {
 | `todo_write` | `@deepseek-ai/dsh-tool-todo` | 记录并更新任务看板列表 |
 | `present` | `@deepseek-ai/dsh-tool-present` | 将本地现有文件声明为最终交付物卡片 |
 | `web_search`, `web_fetch` | `@deepseek-ai/dsh-tool-web`（执行经 `ctx.web` seam，官方引擎包 `dsh-web-search-deepseek` / `dsh-web-fetch-http`） | 网络搜索引擎检索与网页全文内容提取 |
-| `schedule_create`, `schedule_list`, `schedule_delete`, `schedule_update` | `@deepseek-ai/dsh-schedule` | 宿主持久化定时任务管理四件套 |
+| `schedule_create`, `schedule_list`, `schedule_view`, `schedule_edit` | `@deepseek-ai/dsh-tool-schedule`（服务为 `@deepseek-ai/dsh-schedule`） | 宿主全部定时任务管理（创建用 `title` / `prompt` / `rrule` / `target`；编辑用 `schedule_edit` 的 `update` / `delete` action） |
 | `spawn_teammate`, `send_message`, `list_agents`, `wait_agent`, `interrupt_agent`, `team_task_*` | `@deepseek-ai/dsh-experimental-tool-agent-team` | Agent Teams 多智能体团队编排与共享任务看板协同工具（**实验性包**，需挂载配套组合包方可使用） |
 | `ralph` | `@deepseek-ai/dsh-tool-ralph` | 长周期目标续跑工具（条目是否启用取决于 profile 配置） |
 | `list_subagent_models` | `@deepseek-ai/dsh-tool-subagent` | 列出可用的子代理 provider/model 路由（`tool-subagent` 配置 `modelSelectionSettings: true` 时注册） |

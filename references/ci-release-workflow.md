@@ -23,7 +23,7 @@
 
 ### 2. 构建工具需要新 Node API → 在旧 node 上崩
 
-tsdown（rolldown）用到 `Promise.withResolvers`，这是 **Node 22+** 的 API。`actions/setup-node` 配 `node-version: 20` 时构建步骤报 `TypeError: Promise.withResolvers is not a function`。**CI 的 node-version 直接用 22**（或与本地开发版本一致），不要默认 20。
+tsdown（rolldown）用到 `Promise.withResolvers`，这是 **Node 22+** 的 API；而当前 DSH 宿主自身的 `engines.node` 已要求 **Node 24.9+**。`actions/setup-node` 配 `node-version: 20` 时构建步骤报 `TypeError: Promise.withResolvers is not a function`。**CI 的 node-version 直接用 24**（或与本地开发版本一致），不要默认 20/22。
 
 ### 3. `NODE_AUTH_TOKEN` secret 必须手动配，OIDC 404 不致命
 
@@ -63,13 +63,12 @@ apps/cli  <-  @deepseek-ai/dsh@<version>
 ## 三、依赖引擎声明与 CI 环境避坑指南
 
 ### 1. package.json 的 engines 切勿锁死 pnpm 版本
-- **典型症状**：在 `package.json` 中声明了 `"engines": { "node": ">=20", "pnpm": ">=11" }`，本地开发一切正常，但在 GitHub Actions 等 CI Runner 上执行 `pnpm install --frozen-lockfile` 时突然崩溃，报错：  
-  ` ERR_PNPM_UNSUPPORTED_ENGINE  Expected version: >=11, Got: 10.x`。
+- **典型症状**：在 `package.json` 中声明了 `"engines": { "node": ">=24.9", "pnpm": ">=11" }`，本地开发一切正常，但在 GitHub Actions 等 CI Runner 上执行 `pnpm install --frozen-lockfile` 时突然崩溃，报错 `ERR_PNPM_UNSUPPORTED_ENGINE Expected version: >=11, Got: 10.x`。
 - **连锁反应（恶性死锁）**：若尝试将 CI 中的 `pnpm/action-setup` 强行指定为 `version: 11`，在 `node-version: 20` 的容器中，最新版 pnpm 内部引用的新 Node 内置模块（如 `node:sqlite`）又会抛出 `ERR_UNKNOWN_BUILTIN_MODULE`，导致依赖安装彻底瘫痪！
 - **最佳工程实践**：
-  - 学习大厂优秀开源库（如 `dsh-superpower`）的黄金准则：`package.json.engines` **只声明 Node 底座版本**（如 `"node": ">=20"`），**绝不写死 `engines.pnpm`**；
+  - 学习大厂优秀开源库（如 `dsh-superpower`）的黄金准则：`package.json.engines` **只声明 Node 底座版本**（如 `"node": ">=24.9"`），**绝不写死 `engines.pnpm`**；
   - 高版本包管理器的偏好建议仅在 README 顶部作为生态徽章（Badges）呈现；
-  - CI 工作流中的 `pnpm/action-setup` 与 `actions/setup-node` 严格按 LTS 稳定兼容基线搭配（Node 20 配 pnpm 10，Node 22 配 pnpm 11+）。
+  - CI 工作流中的 `pnpm/action-setup` 与 `actions/setup-node` 严格按 LTS 稳定兼容基线搭配（Node 24.9+ 配 pnpm 11+）。
 
 ### 2. PowerShell CLI 命令中管道符 | 的语法陷阱
 - **典型症状**：在 Windows PowerShell / pwsh 中通过 CLI 命令更新云端配置或 GitHub 仓库简介（如 `gh repo edit --description "A | B"`）时，命令直接报错或返回非零 ExitCode。

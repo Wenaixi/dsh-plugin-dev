@@ -131,7 +131,7 @@
   2. CLI 装配表现：在 `loadProfileDirectory` 阶段跳过该 bundle（`dsh: skipping profile bundle "<pkg>"`），导致后续 `cordis.patch.yml` 补丁因找不到挂载目标报错 `patch: entry "<plugin-id>" not found`。
 - **为何静态门禁测不到**：本地开发环境测试与 `tsc` 编译只针对本地 node_modules 下的代码，无法感知外部用户机器上宿主运行时的具体微小版本号，静态断言 100% 全绿但真机直接被阻断激活。
 - **真机判据与工程规范**：
-  1. 官方一等公民引擎声明：在 `package.json` 中显式声明 `"engines": { "node": ">=20", "dsh": ">=<version>" }`（DSH >=0.2.1 优先按 `engines.dsh` 裁决）；
+  1. 官方一等公民引擎声明：在 `package.json` 中显式声明 `"engines": { "node": ">=24.9", "dsh": ">=<version>" }`（DSH >=0.2.1 优先按 `engines.dsh` 裁决）；
   2. `peerDependencies` 必须采用半开区间（如 `">=<version>"`），严禁锁定单点预发布版本；
   3. 破坏实验验证：人为将 peer 依赖改写为不满足宿主的范围，断言真机准确抛出 `incompatible-version`，证明闸门判定真实有效。
 

@@ -62,6 +62,8 @@ export function isBailed(value: any) {
 | `agent/created` | **serial** | 活动 Agent 实例创建时广播，携带 `{ agent }` 句柄。常用于初始化会话级内存缓存（如重置目标的 `disarmed` 态）。 |
 | `agent/disposed` | **emit** | Agent 实例销毁时广播（宿主防御性隔离，监听器抛错仅记日志）。 |
 
+> 注：`fs/write-intent` / `fs/edit-intent` 由 `dsh-tool-fs` 无条件派发；`dsh-base` 当前以 `disabled: true` 交付 `fs-observation-policy` 行，因此默认**没有监听者**，不会产生 `FS_NOT_OBSERVED` / `FS_STALE_VERSION` 拦截。只有显式启用该行后，上表的校验语义才成立。
+
 ---
 
 ## 三、持久会话事件体系 (Persistence Catalog)

@@ -256,7 +256,7 @@ interface TokenUsage {
 
 - loop 构建的请求会**深层冻结**并带上 `markAgentLoopRequest` 进程本地标识（纯日志函数，监听器只读）；`agent/request` waterfall 可替换冻结的 `LlmCallConfig`。
 - `GenerateOptions.system` **只服务单次调用方**（如会话标题生成）；loop 构建的请求**永不携带 `system` 字段**——系统提示词是派生历史中的 `system/message` surface 节点。
-- `purpose?: 'compaction' | 'session-title'` 标识特殊用途调用。
+- `purpose` 由 `@deepseek-ai/dsh-llm/types` 的可声明合并接口 `LlmRequestPurposeMap` 派生：共享包不再内置 `compaction` / `session-title`，构造辅助请求前须导入生产方包（如 `@deepseek-ai/dsh-compaction-basic`、`@deepseek-ai/dsh-session-title-llm`）或在本插件的公开类型入口扩展该接口；适配器应把不熟悉的 purpose 当作模型不可见的传输元数据继续处理，不拒绝请求。
 
 ## 事件与官方 API 扩展
 

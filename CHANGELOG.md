@@ -3,6 +3,18 @@
 本仓库遵循 [Keep a Changelog](https://keepachangelog.com/) 与 [Semantic Versioning](https://semver.org/) 规范。
 面向最终用户的核心文档（`README.md`、`SKILL.md`、`references/`）不硬编码小版本号与单测数字；特定运行时版本与上游验证记录独占于本日志。
 
+## [Unreleased]
+
+### 定向复核 (@deepseek-ai@0.2.2-alpha.3) - 2026-11-03
+
+本轮只复核 0.2.2 系列有明确破坏性变更的契约，并修正受影响条目；其余正文仍以 0.6.0 的 0.2.1-rc.4 全量核验为基线，未逐篇重核。复核依据是已安装的 `@deepseek-ai/*@0.2.2-alpha.3` 发布物（含 `dsh-base` 发行配置）与官方 upgrade-guide。
+
+- **Schedule 模型工具契约变更**：`schedule_update` / `schedule_delete` 已移除；工具现为 `schedule_create`、`schedule_list`、`schedule_view`、`schedule_edit`，由 `@deepseek-ai/dsh-tool-schedule` 注册（服务仍是 `@deepseek-ai/dsh-schedule`），创建参数改为 `title` / `prompt` / `rrule` / `target`；
+- **辅助 LLM 请求用途**：`GenerateOptions.purpose` 改由可声明合并的 `LlmRequestPurposeMap` 派生，共享包不再内置 `compaction` / `session-title`；插件需导入生产方类型或自行扩展该接口；
+- **fs-observation-policy 默认关闭**：`dsh-base` 以 `disabled: true` 交付该行，`write` / `edit` 默认不再要求先读；`@deepseek-ai/dsh-tool-fs` 新增 `apply_patch`（`config.applyPatch`，默认 `false`）；
+- **Node.js 基线**：DSH 运行时 `engines.node` 已提升到 `>=24.9.0`，同步修正 CI 与 `engines` 示例中的旧 Node 20/22 建议；
+- **版本中立原则不变**：入口文档不新增写死的小版本横幅，本轮核验基线、变更范围与未复核边界只记录于此。
+
 ## [0.6.0] - 2026-10-27
 
 ### 重大重构 (Breaking Architecture & Universalization)

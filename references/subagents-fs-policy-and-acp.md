@@ -40,6 +40,8 @@
 
 ## 三、文件系统防覆盖观察策略 (fs-observation-policy) 与 ObservedStateGate
 
+> **默认状态提醒（当前版本）**：`dsh-base` 以 `disabled: true` 交付 `fs-observation-policy` 行，默认不启用本策略，`write` / `edit` 不再要求先读；以下机制均为在 profile 的 `cordis.patch.yml` 中显式改回 `disabled: false` 后的行为。`dsh-tool-fs` 的 `apply_patch` 也走同一组 `fs/*-intent` 门禁。
+
 许多开发者在开发自动化写文件工具时，经常遇到模型写入文件被系统拦截报错。**这是 DSH 极具前瞻性的核心安全设计**！
 注意：**并不存在 `stale observation` 这个错误码**，实际拦截分为三个稳定码：`FS_NOT_OBSERVED`（未先 read 就 write/edit）、`FS_STALE_VERSION`（读后文件版本变化，或文件已消失）、`FS_SANDBOX_DENIED`（沙箱围栏拒绝）。
 

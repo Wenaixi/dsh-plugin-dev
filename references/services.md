@@ -78,6 +78,7 @@ DSH 采用微内核架构，没有特权核心，所有核心能力均以 Cordis
 - **机制形态**：**纯事件网关 (Event Gate)**，不注册 `ctx.fsPolicy` 公开服务方法，避免耦合工具注入。
 - **所属包**：`@deepseek-ai/dsh-fs-observation-policy`
 - **职责**：拦截 `fs/*` 事件（如 `fs/write-intent`, `fs/edit-intent`, `fs/observe`），通过进程内 WeakMap 记录调用者的前置观察记录。未读先写抛出 `FS_NOT_OBSERVED`，版本过期抛出 `FS_STALE_VERSION`，确保 Read-Before-Write 铁律落地。
+- **默认状态（当前版本）**：`dsh-base` 发行配置以 `disabled: true` 交付该行，默认不挂载、不拦截；需要恢复先读后写时，在 profile 的 `cordis.patch.yml` 中显式写 `- {id: fs-observation-policy, disabled: false}`。`dsh-tool-fs` 的 `apply_patch` 也走同一组 `fs/*-intent` 门禁。
 
 ### 7. 定时任务系统 (ScheduleService)
 - **挂载属性**：`ctx.schedule`（单数）
@@ -87,7 +88,7 @@ DSH 采用微内核架构，没有特权核心，所有核心能力均以 Cordis
   - `deliveryHistoryDays`：保留交付记录的天数（默认 30）；
   - `deliveryHistoryRecords`：保留交付记录的条数（默认 200）。
 - **投递保证**：交付承诺必须在会话确认 `session/flush` 后提交；冷会话在到期时由宿主自动拉起。
-- **暴露工具**：`schedule_create`, `schedule_list`, `schedule_delete`, `schedule_update`。
+- **暴露工具**：`schedule_create`, `schedule_list`, `schedule_view`, `schedule_edit`（由 `@deepseek-ai/dsh-tool-schedule` 注册；模型工具只暴露 RRULE 与 `target`，原生/Remote 管理 API 仍支持 After/At/Every/Daily/Weekly/Cron timing）。
 
 ### 8. 工作区实体注册表 (WorkspaceRegistry)
 - **挂载属性**：`ctx.workspaceRegistry`（单数）

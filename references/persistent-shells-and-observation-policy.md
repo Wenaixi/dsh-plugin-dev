@@ -127,6 +127,8 @@ function wrapCommand(command: string, marker: ReturnType<typeof markers>): strin
 
 DSH 实现了基于微内核事件监听的强一致文件观察策略守卫 (`@deepseek-ai/dsh-fs-observation-policy`)。
 
+> **当前版本默认关闭**：`dsh-base` 以 `disabled: true` 交付该行，以下机制仅在 profile 的 `cordis.patch.yml` 中显式改回 `disabled: false` 后生效；默认 `write` / `edit` 不要求先读。
+
 ### 1. 核心架构与 ObservedStateGate
 
 该插件不向外暴露多余的公开服务，仅通过纯事件监听器接入文件系统生命周期：
